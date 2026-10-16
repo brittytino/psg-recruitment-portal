@@ -1,0 +1,15 @@
+node_modules/
+build/
+build-worker/
+.react-router/
+.env
+.env.*
+!.env.example
+storage/
+backups/
+playwright-report/
+test-results/
+tests/pdf-regression/output/
+infrastructure/blue-green/state/
+*.log
+.DS_Store

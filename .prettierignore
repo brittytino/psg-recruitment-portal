@@ -1,0 +1,9 @@
+node_modules
+build
+build-worker
+.react-router
+storage
+source-documents
+templates
+prisma/migrations
+package-lock.json
