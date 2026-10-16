@@ -12,7 +12,7 @@ check() { # path expected-status [must-contain]
 }
 check /healthz/live 200 '"ok"'
 check /healthz/ready 200 "\"version\":\"$version\""
-check / 200 "Faculty recruitment"
+check / 200 "Shape the future"
 check /vacancies 200 "Open vacancies"
 check /login 200 "Sign in"
 check /staff 302

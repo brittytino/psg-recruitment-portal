@@ -152,7 +152,7 @@ export default function AdminIndex({ loaderData, actionData }: Route.ComponentPr
           {cycles.map((c) => (
             <li
               key={c.id}
-              className="flex flex-wrap items-center justify-between gap-2 rounded border border-line p-2"
+              className="flex flex-wrap items-center justify-between gap-2 rounded-2xl bg-soft p-3"
             >
               <span>
                 <span className="font-medium">{c.title}</span> ({c.code}) · {formatDateTime(c.opensAt)} –{" "}
@@ -181,7 +181,7 @@ export default function AdminIndex({ loaderData, actionData }: Route.ComponentPr
             </li>
           ))}
         </ul>
-        <Form method="post" className="grid gap-3 rounded border border-line p-3 md:grid-cols-2">
+        <Form method="post" className="grid gap-3 rounded-2xl bg-soft p-4 md:grid-cols-2">
           <CsrfInput />
           <input type="hidden" name="intent" value="cycle" />
           <TextInput label="Cycle code" name="code" required hint="e.g. FAC-2026-27" error={fe?.code?.[0]} />
@@ -206,7 +206,7 @@ export default function AdminIndex({ loaderData, actionData }: Route.ComponentPr
         <h2 id="dep">Departments and disciplines</h2>
         <ul className="space-y-2 text-sm">
           {departments.map((d) => (
-            <li key={d.id} className="rounded border border-line p-2">
+            <li key={d.id} className="rounded-2xl bg-soft p-3">
               <p>
                 <span className="font-medium">{d.name}</span> ({d.code}) · {d._count.vacancies} vacancies
               </p>
@@ -234,7 +234,7 @@ export default function AdminIndex({ loaderData, actionData }: Route.ComponentPr
             </li>
           ))}
         </ul>
-        <Form method="post" className="grid gap-3 rounded border border-line p-3 md:grid-cols-3 md:items-end">
+        <Form method="post" className="grid gap-3 rounded-2xl bg-soft p-4 md:grid-cols-3 md:items-end">
           <CsrfInput />
           <input type="hidden" name="intent" value="department" />
           <TextInput label="Code" name="code" required hint="e.g. CSE" />

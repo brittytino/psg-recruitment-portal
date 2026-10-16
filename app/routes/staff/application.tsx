@@ -248,7 +248,7 @@ export default function StaffApplication({ loaderData, actionData }: Route.Compo
             <h2 id="pdfs">Consolidated PDF versions</h2>
             <ul className="mt-3 space-y-3 text-sm">
               {currentBundles.map((g) => (
-                <li key={g.id} className="rounded border border-line p-3">
+                <li key={g.id} className="rounded-2xl bg-soft p-4">
                   <div className="flex flex-wrap items-center justify-between gap-2">
                     <span>
                       Version {g.version} · requested {formatDateTime(g.createdAt)}
@@ -328,7 +328,7 @@ export default function StaffApplication({ loaderData, actionData }: Route.Compo
               <h2 id="decide">Status decision</h2>
               <div className="mt-3 space-y-4">
                 {transitions.map((t) => (
-                  <Form key={t.to} method="post" className="space-y-2 rounded border border-line p-3">
+                  <Form key={t.to} method="post" className="space-y-2 rounded-2xl bg-soft p-4">
                     <CsrfInput />
                     <input type="hidden" name="intent" value="transition" />
                     <input type="hidden" name="to" value={t.to} />
@@ -406,7 +406,7 @@ export default function StaffApplication({ loaderData, actionData }: Route.Compo
             <ul className="mt-2 space-y-3 text-sm">
               {app.reviews.length === 0 && <li className="text-muted">No reviews recorded.</li>}
               {app.reviews.map((r) => (
-                <li key={r.id} className="rounded border border-line p-2">
+                <li key={r.id} className="rounded-2xl bg-soft p-3">
                   <p className="font-medium">
                     {RECOMMENDATION_LABELS[r.recommendation]}
                     {r.score != null ? ` · score ${r.score}` : ""}

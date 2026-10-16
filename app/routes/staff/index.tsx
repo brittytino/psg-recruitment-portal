@@ -28,7 +28,14 @@ export async function loader({ request, context }: Route.LoaderArgs) {
     dashboardCounts(user, q.cycleId),
     filterOptions(),
   ]);
-  return { list, counts, options, q, canExport: hasPermission(user.grants, "application:export") };
+  return {
+    list,
+    counts,
+    options,
+    q,
+    canExport: hasPermission(user.grants, "application:export"),
+    firstName: user.displayName.split(" ")[0] ?? "",
+  };
 }
 
 const SORTABLE: { key: string; label: string }[] = [
@@ -39,7 +46,7 @@ const SORTABLE: { key: string; label: string }[] = [
 ];
 
 export default function StaffIndex({ loaderData }: Route.ComponentProps) {
-  const { list, counts, options, q, canExport } = loaderData;
+  const { list, counts, options, q, canExport, firstName } = loaderData;
   const [params] = useSearchParams();
   const location = useLocation();
   const nav = useNavigation();
@@ -56,45 +63,82 @@ export default function StaffIndex({ loaderData }: Route.ComponentProps) {
   };
   const ariaSort = (key: string): "ascending" | "descending" | "none" =>
     q.sort.replace(/^-/, "") === key ? (q.sort.startsWith("-") ? "descending" : "ascending") : "none";
-  const tiles: [string, number | null, string][] = [
-    ["Total (non-draft)", counts.total, ""],
-    ["Drafts in progress", counts.drafts, ""],
-    ["Pending screening", counts.pendingScreening, "UNDER_HR_REVIEW"],
-    ["Awaiting department", counts.awaitingDepartment, "UNDER_DEPARTMENT_REVIEW"],
-    ["Clarification requested", counts.clarification, "NEEDS_CLARIFICATION"],
-    ["Shortlisted", counts.shortlisted, "SHORTLISTED"],
-    ["Rejected", counts.rejected, "REJECTED"],
-    ["PDF processing failures", counts.processingFailures, ""],
+  const tiles: [string, number | null, string, string, string][] = [
+    ["Total applications", counts.total, "", "bg-tile-purple", "📊"],
+    ["Drafts in progress", counts.drafts, "", "bg-soft", "📝"],
+    ["Pending screening", counts.pendingScreening, "UNDER_HR_REVIEW", "bg-tile-blue", "🔍"],
+    ["Awaiting department", counts.awaitingDepartment, "UNDER_DEPARTMENT_REVIEW", "bg-tile-orange", "🏛️"],
+    ["Clarification requested", counts.clarification, "NEEDS_CLARIFICATION", "bg-tile-pink", "💬"],
+    ["Shortlisted", counts.shortlisted, "SHORTLISTED", "bg-tile-green", "⭐"],
+    ["Not selected", counts.rejected, "REJECTED", "bg-soft", "📁"],
+    [
+      "PDF failures",
+      counts.processingFailures,
+      "FAILED",
+      counts.processingFailures ? "bg-danger-50" : "bg-soft",
+      "🧯",
+    ],
   ];
   return (
-    <div className="space-y-6">
-      <h1>Applications</h1>
+    <div className="space-y-8">
+      <div className="flex flex-wrap items-end justify-between gap-4">
+        <div>
+          <p className="eyebrow">Recruitment workspace</p>
+          <h1 className="mt-1">Welcome back, {firstName} 👋</h1>
+          <p className="mt-1 text-muted">
+            Every figure below is counted live from submitted applications in your scope.
+          </p>
+        </div>
+        {canExport && (
+          <a href={`/staff/export.csv${location.search}`} className="btn-secondary">
+            ⬇️ Export CSV
+          </a>
+        )}
+      </div>
       <section aria-label="Summary">
-        <ul className="grid grid-cols-2 gap-3 md:grid-cols-4">
+        <ul className="grid grid-cols-2 gap-4 md:grid-cols-4">
           {tiles
             .filter(([, v]) => v !== null)
-            .map(([label, value, status]) => (
-              <li key={label} className="card p-4">
-                <p className="text-xs text-muted">{label}</p>
-                <p className="mt-1 text-2xl font-semibold">
-                  {status ? (
-                    <Link to={withParams({ status, page: 1 })} className="no-underline text-ink">
-                      {value}
-                    </Link>
-                  ) : label.startsWith("PDF") && value ? (
-                    <Link to={withParams({ processing: "FAILED", page: 1 })} className="text-danger">
-                      {value}
+            .map(([label, value, filter, bg, emoji]) => {
+              const to =
+                filter === "FAILED"
+                  ? withParams({ processing: "FAILED", page: 1 })
+                  : filter
+                    ? withParams({ status: filter, page: 1 })
+                    : null;
+              const body = (
+                <>
+                  <span className="flex items-center justify-between text-sm font-medium">
+                    {label}
+                    <span
+                      aria-hidden="true"
+                      className="grid h-8 w-8 place-items-center rounded-xl bg-white/70 text-base"
+                    >
+                      {emoji}
+                    </span>
+                  </span>
+                  <span className="mt-2 block text-3xl font-bold">{value}</span>
+                </>
+              );
+              return (
+                <li key={label}>
+                  {to ? (
+                    <Link
+                      to={to}
+                      className={`stat-tile block no-underline text-ink transition-transform hover:-translate-y-0.5 ${bg}`}
+                    >
+                      {body}
                     </Link>
                   ) : (
-                    value
+                    <div className={`stat-tile ${bg}`}>{body}</div>
                   )}
-                </p>
-              </li>
-            ))}
+                </li>
+              );
+            })}
         </ul>
       </section>
 
-      <Form method="get" className="card grid gap-3 md:grid-cols-4" aria-label="Filter applications">
+      <Form method="get" className="card grid gap-4 md:grid-cols-4" aria-label="Filter applications">
         <div className="md:col-span-2">
           <label htmlFor="q" className="block text-sm font-medium">
             Search
@@ -173,15 +217,10 @@ export default function StaffIndex({ loaderData }: Route.ComponentProps) {
           <Link to="/staff" className="btn-secondary">
             Clear
           </Link>
-          {canExport && (
-            <a href={`/staff/export.csv${location.search}`} className="btn-secondary">
-              Export CSV
-            </a>
-          )}
         </div>
       </Form>
 
-      <section aria-labelledby="results" className="card overflow-x-auto p-0">
+      <section aria-labelledby="results" className="card overflow-x-auto p-2">
         <div className="flex flex-wrap items-center justify-between gap-2 p-4">
           <h2 id="results" className="text-base">
             <span role="status">
@@ -238,6 +277,7 @@ export default function StaffIndex({ loaderData }: Route.ComponentProps) {
                   <td>
                     <Link
                       to={`/staff/applications/${r.id}`}
+                      className="whitespace-nowrap font-semibold"
                       state={{ back: location.pathname + location.search }}
                     >
                       {r.referenceNo}

@@ -1,47 +1,79 @@
 @import "tailwindcss";
+@import "@fontsource-variable/plus-jakarta-sans/wght.css";
 
-/* Design tokens: restrained institutional palette, WCAG 2.2 AA contrast on white. */
+/*
+ * Design tokens. Soft, premium neutral UI with a pink–lavender accent gradient, dark pill
+ * actions and pastel stat tiles. Text colours keep ≥ 4.5:1 contrast (most ≥ 7:1) on their
+ * backgrounds (WCAG 2.2 AA).
+ */
 @theme {
-  --font-sans: "Segoe UI", system-ui, -apple-system, "Noto Sans", "Liberation Sans", Arial, sans-serif;
-  --color-brand-50: #eef4fb;
-  --color-brand-100: #d5e3f4;
-  --color-brand-600: #1d4f91; /* 8.1:1 on white */
-  --color-brand-700: #173f74;
-  --color-brand-800: #112f57;
-  --color-ink: #1b1f24;
-  --color-muted: #4b5563; /* 7.5:1 */
-  --color-line: #c9d1db;
-  --color-danger: #a61b1b; /* 7.3:1 */
-  --color-danger-50: #fdf0f0;
-  --color-success: #17643a; /* 7.0:1 */
-  --color-success-50: #edf7f1;
-  --color-warning: #7a4a00; /* 7.6:1 */
-  --color-warning-50: #fff6e5;
+  --font-sans:
+    "Plus Jakarta Sans Variable", "Segoe UI", system-ui, -apple-system, sans-serif, "Apple Color Emoji",
+    "Segoe UI Emoji", "Noto Color Emoji";
+  --color-ink: #121316;
+  --color-muted: #5b5f6b; /* 6.4:1 on white */
+  --color-line: #e7e7ec;
+  --color-canvas: #f6f5f8;
+  --color-soft: #f3f2f6;
+  --color-brand-50: #fdf2f8;
+  --color-brand-100: #fce7f3;
+  --color-brand-600: #b4236b; /* 6.3:1 on white */
+  --color-brand-700: #95185a;
+  --color-brand-800: #74124a;
+  --color-danger: #b42318;
+  --color-danger-50: #fef3f2;
+  --color-success: #13703e;
+  --color-success-50: #ecfdf3;
+  --color-warning: #8a4b00;
+  --color-warning-50: #fff7e8;
+  --color-tile-green: #c9f2d6;
+  --color-tile-blue: #c4e6f7;
+  --color-tile-orange: #fdd5b4;
+  --color-tile-purple: #d6d4fb;
+  --color-tile-pink: #fbd3e7;
+  --radius-card: 1.5rem;
+  --shadow-soft: 0 1px 2px rgb(18 19 22 / 0.04), 0 8px 24px -12px rgb(18 19 22 / 0.12);
+  --shadow-float: 0 12px 32px -12px rgb(116 18 74 / 0.25);
 }
 
 @layer base {
   html {
     color: var(--color-ink);
-    background: #f6f7f9;
+    background: var(--color-canvas);
   }
   body {
     @apply font-sans antialiased;
+    font-feature-settings: "ss01";
   }
   :focus-visible {
     outline: 3px solid var(--color-brand-600);
     outline-offset: 2px;
+    border-radius: 0.5rem;
   }
   a {
-    @apply text-brand-600 underline underline-offset-2 hover:text-brand-800;
+    @apply text-brand-700 underline decoration-brand-600/40 underline-offset-4 hover:text-brand-800 hover:decoration-brand-600;
   }
   h1 {
-    @apply text-2xl font-semibold tracking-tight;
+    @apply text-3xl font-bold tracking-tight;
   }
   h2 {
-    @apply text-lg font-semibold;
+    @apply text-lg font-semibold tracking-tight;
   }
   dialog::backdrop {
-    background: rgb(17 24 39 / 0.55);
+    background: rgb(18 19 22 / 0.45);
+    backdrop-filter: blur(3px);
+  }
+  progress {
+    @apply appearance-none overflow-hidden rounded-full;
+  }
+  progress::-webkit-progress-bar {
+    background: var(--color-soft);
+  }
+  progress::-webkit-progress-value {
+    background: linear-gradient(90deg, #f472b6, #a78bfa);
+  }
+  progress::-moz-progress-bar {
+    background: linear-gradient(90deg, #f472b6, #a78bfa);
   }
   @media (prefers-reduced-motion: reduce) {
     * {
@@ -52,38 +84,62 @@
 }
 
 @utility btn {
-  @apply inline-flex items-center justify-center gap-2 rounded px-4 py-2 text-sm font-medium no-underline disabled:cursor-not-allowed disabled:opacity-60;
+  @apply inline-flex items-center justify-center gap-2 rounded-full px-5 py-2.5 text-sm font-semibold no-underline transition-colors disabled:cursor-not-allowed disabled:opacity-50;
 }
 
 @layer components {
   .skip-link {
-    @apply sr-only focus:not-sr-only focus:absolute focus:left-2 focus:top-2 focus:z-50 focus:rounded focus:bg-white focus:px-3 focus:py-2;
+    @apply sr-only focus:not-sr-only focus:absolute focus:left-2 focus:top-2 focus:z-50 focus:rounded-full focus:bg-white focus:px-4 focus:py-2;
   }
   .card {
-    @apply rounded-md border border-line bg-white p-5;
+    @apply rounded-[var(--radius-card)] bg-white p-6 shadow-[var(--shadow-soft)];
+  }
+  .card-soft {
+    @apply rounded-[var(--radius-card)] bg-soft p-5;
+  }
+  .hero-gradient {
+    background:
+      radial-gradient(60% 80% at 15% 20%, #fbcfe8 0%, transparent 60%),
+      radial-gradient(50% 70% at 85% 30%, #ddd6fe 0%, transparent 60%),
+      radial-gradient(60% 80% at 50% 100%, #fecdd3 0%, transparent 60%), #fdf4fa;
+  }
+  .chip {
+    @apply inline-flex items-center gap-1.5 rounded-full border border-line bg-white px-3 py-1 text-xs font-medium text-ink;
+  }
+  .float-card {
+    @apply rounded-2xl bg-white/90 p-3 shadow-[var(--shadow-float)] backdrop-blur;
+  }
+  .stat-tile {
+    @apply rounded-2xl p-4 text-ink;
   }
   .field-input {
-    @apply block w-full rounded border border-line bg-white px-3 py-2 text-sm text-ink placeholder:text-muted focus-visible:border-brand-600 aria-[invalid=true]:border-danger;
+    @apply block w-full rounded-xl border border-transparent bg-soft px-4 py-2.5 text-sm text-ink transition-colors placeholder:text-muted hover:border-line focus-visible:border-brand-600 focus-visible:bg-white aria-[invalid=true]:border-danger aria-[invalid=true]:bg-danger-50;
   }
   .btn-primary {
-    @apply btn bg-brand-600 text-white hover:bg-brand-700 hover:text-white;
+    @apply btn bg-ink text-white hover:bg-black hover:text-white;
   }
   .btn-secondary {
-    @apply btn border border-line bg-white text-ink hover:bg-brand-50 hover:text-ink;
+    @apply btn border border-line bg-white text-ink hover:bg-soft hover:text-ink;
   }
   .btn-danger {
-    @apply btn bg-danger text-white hover:bg-red-900 hover:text-white;
+    @apply btn bg-danger text-white hover:bg-red-800 hover:text-white;
   }
   .btn-link {
-    @apply btn px-0 text-brand-600 underline hover:text-brand-800;
+    @apply btn px-0 text-brand-700 underline hover:text-brand-800;
   }
   .table {
-    @apply w-full border-collapse text-left text-sm;
+    @apply w-full border-separate border-spacing-0 text-left text-sm;
   }
   .table th {
-    @apply border-b border-line bg-brand-50 px-3 py-2 font-semibold text-ink;
+    @apply border-b border-line bg-soft px-4 py-3 text-xs font-semibold uppercase tracking-wide text-muted first:rounded-l-xl last:rounded-r-xl;
   }
   .table td {
-    @apply border-b border-line px-3 py-2 align-top;
+    @apply border-b border-line px-4 py-3 align-top;
+  }
+  .table tbody tr:hover td {
+    @apply bg-brand-50/40;
+  }
+  .eyebrow {
+    @apply text-xs font-semibold uppercase tracking-[0.14em] text-brand-700;
   }
 }

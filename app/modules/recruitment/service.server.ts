@@ -30,7 +30,9 @@ function uniqueViolation(e: unknown, message: string): never {
 // ------------------------------------------------------------------------------------------------
 // Public queries
 // ------------------------------------------------------------------------------------------------
-export async function listPublishedVacancies(filter: { departmentId?: string; position?: string } = {}) {
+export async function listPublishedVacancies(
+  filter: { departmentId?: string; position?: string; q?: string } = {},
+) {
   const now = new Date();
   return prisma.vacancy.findMany({
     where: {
@@ -40,6 +42,16 @@ export async function listPublishedVacancies(filter: { departmentId?: string; po
       opensAt: { lte: now },
       ...(filter.departmentId ? { departmentId: filter.departmentId } : {}),
       ...(filter.position ? { position: filter.position as never } : {}),
+      ...(filter.q
+        ? {
+            OR: [
+              { title: { contains: filter.q, mode: "insensitive" as const } },
+              { code: { contains: filter.q, mode: "insensitive" as const } },
+              { department: { name: { contains: filter.q, mode: "insensitive" as const } } },
+              { discipline: { name: { contains: filter.q, mode: "insensitive" as const } } },
+            ],
+          }
+        : {}),
     },
     include: { department: true, discipline: true, cycle: true },
     orderBy: [{ closesAt: "asc" }, { title: "asc" }],

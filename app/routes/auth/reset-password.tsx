@@ -1,4 +1,5 @@
 import { Form, Link, redirect, useNavigation, useSearchParams } from "react-router";
+import { AuthShell } from "~/components/auth-shell";
 import type { Route } from "./+types/reset-password";
 import { Alert, CsrfInput, errorFor, TextInput } from "~/components/forms";
 import { clientIp, handleAction, readForm } from "~/lib/http.server";
@@ -23,39 +24,41 @@ export default function ResetPassword({ actionData }: Route.ComponentProps) {
   const [params] = useSearchParams();
   const fe = actionData && "fieldErrors" in actionData ? actionData.fieldErrors : undefined;
   return (
-    <div className="mx-auto max-w-md">
-      <h1>Choose a new password</h1>
-      <Form method="post" className="card mt-6 space-y-4">
-        <CsrfInput />
-        <input type="hidden" name="token" value={params.get("token") ?? ""} />
-        {actionData && "formError" in actionData && actionData.formError && (
-          <Alert tone="danger">{actionData.formError}</Alert>
-        )}
-        <TextInput
-          label="New password"
-          name="password"
-          type="password"
-          required
-          autoComplete="new-password"
-          hint="At least 10 characters."
-          error={errorFor(fe, "password")}
-        />
-        <TextInput
-          label="Confirm new password"
-          name="confirmPassword"
-          type="password"
-          required
-          autoComplete="new-password"
-          error={errorFor(fe, "confirmPassword")}
-        />
-        <button type="submit" className="btn-primary w-full" disabled={nav.state !== "idle"}>
-          Set new password
-        </button>
-        <p className="text-sm text-muted">All your other signed-in sessions will be signed out.</p>
-      </Form>
-      <p className="mt-4 text-sm">
-        <Link to="/forgot-password">Request a new link</Link>
-      </p>
-    </div>
+    <AuthShell>
+      <div>
+        <h1>Choose a new password 🔐</h1>
+        <Form method="post" className="mt-8 space-y-4">
+          <CsrfInput />
+          <input type="hidden" name="token" value={params.get("token") ?? ""} />
+          {actionData && "formError" in actionData && actionData.formError && (
+            <Alert tone="danger">{actionData.formError}</Alert>
+          )}
+          <TextInput
+            label="New password"
+            name="password"
+            type="password"
+            required
+            autoComplete="new-password"
+            hint="At least 10 characters."
+            error={errorFor(fe, "password")}
+          />
+          <TextInput
+            label="Confirm new password"
+            name="confirmPassword"
+            type="password"
+            required
+            autoComplete="new-password"
+            error={errorFor(fe, "confirmPassword")}
+          />
+          <button type="submit" className="btn-primary w-full" disabled={nav.state !== "idle"}>
+            Set new password
+          </button>
+          <p className="text-sm text-muted">All your other signed-in sessions will be signed out.</p>
+        </Form>
+        <p className="mt-4 text-sm">
+          <Link to="/forgot-password">Request a new link</Link>
+        </p>
+      </div>
+    </AuthShell>
   );
 }

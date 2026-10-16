@@ -152,10 +152,7 @@ export default function Users({ loaderData, actionData }: Route.ComponentProps) 
             </div>
             <ul className="flex flex-wrap gap-2">
               {u.roles.map((r) => (
-                <li
-                  key={r.id}
-                  className="flex items-center gap-1 rounded border border-line px-2 py-1 text-sm"
-                >
+                <li key={r.id} className="flex items-center gap-1 rounded-full bg-soft px-3 py-1 text-sm">
                   {ROLE_LABELS[r.role as RoleName]}
                   {r.department ? ` — ${r.department.name}` : ""}
                   {r.role === "HR_OFFICER" ? ` — ${r.cycle?.title ?? "all cycles"}` : ""}

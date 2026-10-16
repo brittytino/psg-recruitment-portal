@@ -125,7 +125,7 @@ export function ScalarInput({
       input = (
         <p
           id={id}
-          className="rounded border border-dashed border-line bg-brand-50 px-3 py-2 text-sm"
+          className="rounded-xl border border-dashed border-brand-600/30 bg-brand-50 px-4 py-2.5 text-sm"
           aria-describedby={describedBy}
         >
           {str || "Calculated automatically"}
@@ -247,7 +247,7 @@ function RemoveButton({ label, onConfirm }: { label: string; onConfirm: () => vo
       <dialog
         ref={ref}
         aria-labelledby={titleId}
-        className="m-auto w-full max-w-md rounded-md border border-line p-0"
+        className="m-auto w-full max-w-md rounded-3xl border-0 p-0 shadow-2xl"
       >
         <div className="p-6">
           <h2 id={titleId}>Remove {label}?</h2>
@@ -297,7 +297,7 @@ function TableEditor({
     onChange(next);
   };
   return (
-    <fieldset className="space-y-3 rounded border border-line p-4" aria-labelledby={headingId}>
+    <fieldset className="space-y-3 rounded-2xl bg-soft p-5" aria-labelledby={headingId}>
       <legend id={headingId} className="px-1 text-base font-semibold">
         {field.label}
         {field.requirement === "required" && (
@@ -321,7 +321,7 @@ function TableEditor({
       {rows.length === 0 && <p className="text-sm text-muted">No entries yet.</p>}
       <ol className="space-y-4">
         {rows.map((row, i) => (
-          <li key={i} className="rounded border border-line bg-white p-3">
+          <li key={i} className="rounded-2xl bg-white p-4 shadow-[var(--shadow-soft)]">
             <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
               <p className="text-sm font-semibold">Entry {i + 1}</p>
               <div className="flex gap-2">
@@ -382,7 +382,7 @@ function ListEditor({
 }) {
   const headingId = `l-${field.key}`;
   return (
-    <fieldset className="space-y-3 rounded border border-line p-4" aria-labelledby={headingId}>
+    <fieldset className="space-y-3 rounded-2xl bg-soft p-5" aria-labelledby={headingId}>
       <legend id={headingId} className="px-1 text-base font-semibold">
         {field.label}
       </legend>

@@ -74,28 +74,52 @@ export function Layout({ children }: { children: React.ReactNode }) {
   );
 }
 
+function Logo() {
+  return (
+    <Link
+      to="/"
+      className="flex items-center gap-2.5 no-underline text-ink"
+      aria-label="PSG Tech Careers — home"
+    >
+      <span
+        aria-hidden="true"
+        className="grid h-9 w-9 place-items-center rounded-xl bg-gradient-to-br from-pink-400 to-violet-400 text-lg shadow-[var(--shadow-float)]"
+      >
+        🌸
+      </span>
+      <span className="flex flex-col leading-tight">
+        <span className="text-base font-bold tracking-tight">PSG Tech Careers</span>
+        <span className="text-[11px] font-medium text-muted">Staff Recruitment · Coimbatore</span>
+      </span>
+    </Link>
+  );
+}
+
 function Header() {
   const root = useRouteLoaderData<typeof loader>("root");
   const user = root?.user;
   const grants = user?.grants ?? [];
   const nav =
-    "rounded px-2 py-1 text-sm no-underline text-ink hover:bg-brand-50 aria-[current=page]:font-semibold aria-[current=page]:text-brand-700";
+    "rounded-full px-3 py-1.5 text-sm font-medium no-underline text-muted hover:bg-soft hover:text-ink aria-[current=page]:bg-ink aria-[current=page]:text-white";
+  const initials = (user?.displayName ?? "")
+    .split(/\s+/)
+    .map((p) => p[0])
+    .join("")
+    .slice(0, 2)
+    .toUpperCase();
   return (
-    <header className="border-b border-line bg-white">
+    <header className="sticky top-0 z-40 px-4 pt-4">
       <a href="#main" className="skip-link">
         Skip to main content
       </a>
-      <div className="mx-auto flex max-w-6xl flex-wrap items-center justify-between gap-3 px-4 py-3">
-        <Link to="/" className="flex flex-col no-underline text-ink">
-          <span className="text-base font-semibold">PSG College of Technology</span>
-          <span className="text-xs text-muted">Staff Recruitment Portal · Coimbatore</span>
-        </Link>
+      <div className="mx-auto flex max-w-6xl flex-wrap items-center justify-between gap-3 rounded-full bg-white/85 px-4 py-2.5 shadow-[var(--shadow-soft)] backdrop-blur">
+        <Logo />
         <nav aria-label="Main" className="flex flex-wrap items-center gap-1">
           <NavLink to="/vacancies" className={nav}>
-            Vacancies
+            Find a job
           </NavLink>
           <NavLink to="/help" className={nav}>
-            Help &amp; FAQ
+            How it works
           </NavLink>
           {user && grants.some((g) => g.role === "CANDIDATE") && (
             <NavLink to="/account" className={nav}>
@@ -103,12 +127,12 @@ function Header() {
             </NavLink>
           )}
           {user && hasPermission(grants, "application:list") && (
-            <NavLink to="/staff" className={nav}>
-              Applications
+            <NavLink to="/staff" end className={nav}>
+              Dashboard
             </NavLink>
           )}
           {user && hasPermission(grants, "recruitment:manage") && (
-            <NavLink to="/admin" className={nav}>
+            <NavLink to="/admin" end className={nav}>
               Administration
             </NavLink>
           )}
@@ -122,28 +146,38 @@ function Header() {
               Audit log
             </NavLink>
           )}
+        </nav>
+        <div className="flex items-center gap-2">
           {user ? (
-            <form method="post" action="/logout" className="ml-2 flex items-center gap-2">
+            <form method="post" action="/logout" className="flex items-center gap-2">
               <CsrfInput />
-              <span className="hidden text-sm text-muted sm:inline">
-                {user.displayName}
-                {isStaff(grants) ? " (staff)" : ""}
+              <span className="hidden items-center gap-2 sm:flex">
+                <span
+                  aria-hidden="true"
+                  className="grid h-9 w-9 place-items-center rounded-full bg-gradient-to-br from-pink-200 to-violet-200 text-xs font-bold"
+                >
+                  {initials || "🙂"}
+                </span>
+                <span className="flex flex-col leading-tight">
+                  <span className="text-sm font-semibold">{user.displayName}</span>
+                  <span className="text-[11px] text-muted">{isStaff(grants) ? "Staff" : "Candidate"}</span>
+                </span>
               </span>
-              <button type="submit" className="btn-secondary py-1">
+              <button type="submit" className="btn-secondary px-4 py-2">
                 Sign out
               </button>
             </form>
           ) : (
             <>
-              <NavLink to="/login" className={nav}>
-                Sign in
-              </NavLink>
-              <Link to="/register" className="btn-primary ml-1 py-1">
-                Register
+              <Link to="/login" className="btn px-4 py-2 text-ink hover:bg-soft">
+                Login
+              </Link>
+              <Link to="/register" className="btn-primary px-4 py-2">
+                Sign up
               </Link>
             </>
           )}
-        </nav>
+        </div>
       </div>
     </header>
   );
@@ -151,13 +185,43 @@ function Header() {
 
 function Footer() {
   return (
-    <footer className="mt-12 border-t border-line bg-white">
-      <div className="mx-auto flex max-w-6xl flex-wrap justify-between gap-2 px-4 py-6 text-sm text-muted">
-        <p>PSG College of Technology, Peelamedu, Coimbatore – 641 004</p>
-        <p className="flex gap-4">
-          <Link to="/privacy">Privacy notice</Link>
-          <Link to="/help#contact">Contact</Link>
-        </p>
+    <footer className="mt-16 px-4 pb-6">
+      <div className="mx-auto grid max-w-6xl gap-8 rounded-[var(--radius-card)] bg-white p-8 shadow-[var(--shadow-soft)] sm:grid-cols-[2fr_1fr_1fr]">
+        <div className="space-y-3">
+          <Logo />
+          <p className="max-w-sm text-sm text-muted">
+            Faculty recruitment for PSG College of Technology, Peelamedu, Coimbatore – 641 004. Autonomous,
+            affiliated to Anna University, ISO 9001:2015 certified.
+          </p>
+        </div>
+        <div>
+          <h2 className="text-sm">Candidates</h2>
+          <ul className="mt-3 space-y-2 text-sm">
+            <li>
+              <Link to="/vacancies">Open vacancies</Link>
+            </li>
+            <li>
+              <Link to="/register">Create an account</Link>
+            </li>
+            <li>
+              <Link to="/help">Help &amp; FAQ</Link>
+            </li>
+          </ul>
+        </div>
+        <div>
+          <h2 className="text-sm">Institution</h2>
+          <ul className="mt-3 space-y-2 text-sm">
+            <li>
+              <Link to="/privacy">Privacy notice</Link>
+            </li>
+            <li>
+              <Link to="/help#contact">Contact</Link>
+            </li>
+            <li>
+              <Link to="/login">Staff sign in</Link>
+            </li>
+          </ul>
+        </div>
       </div>
     </footer>
   );
@@ -177,26 +241,36 @@ export default function App() {
 
 export function ErrorBoundary({ error }: Route.ErrorBoundaryProps) {
   let title = "Something went wrong";
+  let emoji = "😕";
   let detail =
     "An unexpected error occurred. Please try again. If the problem continues, contact the recruitment office.";
   if (isRouteErrorResponse(error)) {
     if (error.status === 404) {
       title = "Page not found";
+      emoji = "🧭";
       detail = "The page you requested does not exist or you do not have access to it.";
     } else if (error.status === 403) {
       title = "Access denied";
+      emoji = "🔒";
       detail = typeof error.data === "string" ? error.data : "You do not have permission to view this page.";
     } else if (typeof error.data === "string") detail = error.data;
   }
   return (
     <>
       <Header />
-      <main id="main" className="mx-auto max-w-3xl px-4 py-16">
-        <h1>{title}</h1>
-        <p className="mt-3 text-muted">{detail}</p>
-        <p className="mt-6">
-          <Link to="/">Return to the home page</Link>
-        </p>
+      <main id="main" className="mx-auto max-w-2xl px-4 py-16">
+        <div className="card hero-gradient text-center">
+          <p aria-hidden="true" className="text-5xl">
+            {emoji}
+          </p>
+          <h1 className="mt-4">{title}</h1>
+          <p className="mt-3 text-muted">{detail}</p>
+          <p className="mt-6">
+            <Link to="/" className="btn-primary">
+              Back to home
+            </Link>
+          </p>
+        </div>
       </main>
     </>
   );

@@ -12,8 +12,8 @@ async function signIn(page: Page, email: string) {
 
 test("public pages render with vacancies and accessible landmarks", async ({ page }) => {
   await page.goto("/");
-  await expect(page.getByRole("heading", { level: 1 })).toContainText("Faculty recruitment");
-  await page.getByRole("link", { name: /View open vacancies/ }).click();
+  await expect(page.getByRole("heading", { level: 1 })).toContainText("Shape the future");
+  await page.getByRole("link", { name: /View all vacancies/ }).click();
   await expect(page.getByRole("link", { name: /\(demo\)/ }).first()).toBeVisible();
   await expect(page.getByRole("main")).toBeVisible();
 });
@@ -35,9 +35,9 @@ test("candidate starts an application, edits a section and saves the draft", asy
   await signIn(page, "candidate@example.test");
   await expect(page).toHaveURL(/\/account/);
   await page.goto("/vacancies/DEMO-CSE-AP");
-  const start = page.getByRole("button", { name: "Start application" });
+  const start = page.getByRole("button", { name: /Apply now/ });
   if (await start.isVisible()) await start.click();
-  else await page.getByRole("link", { name: "Continue your application" }).click();
+  else await page.getByRole("link", { name: /Continue application/ }).click();
   await expect(page.getByRole("navigation", { name: "Application sections" })).toBeVisible();
   await page.getByRole("link", { name: /Personal details/ }).click();
   await page.getByLabel(/^Name \(in block letters\)/).fill("e2e candidate");
@@ -52,7 +52,7 @@ test("candidate starts an application, edits a section and saves the draft", asy
 test("HR officer sees the application workspace; candidate cannot", async ({ page, browser }) => {
   await signIn(page, "hr@example.test");
   await expect(page).toHaveURL(/\/staff/);
-  await expect(page.getByRole("heading", { name: "Applications" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: /Welcome back/ })).toBeVisible();
   await expect(page.getByText("Drafts in progress")).toBeVisible();
   const ctx = await browser.newContext();
   const cand = await ctx.newPage();

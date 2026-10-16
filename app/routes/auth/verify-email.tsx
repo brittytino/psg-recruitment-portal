@@ -1,4 +1,5 @@
 import { Link } from "react-router";
+import { AuthShell } from "~/components/auth-shell";
 import type { Route } from "./+types/verify-email";
 import { Alert } from "~/components/forms";
 import { verifyEmail } from "~/modules/auth/account.server";
@@ -12,20 +13,22 @@ export async function loader({ request }: Route.LoaderArgs) {
 
 export default function VerifyEmail({ loaderData }: Route.ComponentProps) {
   return (
-    <div className="mx-auto max-w-lg space-y-4">
-      <h1>E-mail verification</h1>
-      {loaderData.ok ? (
-        <Alert tone="success" title="Your e-mail address is verified">
-          You can now sign in and start your application.
-        </Alert>
-      ) : (
-        <Alert tone="danger" title="This link is invalid or has expired">
-          Sign in and request a new verification e-mail from your account page.
-        </Alert>
-      )}
-      <p>
-        <Link to="/login">Go to sign in</Link>
-      </p>
-    </div>
+    <AuthShell>
+      <div className="space-y-4">
+        <h1>E-mail verification 📧</h1>
+        {loaderData.ok ? (
+          <Alert tone="success" title="Your e-mail address is verified">
+            You can now sign in and start your application.
+          </Alert>
+        ) : (
+          <Alert tone="danger" title="This link is invalid or has expired">
+            Sign in and request a new verification e-mail from your account page.
+          </Alert>
+        )}
+        <p>
+          <Link to="/login">Go to sign in</Link>
+        </p>
+      </div>
+    </AuthShell>
   );
 }

@@ -127,7 +127,7 @@ export function ErrorSummary({
       tabIndex={-1}
       role="alert"
       aria-labelledby="error-summary-title"
-      className="mb-6 rounded border-2 border-danger bg-danger-50 p-4"
+      className="mb-6 rounded-2xl bg-danger-50 p-5 ring-1 ring-red-200"
     >
       <h2 id="error-summary-title" className="text-base font-semibold text-danger">
         {title}
@@ -151,19 +151,28 @@ export function Alert({
   children: ReactNode;
 }) {
   const styles = {
-    info: "border-brand-600 bg-brand-50",
-    success: "border-success bg-success-50",
-    warning: "border-warning bg-warning-50",
-    danger: "border-danger bg-danger-50",
+    info: "bg-brand-50 ring-brand-100",
+    success: "bg-success-50 ring-green-200",
+    warning: "bg-warning-50 ring-amber-200",
+    danger: "bg-danger-50 ring-red-200",
   }[tone];
   const label = { info: "Information", success: "Success", warning: "Warning", danger: "Error" }[tone];
+  const icon = { info: "💡", success: "✅", warning: "⚠️", danger: "⛔" }[tone];
   return (
-    <div role={tone === "danger" ? "alert" : "status"} className={`rounded border-l-4 p-4 text-sm ${styles}`}>
-      <p className="font-semibold">
-        <span className="sr-only">{label}: </span>
-        {title ?? label}
-      </p>
-      <div className="mt-1">{children}</div>
+    <div
+      role={tone === "danger" ? "alert" : "status"}
+      className={`flex gap-3 rounded-2xl p-4 text-sm ring-1 ${styles}`}
+    >
+      <span aria-hidden="true" className="text-lg leading-5">
+        {icon}
+      </span>
+      <div className="min-w-0 flex-1">
+        <p className="font-semibold">
+          <span className="sr-only">{label}: </span>
+          {title ?? label}
+        </p>
+        <div className="mt-1">{children}</div>
+      </div>
     </div>
   );
 }
@@ -177,14 +186,16 @@ export function Badge({
   tone?: "neutral" | "info" | "success" | "warning" | "danger";
 }) {
   const styles = {
-    neutral: "border-line bg-white text-ink",
-    info: "border-brand-600 bg-brand-50 text-brand-800",
-    success: "border-success bg-success-50 text-success",
-    warning: "border-warning bg-warning-50 text-warning",
-    danger: "border-danger bg-danger-50 text-danger",
+    neutral: "bg-soft text-ink before:bg-muted",
+    info: "bg-tile-purple/60 text-ink before:bg-violet-600",
+    success: "bg-success-50 text-success before:bg-success",
+    warning: "bg-warning-50 text-warning before:bg-amber-500",
+    danger: "bg-danger-50 text-danger before:bg-danger",
   }[tone];
   return (
-    <span className={`inline-flex items-center rounded border px-2 py-0.5 text-xs font-medium ${styles}`}>
+    <span
+      className={`inline-flex items-center gap-1.5 whitespace-nowrap rounded-full px-2.5 py-1 text-xs font-semibold before:h-1.5 before:w-1.5 before:rounded-full before:content-[""] ${styles}`}
+    >
       {children}
     </span>
   );
@@ -235,7 +246,7 @@ export function ConfirmDialog({
       <dialog
         ref={ref}
         aria-labelledby={titleId}
-        className="m-auto w-full max-w-lg rounded-md border border-line p-0"
+        className="m-auto w-full max-w-lg rounded-3xl border-0 p-0 shadow-2xl"
       >
         <div className="p-6">
           <h2 id={titleId}>{title}</h2>

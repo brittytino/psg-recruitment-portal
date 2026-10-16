@@ -1,4 +1,5 @@
 import { Form, Link, redirect, useNavigation, useSearchParams } from "react-router";
+import { AuthShell } from "~/components/auth-shell";
 import type { Route } from "./+types/login";
 import { Alert, CsrfInput, TextInput } from "~/components/forms";
 import { clientIp, handleAction, readForm, safeNext } from "~/lib/http.server";
@@ -45,32 +46,34 @@ export default function Login({ actionData }: Route.ComponentProps) {
   const nav = useNavigation();
   const [params] = useSearchParams();
   return (
-    <div className="mx-auto max-w-md">
-      <h1>Sign in</h1>
-      <p className="mt-2 text-sm text-muted">
-        New candidate? <Link to="/register">Create an account</Link>
-      </p>
-      <Form method="post" className="card mt-6 space-y-4">
-        <CsrfInput />
-        <input type="hidden" name="next" value={params.get("next") ?? ""} />
-        {actionData && "formError" in actionData && actionData.formError && (
-          <Alert tone="danger">{actionData.formError}</Alert>
-        )}
-        <TextInput label="E-mail address" name="email" type="email" required autoComplete="username" />
-        <TextInput
-          label="Password"
-          name="password"
-          type="password"
-          required
-          autoComplete="current-password"
-        />
-        <button type="submit" className="btn-primary w-full" disabled={nav.state !== "idle"}>
-          {nav.state !== "idle" ? "Signing in…" : "Sign in"}
-        </button>
-        <p className="text-sm">
-          <Link to="/forgot-password">Forgot your password?</Link>
+    <AuthShell>
+      <div>
+        <h1>Sign in 👋</h1>
+        <p className="mt-2 text-sm text-muted">
+          New candidate? <Link to="/register">Create an account</Link>
         </p>
-      </Form>
-    </div>
+        <Form method="post" className="mt-8 space-y-4">
+          <CsrfInput />
+          <input type="hidden" name="next" value={params.get("next") ?? ""} />
+          {actionData && "formError" in actionData && actionData.formError && (
+            <Alert tone="danger">{actionData.formError}</Alert>
+          )}
+          <TextInput label="E-mail address" name="email" type="email" required autoComplete="username" />
+          <TextInput
+            label="Password"
+            name="password"
+            type="password"
+            required
+            autoComplete="current-password"
+          />
+          <button type="submit" className="btn-primary w-full" disabled={nav.state !== "idle"}>
+            {nav.state !== "idle" ? "Signing in…" : "Sign in"}
+          </button>
+          <p className="text-sm">
+            <Link to="/forgot-password">Forgot your password?</Link>
+          </p>
+        </Form>
+      </div>
+    </AuthShell>
   );
 }

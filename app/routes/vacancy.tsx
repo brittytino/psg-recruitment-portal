@@ -1,13 +1,14 @@
 import { Form, Link } from "react-router";
 import type { Route } from "./+types/vacancy";
-import { Alert, CsrfInput, formatDateTime } from "~/components/forms";
+import { Alert, CsrfInput, formatDate } from "~/components/forms";
+import { daysLeft } from "~/components/vacancy-card";
 import { FORM_LABELS, POSITION_LABELS } from "~/lib/labels";
 import { userContext } from "~/context";
 import { getPublishedVacancy } from "~/modules/recruitment/service.server";
 import { prisma } from "~/modules/core/db.server";
 
 export const meta: Route.MetaFunction = ({ data }) => [
-  { title: data ? `${data.vacancy.title} — PSG Tech Recruitment` : "Vacancy" },
+  { title: data ? `${data.vacancy.title} — PSG Tech Careers` : "Vacancy" },
 ];
 
 export async function loader({ params, context }: Route.LoaderArgs) {
@@ -27,115 +28,153 @@ export async function loader({ params, context }: Route.LoaderArgs) {
 
 export default function Vacancy({ loaderData }: Route.ComponentProps) {
   const { vacancy: v, open, signedIn, isCandidate, verified, existing } = loaderData;
+  const days = daysLeft(v.closesAt);
+  const tiles: [string, string, string, string][] = [
+    ["bg-tile-green", "Position", POSITION_LABELS[v.position] ?? v.position, "🎓"],
+    ["bg-tile-blue", "Number of posts", v.numberOfPosts ? String(v.numberOfPosts) : "Not specified", "👥"],
+    ["bg-tile-orange", "Closes", formatDate(v.closesAt), "⏳"],
+    ["bg-tile-purple", "Time left", open ? `${days} day${days === 1 ? "" : "s"}` : "Closed", "🗓️"],
+  ];
   return (
     <article className="space-y-6">
       <nav aria-label="Breadcrumb" className="text-sm">
-        <Link to="/vacancies">Vacancies</Link> <span aria-hidden="true">/</span> <span>{v.code}</span>
+        <Link to="/vacancies">Vacancies</Link> <span aria-hidden="true">›</span>{" "}
+        <span className="text-muted">{v.code}</span>
       </nav>
-      <header className="card">
-        <p className="text-xs uppercase tracking-wide text-muted">
-          {v.department.name}
-          {v.discipline ? ` · ${v.discipline.name}` : ""}
-        </p>
-        <h1 className="mt-1">{v.title}</h1>
-        <dl className="mt-4 grid gap-3 text-sm sm:grid-cols-2 lg:grid-cols-4">
-          <div>
-            <dt className="text-muted">Position</dt>
-            <dd className="font-medium">{POSITION_LABELS[v.position]}</dd>
-          </div>
-          <div>
-            <dt className="text-muted">Number of posts</dt>
-            <dd className="font-medium">{v.numberOfPosts ?? "Not specified"}</dd>
-          </div>
-          <div>
-            <dt className="text-muted">Opens</dt>
-            <dd className="font-medium">{formatDateTime(v.opensAt)}</dd>
-          </div>
-          <div>
-            <dt className="text-muted">Closes</dt>
-            <dd className="font-medium">{formatDateTime(v.closesAt)}</dd>
-          </div>
-        </dl>
-      </header>
+      <div className="grid gap-6 lg:grid-cols-[1fr_20rem]">
+        <div className="space-y-6">
+          <header className="card">
+            <div className="flex items-start gap-4">
+              <span
+                aria-hidden="true"
+                className="grid h-14 w-14 shrink-0 place-items-center rounded-2xl bg-gradient-to-br from-pink-200 to-violet-200 text-3xl"
+              >
+                🏛️
+              </span>
+              <div>
+                <p className="text-sm font-medium text-muted">
+                  {v.department.name}
+                  {v.discipline ? ` · ${v.discipline.name}` : ""}
+                </p>
+                <h1 className="mt-1 text-2xl">{v.title}</h1>
+                <p className="mt-1 text-xs text-muted">
+                  Ref. {v.code} · {v.cycle.title}
+                </p>
+              </div>
+            </div>
+            <dl className="mt-6 grid grid-cols-2 gap-3 md:grid-cols-4">
+              {tiles.map(([bg, label, value, emoji]) => (
+                <div key={label} className={`stat-tile ${bg}`}>
+                  <dt className="text-xs font-medium">
+                    <span aria-hidden="true">{emoji} </span>
+                    {label}
+                  </dt>
+                  <dd className="mt-1 font-bold">{value}</dd>
+                </div>
+              ))}
+            </dl>
+          </header>
 
-      <section className="card space-y-2" aria-labelledby="about">
-        <h2 id="about">About the position</h2>
-        <p className="whitespace-pre-line text-sm">{v.description}</p>
-      </section>
+          <section className="card space-y-2" aria-labelledby="about">
+            <h2 id="about">About the position</h2>
+            <p className="whitespace-pre-line text-sm leading-relaxed text-muted">{v.description}</p>
+          </section>
 
-      <section className="card" aria-labelledby="eligibility">
-        <h2 id="eligibility">Eligibility</h2>
-        {v.eligibility.length ? (
-          <ul className="mt-2 list-disc space-y-1 pl-5 text-sm">
-            {v.eligibility.map((e) => (
-              <li key={e.id}>{e.description}</li>
-            ))}
-          </ul>
-        ) : (
-          <p className="mt-2 text-sm text-muted">
-            Eligibility criteria have not been published for this vacancy.
-          </p>
-        )}
-      </section>
+          <section className="card" aria-labelledby="eligibility">
+            <h2 id="eligibility">Eligibility</h2>
+            {v.eligibility.length ? (
+              <ul className="mt-3 space-y-2 text-sm">
+                {v.eligibility.map((e) => (
+                  <li key={e.id} className="flex gap-2">
+                    <span aria-hidden="true">✔️</span>
+                    <span>{e.description}</span>
+                  </li>
+                ))}
+              </ul>
+            ) : (
+              <p className="mt-2 text-sm text-muted">
+                Eligibility criteria have not been published for this vacancy.
+              </p>
+            )}
+          </section>
 
-      <section className="card" aria-labelledby="docs">
-        <h2 id="docs">Documents to upload</h2>
-        <ul className="mt-2 list-disc space-y-1 pl-5 text-sm">
-          <li>Recent passport size photograph (JPEG or PNG) — printed on the application form</li>
-          {v.requiredDocuments.map((d) => (
-            <li key={d.id}>
-              {d.label}
-              {d.required ? "" : " (if applicable)"}
-            </li>
-          ))}
-        </ul>
-        <p className="mt-3 text-sm text-muted">
-          Application form: {FORM_LABELS[v.formTemplate.code]} (official form, version{" "}
-          {v.formTemplate.version}). Note from the official form: attested copies of degrees, certificates,
-          testimonials, community etc. should be annexed to the application. Candidates already employed
-          should send their applications only through their present employer.
-        </p>
-      </section>
-
-      <section aria-labelledby="apply" className="card">
-        <h2 id="apply">Apply</h2>
-        <div className="mt-3">
-          {!open ? (
-            <Alert tone="warning" title="Applications are closed">
-              This vacancy is not accepting applications.
-            </Alert>
-          ) : existing ? (
-            <p>
-              You have already started an application for this vacancy.{" "}
-              <Link to={`/applications/${existing.id}`}>Continue your application</Link>
+          <section className="card" aria-labelledby="docs">
+            <h2 id="docs">Documents to upload</h2>
+            <ul className="mt-3 grid gap-2 sm:grid-cols-2">
+              <li className="card-soft flex items-center gap-3 p-3 text-sm">
+                <span aria-hidden="true" className="text-xl">
+                  📷
+                </span>
+                Recent passport size photograph (JPEG or PNG)
+              </li>
+              {v.requiredDocuments.map((d) => (
+                <li key={d.id} className="card-soft flex items-center gap-3 p-3 text-sm">
+                  <span aria-hidden="true" className="text-xl">
+                    📄
+                  </span>
+                  <span>
+                    {d.label}
+                    {d.required ? "" : <span className="text-muted"> (if applicable)</span>}
+                  </span>
+                </li>
+              ))}
+            </ul>
+            <p className="mt-4 text-xs text-muted">
+              Official form: {FORM_LABELS[v.formTemplate.code]} (version {v.formTemplate.version}). Attested
+              copies of degrees, certificates, testimonials, community etc. should be annexed. Candidates
+              already employed should send their applications through their present employer.
             </p>
-          ) : !signedIn ? (
-            <p className="flex flex-wrap gap-3">
-              <Link to={`/register`} className="btn-primary">
-                Register to apply
-              </Link>
-              <Link to={`/login?next=/vacancies/${v.code}`} className="btn-secondary">
-                Sign in
-              </Link>
-            </p>
-          ) : !isCandidate ? (
-            <p className="text-sm text-muted">
-              Staff accounts cannot apply. Use a separate candidate account.
-            </p>
-          ) : !verified ? (
-            <Alert tone="warning" title="Verify your e-mail address">
-              Please verify your e-mail address using the link we sent you before starting an application.
-            </Alert>
-          ) : (
-            <Form method="post" action={`/apply/${v.code}`}>
-              <CsrfInput />
-              <button type="submit" className="btn-primary">
-                Start application
-              </button>
-            </Form>
-          )}
+          </section>
         </div>
-      </section>
+
+        <aside aria-labelledby="apply" className="lg:sticky lg:top-28 lg:h-fit">
+          <div className="card space-y-4">
+            <h2 id="apply">Apply for this position</h2>
+            {!open ? (
+              <Alert tone="warning" title="Applications are closed">
+                This vacancy is not accepting applications.
+              </Alert>
+            ) : existing ? (
+              <>
+                <p className="text-sm text-muted">
+                  You have already started an application for this vacancy.
+                </p>
+                <Link to={`/applications/${existing.id}`} className="btn-primary w-full py-3">
+                  Continue application →
+                </Link>
+              </>
+            ) : !signedIn ? (
+              <>
+                <p className="text-sm text-muted">
+                  Create an account or sign in to start the official application form.
+                </p>
+                <Link to="/register" className="btn-primary w-full py-3">
+                  Register to apply
+                </Link>
+                <Link to={`/login?next=/vacancies/${v.code}`} className="btn-secondary w-full py-3">
+                  Sign in
+                </Link>
+              </>
+            ) : !isCandidate ? (
+              <p className="text-sm text-muted">
+                Staff accounts cannot apply. Use a separate candidate account.
+              </p>
+            ) : !verified ? (
+              <Alert tone="warning" title="Verify your e-mail address">
+                Use the link we sent you before starting an application.
+              </Alert>
+            ) : (
+              <Form method="post" action={`/apply/${v.code}`}>
+                <CsrfInput />
+                <button type="submit" className="btn-primary w-full py-3">
+                  Apply now 🚀
+                </button>
+              </Form>
+            )}
+            <p className="text-xs text-muted">Your progress is saved as a draft — you can finish later.</p>
+          </div>
+        </aside>
+      </div>
     </article>
   );
 }
