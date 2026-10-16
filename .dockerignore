@@ -1,0 +1,15 @@
+node_modules
+build
+build-worker
+.react-router
+.git
+.env
+.env.*
+storage
+backups
+playwright-report
+test-results
+tests/pdf-regression/output
+infrastructure/blue-green/state
+source-documents
+*.log

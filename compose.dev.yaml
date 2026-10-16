@@ -1,0 +1,20 @@
+# Development overrides: publish data services on non-default host ports (loopback only) so that
+# tests, Prisma Studio and scripts can run from the host. Never use this file in production.
+services:
+  db:
+    ports: ["127.0.0.1:${POSTGRES_HOST_PORT:-65432}:5432"]
+    networks: [data, devhost]
+  redis:
+    ports: ["127.0.0.1:${REDIS_HOST_PORT:-63879}:6379"]
+    networks: [data, devhost]
+  converter:
+    ports: ["127.0.0.1:${CONVERTER_HOST_PORT:-63100}:3100"]
+  clamav:
+    ports: ["127.0.0.1:63310:3310"]
+  mailpit:
+    ports: ["127.0.0.1:${MAILPIT_UI_HOST_PORT:-6980}:8025", "127.0.0.1:61025:1025"]
+
+networks:
+  # Ports cannot be published from an internal-only network, so the data services join an
+  # additional bridge network in development only.
+  devhost: {}

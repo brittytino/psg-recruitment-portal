@@ -13,3 +13,6 @@ tests/pdf-regression/output/
 infrastructure/blue-green/state/
 *.log
 .DS_Store
+storage-test/
+storage-dev.log
+*.tmp.*
