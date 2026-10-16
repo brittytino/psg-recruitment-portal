@@ -26,7 +26,8 @@
     "db:migrate:dev": "prisma migrate dev",
     "db:seed": "tsx prisma/seed.ts",
     "forms:inventory": "tsx scripts/extract-inventory.ts",
-    "db:seed:prod": "node build-worker/seed.js"
+    "db:seed:prod": "node build-worker/seed.js",
+    "db:studio": "prisma studio --port 5555"
   },
   "prisma": {
     "seed": "tsx prisma/seed.ts"
@@ -41,6 +42,8 @@
     "bullmq": "5.81.5",
     "clsx": "2.1.1",
     "file-type": "22.2.0",
+    "framer-motion": "^14.3.0",
+    "gsap": "^3.15.0",
     "ioredis": "5.11.1",
     "isbot": "5.2.2",
     "jszip": "3.10.2",

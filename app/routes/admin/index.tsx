@@ -60,11 +60,41 @@ export default function AdminIndex({ loaderData, actionData }: Route.ComponentPr
   const fe = actionData && "fieldErrors" in actionData ? actionData.fieldErrors : undefined;
   return (
     <div className="space-y-8">
-      <div className="flex flex-wrap items-center justify-between gap-3">
-        <h1>Recruitment administration</h1>
-        <Link to="/admin/vacancies/new" className="btn-primary">
-          Create vacancy
-        </Link>
+      <div className="flex flex-wrap items-center justify-between gap-4 border-b border-line/70 pb-6">
+        <div>
+          <p className="eyebrow">College Administration</p>
+          <h1 className="mt-1.5 text-3xl sm:text-4xl lg:text-5xl font-extrabold text-ink">
+            Recruitment administration
+          </h1>
+          <p className="mt-2 text-base text-muted">
+            Manage recruitment cycles, vacancies, departments, official templates, and system databases.
+          </p>
+        </div>
+        <div className="flex flex-wrap items-center gap-2">
+          <a
+            href="http://localhost:6981/?pgsql=db&username=srp_owner&db=srportal"
+            target="_blank"
+            rel="noreferrer"
+            className="btn-secondary flex items-center gap-1.5"
+            title="Open Adminer database management in a new tab"
+          >
+            <span>🗄️</span>
+            <span>Database Viewer</span>
+          </a>
+          <a
+            href="http://localhost:6980"
+            target="_blank"
+            rel="noreferrer"
+            className="btn-secondary flex items-center gap-1.5"
+            title="Open Mailpit inbox in a new tab"
+          >
+            <span>✉️</span>
+            <span>Mailbox</span>
+          </a>
+          <Link to="/admin/vacancies/new" className="btn-primary">
+            Create vacancy
+          </Link>
+        </div>
       </div>
       {actionData && "message" in actionData && actionData.message && (
         <Alert tone="success">{actionData.message}</Alert>
@@ -72,6 +102,69 @@ export default function AdminIndex({ loaderData, actionData }: Route.ComponentPr
       {actionData && "formError" in actionData && actionData.formError && (
         <Alert tone="danger">{actionData.formError}</Alert>
       )}
+
+      {/* Developer & Server Database Tools Banner */}
+      <section className="card space-y-3 bg-gradient-to-r from-pink-50/70 via-purple-50/70 to-blue-50/70 border border-purple-100/80">
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <div className="flex items-center gap-2">
+            <span className="text-xl">🛠️</span>
+            <div>
+              <h2 className="text-sm font-bold text-ink">Server & Database Management</h2>
+              <p className="text-xs text-muted">Direct visual database inspector and transactional email preview</p>
+            </div>
+          </div>
+          <span className="badge-soft text-[11px] font-mono">Docker Services Online</span>
+        </div>
+        <div className="grid gap-3 sm:grid-cols-2">
+          <div className="flex flex-col justify-between rounded-xl bg-white/90 p-3.5 shadow-xs border border-line">
+            <div>
+              <div className="flex items-center justify-between">
+                <span className="font-semibold text-xs text-ink flex items-center gap-1.5">🗄️ Adminer Database Viewer</span>
+                <span className="rounded bg-soft px-1.5 py-0.5 text-[10px] font-mono font-medium text-muted">Port 6981</span>
+              </div>
+              <p className="mt-1 text-xs text-muted">
+                Inspect PostgreSQL tables, run SQL queries, view users, forms, and attachments directly.
+              </p>
+              <div className="mt-2 rounded-lg bg-soft p-2 text-[11px] font-mono text-muted leading-relaxed">
+                System: <strong className="text-ink">PostgreSQL</strong> · Server: <strong className="text-ink">db</strong><br />
+                Database: <strong className="text-ink">srportal</strong> · User: <strong className="text-ink">srp_owner</strong>
+              </div>
+            </div>
+            <a
+              href="http://localhost:6981/?pgsql=db&username=srp_owner&db=srportal"
+              target="_blank"
+              rel="noreferrer"
+              className="mt-3 btn-secondary text-xs text-center justify-center py-1.5"
+            >
+              Open Database Viewer ↗
+            </a>
+          </div>
+
+          <div className="flex flex-col justify-between rounded-xl bg-white/90 p-3.5 shadow-xs border border-line">
+            <div>
+              <div className="flex items-center justify-between">
+                <span className="font-semibold text-xs text-ink flex items-center gap-1.5">✉️ Mailpit Local Inbox</span>
+                <span className="rounded bg-soft px-1.5 py-0.5 text-[10px] font-mono font-medium text-muted">Port 6980</span>
+              </div>
+              <p className="mt-1 text-xs text-muted">
+                Catch and inspect all outgoing transactional emails, verification links, and password resets.
+              </p>
+              <div className="mt-2 rounded-lg bg-soft p-2 text-[11px] font-mono text-muted leading-relaxed">
+                SMTP Host: <strong className="text-ink">mailpit:1025</strong><br />
+                Web UI: <strong className="text-ink">http://localhost:6980</strong>
+              </div>
+            </div>
+            <a
+              href="http://localhost:6980"
+              target="_blank"
+              rel="noreferrer"
+              className="mt-3 btn-secondary text-xs text-center justify-center py-1.5"
+            >
+              Open Mail Inbox ↗
+            </a>
+          </div>
+        </div>
+      </section>
 
       <section className="card overflow-x-auto" aria-labelledby="vac">
         <h2 id="vac">Vacancies</h2>

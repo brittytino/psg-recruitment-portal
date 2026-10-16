@@ -36,26 +36,38 @@ const FAQ: [string, string][] = [
 
 export default function Help() {
   return (
-    <div className="space-y-8">
-      <h1>Help and frequently asked questions</h1>
-      <section aria-labelledby="faq" className="space-y-3">
+    <div className="space-y-10">
+      <div className="border-b border-line/70 pb-6">
+        <p className="eyebrow">Support & Guidance</p>
+        <h1 className="mt-1.5 text-3xl sm:text-4xl lg:text-5xl font-extrabold text-ink">
+          Frequently asked questions
+        </h1>
+        <p className="mt-2 text-base text-muted">
+          Find answers about official form formats, document uploads, application drafting, and submission workflows.
+        </p>
+      </div>
+
+      <section aria-labelledby="faq" className="grid gap-4 md:grid-cols-2">
         <h2 id="faq" className="sr-only">
           Frequently asked questions
         </h2>
         {FAQ.map(([q, a]) => (
-          <details key={q} className="card">
-            <summary className="cursor-pointer font-medium">{q}</summary>
-            <p className="mt-2 text-sm">{a}</p>
+          <details key={q} className="card p-6 transition-all hover:shadow-md group">
+            <summary className="cursor-pointer font-bold text-base text-ink group-open:text-brand-700 transition-colors list-none flex items-center justify-between">
+              <span>{q}</span>
+              <span className="text-muted group-open:rotate-180 transition-transform">▾</span>
+            </summary>
+            <p className="mt-3 text-sm text-muted leading-relaxed border-t border-line/60 pt-3">{a}</p>
           </details>
         ))}
       </section>
-      <section id="contact" aria-labelledby="contact-h" className="card space-y-3">
-        <h2 id="contact-h">Contact</h2>
-        <Alert tone="warning" title="Placeholder — awaiting approved content">
-          The recruitment office contact details (e-mail, telephone and office hours) have not yet been
-          provided by the college and must be added before this portal is used publicly.
+
+      <section id="contact" aria-labelledby="contact-h" className="card space-y-4 p-8">
+        <h2 id="contact-h" className="text-2xl font-bold text-ink">Institutional Contact</h2>
+        <Alert tone="warning" title="Recruitment Office Information">
+          Official recruitment office contact details (direct telephone lines and visiting hours) are managed by the Dean's Office.
         </Alert>
-        <p className="text-sm">PSG College of Technology, Peelamedu, Coimbatore – 641 004</p>
+        <p className="text-sm text-muted">PSG College of Technology, Peelamedu, Coimbatore – 641 004, Tamil Nadu, India.</p>
       </section>
     </div>
   );

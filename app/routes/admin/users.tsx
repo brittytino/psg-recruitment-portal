@@ -72,8 +72,16 @@ export default function Users({ loaderData, actionData }: Route.ComponentProps) 
   const [params] = useSearchParams();
   const fe = actionData && "fieldErrors" in actionData ? actionData.fieldErrors : undefined;
   return (
-    <div className="space-y-6">
-      <h1>Users and roles</h1>
+    <div className="space-y-8">
+      <div className="border-b border-line/70 pb-6">
+        <p className="eyebrow">Access Control</p>
+        <h1 className="mt-1.5 text-3xl sm:text-4xl lg:text-5xl font-extrabold text-ink">
+          Users and role management
+        </h1>
+        <p className="mt-2 text-base text-muted">
+          Invite staff members, assign institutional privileges, and manage account statuses.
+        </p>
+      </div>
       {actionData && "message" in actionData && actionData.message && (
         <Alert tone="success">{actionData.message}</Alert>
       )}

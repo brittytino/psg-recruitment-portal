@@ -3,9 +3,9 @@ import type { ReactNode } from "react";
 /** Split layout for account pages: form on the left, welcome panel on the right. */
 export function AuthShell({ children }: { children: ReactNode }) {
   return (
-    <div className="mx-auto grid max-w-5xl overflow-hidden rounded-[2rem] bg-white shadow-[var(--shadow-soft)] lg:grid-cols-2">
-      <div className="p-8 sm:p-12">{children}</div>
-      <div aria-hidden="true" className="hero-gradient relative hidden flex-col justify-between p-12 lg:flex">
+    <div className="mx-auto grid max-w-6xl overflow-hidden rounded-3xl bg-white shadow-[var(--shadow-soft)] border border-line/60 lg:grid-cols-2">
+      <div className="p-5 sm:p-10 lg:p-14">{children}</div>
+      <div aria-hidden="true" className="hero-gradient relative hidden flex-col justify-between p-12 lg:flex border-l border-pink-100/60">
         <p className="chip w-fit">🌸 PSG Tech Careers</p>
         <div>
           <p className="text-3xl font-bold leading-tight">Teach. Research. Inspire.</p>

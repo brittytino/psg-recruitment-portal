@@ -1,4 +1,5 @@
 import { Form, Link } from "react-router";
+import { motion } from "framer-motion";
 import type { Route } from "./+types/vacancy";
 import { Alert, CsrfInput, formatDate } from "~/components/forms";
 import { daysLeft } from "~/components/vacancy-card";
@@ -36,40 +37,47 @@ export default function Vacancy({ loaderData }: Route.ComponentProps) {
     ["bg-tile-purple", "Time left", open ? `${days} day${days === 1 ? "" : "s"}` : "Closed", "🗓️"],
   ];
   return (
-    <article className="space-y-6">
+    <motion.article
+      initial={{ opacity: 0, y: 12 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ duration: 0.45, ease: [0.16, 1, 0.3, 1] }}
+      className="space-y-6"
+    >
       <nav aria-label="Breadcrumb" className="text-sm">
         <Link to="/vacancies">Vacancies</Link> <span aria-hidden="true">›</span>{" "}
         <span className="text-muted">{v.code}</span>
       </nav>
-      <div className="grid gap-6 lg:grid-cols-[1fr_20rem]">
+      <div className="grid gap-6 sm:gap-8 lg:grid-cols-[1fr_22rem] xl:grid-cols-[1fr_25rem]">
         <div className="space-y-6">
-          <header className="card">
-            <div className="flex items-start gap-4">
+          <header className="card p-5 sm:p-8">
+            <div className="flex items-start gap-3.5 sm:gap-4">
               <span
                 aria-hidden="true"
-                className="grid h-14 w-14 shrink-0 place-items-center rounded-2xl bg-gradient-to-br from-pink-200 to-violet-200 text-3xl"
+                className="grid h-12 w-12 sm:h-16 sm:w-16 shrink-0 place-items-center rounded-2xl bg-gradient-to-br from-pink-200 to-violet-200 text-2xl sm:text-3xl shadow-xs"
               >
                 🏛️
               </span>
-              <div>
-                <p className="text-sm font-medium text-muted">
+              <div className="min-w-0 flex-1">
+                <p className="text-xs sm:text-sm font-bold uppercase tracking-wider text-muted truncate">
                   {v.department.name}
                   {v.discipline ? ` · ${v.discipline.name}` : ""}
                 </p>
-                <h1 className="mt-1 text-2xl">{v.title}</h1>
-                <p className="mt-1 text-xs text-muted">
-                  Ref. {v.code} · {v.cycle.title}
+                <h1 className="mt-1 text-xl sm:text-3xl lg:text-4xl font-extrabold text-ink leading-tight">
+                  {v.title}
+                </h1>
+                <p className="mt-2 text-xs sm:text-sm text-muted">
+                  Ref. <code className="font-semibold text-ink">{v.code}</code> · {v.cycle.title}
                 </p>
               </div>
             </div>
-            <dl className="mt-6 grid grid-cols-2 gap-3 md:grid-cols-4">
+            <dl className="mt-6 grid grid-cols-2 gap-2.5 sm:gap-3 md:grid-cols-4">
               {tiles.map(([bg, label, value, emoji]) => (
-                <div key={label} className={`stat-tile ${bg}`}>
-                  <dt className="text-xs font-medium">
+                <div key={label} className={`stat-tile p-3 sm:p-4 ${bg}`}>
+                  <dt className="text-xs font-medium truncate">
                     <span aria-hidden="true">{emoji} </span>
                     {label}
                   </dt>
-                  <dd className="mt-1 font-bold">{value}</dd>
+                  <dd className="mt-1 font-bold text-sm sm:text-base truncate">{value}</dd>
                 </div>
               ))}
             </dl>
@@ -175,6 +183,6 @@ export default function Vacancy({ loaderData }: Route.ComponentProps) {
           </div>
         </aside>
       </div>
-    </article>
+    </motion.article>
   );
 }

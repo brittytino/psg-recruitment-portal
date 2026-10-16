@@ -1,4 +1,5 @@
 import { Form, Link } from "react-router";
+import { motion } from "framer-motion";
 import type { Route } from "./+types/account";
 import { Alert, Badge, CsrfInput, formatDateTime, statusTone } from "~/components/forms";
 import { handleAction, readForm, requireUser } from "~/lib/http.server";
@@ -59,15 +60,24 @@ export default function Account({ loaderData, actionData }: Route.ComponentProps
     ["bg-tile-green", "Shortlisted / selected", count((s) => s === "SHORTLISTED" || s === "APPROVED"), "⭐"],
   ];
   return (
-    <div className="space-y-8">
-      <div className="flex flex-wrap items-end justify-between gap-4">
+    <motion.div
+      initial={{ opacity: 0, y: 12 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ duration: 0.45, ease: [0.16, 1, 0.3, 1] }}
+      className="space-y-8"
+    >
+      <div className="flex flex-col sm:flex-row items-start sm:items-end justify-between gap-4 border-b border-line/70 pb-6">
         <div>
-          <p className="eyebrow">Candidate dashboard</p>
-          <h1 className="mt-1">Welcome back, {name.split(" ")[0]} 👋</h1>
-          <p className="mt-1 text-muted">Track your applications and continue where you left off.</p>
+          <p className="eyebrow">Candidate workspace</p>
+          <h1 className="mt-1.5 text-2xl sm:text-4xl lg:text-5xl font-extrabold text-ink">
+            Welcome back, {name.split(" ")[0]} 👋
+          </h1>
+          <p className="mt-1.5 sm:mt-2 text-sm sm:text-base text-muted">
+            Track your submitted applications, review feedback, and continue draft forms.
+          </p>
         </div>
-        <Link to="/vacancies" className="btn-primary">
-          🔎 Browse vacancies
+        <Link to="/vacancies" className="btn-primary w-full sm:w-auto text-center shrink-0">
+          🔎 Browse open vacancies
         </Link>
       </div>
 
@@ -91,14 +101,14 @@ export default function Account({ loaderData, actionData }: Route.ComponentProps
       )}
 
       <section aria-label="Summary">
-        <dl className="grid grid-cols-2 gap-4 lg:grid-cols-4">
+        <dl className="grid grid-cols-2 gap-3 sm:gap-4 lg:grid-cols-4">
           {tiles.map(([bg, label, value, emoji]) => (
-            <div key={label} className={`stat-tile ${bg}`}>
-              <dt className="text-sm font-medium">
+            <div key={label} className={`stat-tile p-3.5 sm:p-5 ${bg}`}>
+              <dt className="text-xs sm:text-sm font-medium truncate">
                 <span aria-hidden="true">{emoji} </span>
                 {label}
               </dt>
-              <dd className="mt-2 text-3xl font-bold">{value}</dd>
+              <dd className="mt-1.5 sm:mt-2 text-2xl sm:text-3xl font-bold">{value}</dd>
             </div>
           ))}
         </dl>
@@ -169,6 +179,6 @@ export default function Account({ loaderData, actionData }: Route.ComponentProps
           </ul>
         )}
       </section>
-    </div>
+    </motion.div>
   );
 }

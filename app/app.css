@@ -54,10 +54,13 @@
     @apply text-brand-700 underline decoration-brand-600/40 underline-offset-4 hover:text-brand-800 hover:decoration-brand-600;
   }
   h1 {
-    @apply text-3xl font-bold tracking-tight;
+    @apply text-3xl font-extrabold tracking-tight sm:text-4xl lg:text-5xl;
   }
   h2 {
-    @apply text-lg font-semibold tracking-tight;
+    @apply text-xl font-bold tracking-tight sm:text-2xl lg:text-3xl;
+  }
+  h3 {
+    @apply text-base font-bold tracking-tight sm:text-lg lg:text-xl;
   }
   dialog::backdrop {
     background: rgb(18 19 22 / 0.45);
@@ -84,42 +87,45 @@
 }
 
 @utility btn {
-  @apply inline-flex items-center justify-center gap-2 rounded-full px-5 py-2.5 text-sm font-semibold no-underline transition-colors disabled:cursor-not-allowed disabled:opacity-50;
+  @apply inline-flex items-center justify-center gap-2 rounded-full px-5 py-2.5 text-sm font-semibold no-underline transition-all duration-150 active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-50;
 }
 
 @layer components {
+  .page-container {
+    @apply mx-auto w-full max-w-[1500px] px-4 sm:px-6 lg:px-10;
+  }
   .skip-link {
     @apply sr-only focus:not-sr-only focus:absolute focus:left-2 focus:top-2 focus:z-50 focus:rounded-full focus:bg-white focus:px-4 focus:py-2;
   }
   .card {
-    @apply rounded-[var(--radius-card)] bg-white p-6 shadow-[var(--shadow-soft)];
+    @apply rounded-[var(--radius-card)] bg-white p-6 sm:p-8 shadow-[var(--shadow-soft)] border border-line/60;
   }
   .card-soft {
-    @apply rounded-[var(--radius-card)] bg-soft p-5;
+    @apply rounded-[var(--radius-card)] bg-soft p-5 sm:p-6 border border-line/40;
   }
   .hero-gradient {
     background:
-      radial-gradient(60% 80% at 15% 20%, #fbcfe8 0%, transparent 60%),
-      radial-gradient(50% 70% at 85% 30%, #ddd6fe 0%, transparent 60%),
-      radial-gradient(60% 80% at 50% 100%, #fecdd3 0%, transparent 60%), #fdf4fa;
+      radial-gradient(70% 90% at 10% 20%, #fbcfe8 0%, transparent 60%),
+      radial-gradient(60% 80% at 90% 25%, #ddd6fe 0%, transparent 60%),
+      radial-gradient(70% 90% at 50% 100%, #fecdd3 0%, transparent 60%), #fdf4fa;
   }
   .chip {
-    @apply inline-flex items-center gap-1.5 rounded-full border border-line bg-white px-3 py-1 text-xs font-medium text-ink;
+    @apply inline-flex items-center gap-1.5 rounded-full border border-line bg-white px-3.5 py-1 text-xs font-medium text-ink transition-colors hover:border-brand-600/30;
   }
   .float-card {
-    @apply rounded-2xl bg-white/90 p-3 shadow-[var(--shadow-float)] backdrop-blur;
+    @apply rounded-2xl bg-white/95 p-3.5 shadow-[var(--shadow-float)] backdrop-blur-md border border-white/60;
   }
   .stat-tile {
-    @apply rounded-2xl p-4 text-ink;
+    @apply rounded-2xl p-4 sm:p-5 text-ink transition-transform hover:-translate-y-0.5;
   }
   .field-input {
-    @apply block w-full rounded-xl border border-transparent bg-soft px-4 py-2.5 text-sm text-ink transition-colors placeholder:text-muted hover:border-line focus-visible:border-brand-600 focus-visible:bg-white aria-[invalid=true]:border-danger aria-[invalid=true]:bg-danger-50;
+    @apply block w-full rounded-xl border border-line/70 bg-soft px-4 py-2.5 text-sm text-ink transition-all placeholder:text-muted hover:border-line focus-visible:border-brand-600 focus-visible:bg-white focus-visible:ring-2 focus-visible:ring-brand-600/20 aria-[invalid=true]:border-danger aria-[invalid=true]:bg-danger-50;
   }
   .btn-primary {
-    @apply btn bg-ink text-white hover:bg-black hover:text-white;
+    @apply btn bg-ink text-white hover:bg-black hover:text-white shadow-xs hover:shadow;
   }
   .btn-secondary {
-    @apply btn border border-line bg-white text-ink hover:bg-soft hover:text-ink;
+    @apply btn border border-line bg-white text-ink hover:bg-soft hover:text-ink shadow-xs;
   }
   .btn-danger {
     @apply btn bg-danger text-white hover:bg-red-800 hover:text-white;
@@ -140,6 +146,6 @@
     @apply bg-brand-50/40;
   }
   .eyebrow {
-    @apply text-xs font-semibold uppercase tracking-[0.14em] text-brand-700;
+    @apply text-xs font-bold uppercase tracking-[0.16em] text-brand-700;
   }
 }

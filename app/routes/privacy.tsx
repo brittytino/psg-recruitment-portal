@@ -6,14 +6,22 @@ export const meta: Route.MetaFunction = () => [{ title: "Privacy notice — PSG 
 
 export default function Privacy() {
   return (
-    <article className="max-w-3xl space-y-5">
-      <h1>Privacy notice</h1>
+    <article className="max-w-4xl space-y-8">
+      <div className="border-b border-line/70 pb-6">
+        <p className="eyebrow">Data Governance</p>
+        <h1 className="mt-1.5 text-3xl sm:text-4xl lg:text-5xl font-extrabold text-ink">
+          Privacy notice
+        </h1>
+        <p className="mt-2 text-base text-muted">
+          Information handling, data storage security, and audit transparency standards.
+        </p>
+      </div>
       <Alert tone="warning" title="Draft — pending institutional and legal review">
         This notice describes how the portal is built to handle personal data. The final wording, retention
         periods and contact for data requests must be approved by the college before production use. Version{" "}
         {PRIVACY_NOTICE_VERSION}.
       </Alert>
-      <section className="space-y-2 text-sm">
+      <section className="card space-y-6 text-sm sm:text-base text-muted leading-relaxed">
         <h2>What we collect</h2>
         <p>
           The information requested by the official application form (personal details, addresses,

@@ -1,3 +1,4 @@
+import { useEffect, useState } from "react";
 import { newNonce } from "./lib/nonce.server";
 import {
   isRouteErrorResponse,
@@ -8,8 +9,25 @@ import {
   Outlet,
   Scripts,
   ScrollRestoration,
+  useLocation,
   useRouteLoaderData,
 } from "react-router";
+import { AnimatePresence, motion } from "framer-motion";
+import {
+  Briefcase,
+  ChevronRight,
+  FileText,
+  HelpCircle,
+  LayoutDashboard,
+  LogIn,
+  LogOut,
+  Menu,
+  Settings,
+  ShieldCheck,
+  UserPlus,
+  Users,
+  X,
+} from "lucide-react";
 import type { Route } from "./+types/root";
 import "./app.css";
 import { nonceContext, userContext } from "./context";
@@ -46,10 +64,10 @@ export async function loader({ context }: Route.LoaderArgs) {
     csrf: csrfToken(user?.sessionId ?? null),
     user: user
       ? {
-          displayName: user.displayName,
-          emailVerified: user.emailVerified,
-          grants: user.grants,
-        }
+        displayName: user.displayName,
+        emailVerified: user.emailVerified,
+        grants: user.grants,
+      }
       : null,
   };
 }
@@ -78,19 +96,38 @@ function Logo() {
   return (
     <Link
       to="/"
-      className="flex items-center gap-2.5 no-underline text-ink"
-      aria-label="PSG Tech Careers — home"
+      className="flex items-center gap-2 sm:gap-3.5 no-underline group shrink-0"
+      aria-label="PSG College of Technology — Home"
     >
-      <span
-        aria-hidden="true"
-        className="grid h-9 w-9 place-items-center rounded-xl bg-gradient-to-br from-pink-400 to-violet-400 text-lg shadow-[var(--shadow-float)]"
-      >
-        🌸
-      </span>
-      <span className="flex flex-col leading-tight">
-        <span className="text-base font-bold tracking-tight">PSG Tech Careers</span>
-        <span className="text-[11px] font-medium text-muted">Staff Recruitment · Coimbatore</span>
-      </span>
+      <div className="flex items-center gap-1.5 sm:gap-2.5 shrink-0">
+        <img
+          src="/images/psg_logo.png"
+          alt="PSG College of Technology Crest"
+          className="h-8 sm:h-10 md:h-12 w-auto object-contain transition-transform duration-300 group-hover:scale-105"
+        />
+        <div className="flex flex-col leading-tight border-l border-line/80 pl-2 sm:pl-3 min-w-0">
+          <span className="text-xs sm:text-sm md:text-base font-black tracking-tight text-ink group-hover:text-brand-700 transition-colors uppercase whitespace-nowrap">
+            <span className="hidden sm:inline">PSG College Of Technology</span>
+            <span className="sm:hidden font-extrabold">PSG Tech</span>
+          </span>
+          <span className="text-[10px] sm:text-xs font-semibold text-muted tracking-wide whitespace-nowrap hidden sm:block">
+            Faculty Recruitment Portal
+          </span>
+        </div>
+        <div className="h-5 sm:h-7 md:h-8 w-px bg-line/80 shrink-0" />
+        <img
+          src="/images/75yearsLogo.png"
+          alt="75 Years Celebration"
+          className="h-7 sm:h-9 md:h-11 w-auto object-contain transition-transform duration-300 group-hover:scale-105"
+        />
+        <div className="h-5 sm:h-7 md:h-8 w-px bg-line/80 shrink-0" />
+        <img
+          src="/images/100yearsLogo.png"
+          alt="100 Years Legacy"
+          className="h-7 sm:h-9 md:h-11 w-auto object-contain transition-transform duration-300 group-hover:scale-105"
+        />
+      </div>
+
     </Link>
   );
 }
@@ -99,22 +136,32 @@ function Header() {
   const root = useRouteLoaderData<typeof loader>("root");
   const user = root?.user;
   const grants = user?.grants ?? [];
+  const location = useLocation();
+  const [mobileOpen, setMobileOpen] = useState(false);
+
+  useEffect(() => {
+    setMobileOpen(false);
+  }, [location.pathname]);
+
   const nav =
-    "rounded-full px-3 py-1.5 text-sm font-medium no-underline text-muted hover:bg-soft hover:text-ink aria-[current=page]:bg-ink aria-[current=page]:text-white";
+    "rounded-full px-3.5 py-1.5 text-sm font-semibold no-underline text-muted hover:bg-soft hover:text-ink transition-colors aria-[current=page]:bg-ink aria-[current=page]:text-white";
   const initials = (user?.displayName ?? "")
     .split(/\s+/)
     .map((p) => p[0])
     .join("")
     .slice(0, 2)
     .toUpperCase();
+
   return (
-    <header className="sticky top-0 z-40 px-4 pt-4">
+    <header className="sticky top-0 z-40 w-full border-b border-line/70 bg-white/95 backdrop-blur-md shadow-xs">
       <a href="#main" className="skip-link">
         Skip to main content
       </a>
-      <div className="mx-auto flex max-w-6xl flex-wrap items-center justify-between gap-3 rounded-full bg-white/85 px-4 py-2.5 shadow-[var(--shadow-soft)] backdrop-blur">
+      <div className="mx-auto flex w-full max-w-[1500px] items-center justify-between gap-4 px-3 sm:px-6 lg:px-10 py-2.5 sm:py-3">
         <Logo />
-        <nav aria-label="Main" className="flex flex-wrap items-center gap-1">
+
+        {/* Desktop Navigation */}
+        <nav aria-label="Main" className="hidden lg:flex items-center gap-1.5">
           <NavLink to="/vacancies" className={nav}>
             Find a job
           </NavLink>
@@ -147,11 +194,13 @@ function Header() {
             </NavLink>
           )}
         </nav>
-        <div className="flex items-center gap-2">
+
+        {/* Desktop User actions */}
+        <div className="hidden lg:flex items-center gap-3">
           {user ? (
-            <form method="post" action="/logout" className="flex items-center gap-2">
+            <form method="post" action="/logout" className="flex items-center gap-2.5">
               <CsrfInput />
-              <span className="hidden items-center gap-2 sm:flex">
+              <div className="flex items-center gap-2.5">
                 <span
                   aria-hidden="true"
                   className="grid h-9 w-9 place-items-center rounded-full bg-gradient-to-br from-pink-200 to-violet-200 text-xs font-bold"
@@ -162,7 +211,7 @@ function Header() {
                   <span className="text-sm font-semibold">{user.displayName}</span>
                   <span className="text-[11px] text-muted">{isStaff(grants) ? "Staff" : "Candidate"}</span>
                 </span>
-              </span>
+              </div>
               <button type="submit" className="btn-secondary px-4 py-2">
                 Sign out
               </button>
@@ -172,31 +221,186 @@ function Header() {
               <Link to="/login" className="btn px-4 py-2 text-ink hover:bg-soft">
                 Login
               </Link>
-              <Link to="/register" className="btn-primary px-4 py-2">
+              <Link to="/register" className="btn-primary px-5 py-2">
                 Sign up
               </Link>
             </>
           )}
         </div>
+
+        {/* Mobile Hamburger Button */}
+        <button
+          type="button"
+          onClick={() => setMobileOpen(!mobileOpen)}
+          className="lg:hidden p-2 rounded-xl text-ink hover:bg-soft transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-600"
+          aria-expanded={mobileOpen}
+          aria-label={mobileOpen ? "Close navigation menu" : "Open navigation menu"}
+        >
+          {mobileOpen ? <X className="h-6 w-6" /> : <Menu className="h-6 w-6" />}
+        </button>
       </div>
+
+      {/* Animated Mobile Navigation Drawer */}
+      <AnimatePresence>
+        {mobileOpen && (
+          <motion.div
+            initial={{ opacity: 0, height: 0 }}
+            animate={{ opacity: 1, height: "auto" }}
+            exit={{ opacity: 0, height: 0 }}
+            transition={{ duration: 0.22, ease: "easeInOut" }}
+            className="lg:hidden border-t border-line/70 bg-white/98 backdrop-blur-xl px-4 py-5 shadow-xl overflow-hidden"
+          >
+            <nav aria-label="Mobile Navigation" className="flex flex-col space-y-1">
+              <NavLink
+                to="/vacancies"
+                className="flex items-center justify-between rounded-xl p-3 text-sm font-semibold text-ink hover:bg-soft aria-[current=page]:bg-ink aria-[current=page]:text-white transition-colors"
+              >
+                <span className="flex items-center gap-3">
+                  <Briefcase className="h-4 w-4 text-brand-600" />
+                  Find a job
+                </span>
+                <ChevronRight className="h-4 w-4 opacity-50" />
+              </NavLink>
+
+              <NavLink
+                to="/help"
+                className="flex items-center justify-between rounded-xl p-3 text-sm font-semibold text-ink hover:bg-soft aria-[current=page]:bg-ink aria-[current=page]:text-white transition-colors"
+              >
+                <span className="flex items-center gap-3">
+                  <HelpCircle className="h-4 w-4 text-brand-600" />
+                  How it works
+                </span>
+                <ChevronRight className="h-4 w-4 opacity-50" />
+              </NavLink>
+
+              {user && grants.some((g) => g.role === "CANDIDATE") && (
+                <NavLink
+                  to="/account"
+                  className="flex items-center justify-between rounded-xl p-3 text-sm font-semibold text-ink hover:bg-soft aria-[current=page]:bg-ink aria-[current=page]:text-white transition-colors"
+                >
+                  <span className="flex items-center gap-3">
+                    <FileText className="h-4 w-4 text-brand-600" />
+                    My applications
+                  </span>
+                  <ChevronRight className="h-4 w-4 opacity-50" />
+                </NavLink>
+              )}
+
+              {user && hasPermission(grants, "application:list") && (
+                <NavLink
+                  to="/staff"
+                  end
+                  className="flex items-center justify-between rounded-xl p-3 text-sm font-semibold text-ink hover:bg-soft aria-[current=page]:bg-ink aria-[current=page]:text-white transition-colors"
+                >
+                  <span className="flex items-center gap-3">
+                    <LayoutDashboard className="h-4 w-4 text-brand-600" />
+                    Staff Dashboard
+                  </span>
+                  <ChevronRight className="h-4 w-4 opacity-50" />
+                </NavLink>
+              )}
+
+              {user && hasPermission(grants, "recruitment:manage") && (
+                <NavLink
+                  to="/admin"
+                  end
+                  className="flex items-center justify-between rounded-xl p-3 text-sm font-semibold text-ink hover:bg-soft aria-[current=page]:bg-ink aria-[current=page]:text-white transition-colors"
+                >
+                  <span className="flex items-center gap-3">
+                    <Settings className="h-4 w-4 text-brand-600" />
+                    Administration
+                  </span>
+                  <ChevronRight className="h-4 w-4 opacity-50" />
+                </NavLink>
+              )}
+
+              {user && hasPermission(grants, "user:manage") && (
+                <NavLink
+                  to="/admin/users"
+                  className="flex items-center justify-between rounded-xl p-3 text-sm font-semibold text-ink hover:bg-soft aria-[current=page]:bg-ink aria-[current=page]:text-white transition-colors"
+                >
+                  <span className="flex items-center gap-3">
+                    <Users className="h-4 w-4 text-brand-600" />
+                    User Management
+                  </span>
+                  <ChevronRight className="h-4 w-4 opacity-50" />
+                </NavLink>
+              )}
+
+              {user && hasPermission(grants, "audit:read") && (
+                <NavLink
+                  to="/staff/audit"
+                  className="flex items-center justify-between rounded-xl p-3 text-sm font-semibold text-ink hover:bg-soft aria-[current=page]:bg-ink aria-[current=page]:text-white transition-colors"
+                >
+                  <span className="flex items-center gap-3">
+                    <ShieldCheck className="h-4 w-4 text-brand-600" />
+                    Audit Log
+                  </span>
+                  <ChevronRight className="h-4 w-4 opacity-50" />
+                </NavLink>
+              )}
+            </nav>
+
+            {/* Mobile Auth Bar */}
+            <div className="mt-5 border-t border-line/70 pt-4">
+              {user ? (
+                <div className="space-y-3">
+                  <div className="flex items-center gap-3 rounded-2xl bg-soft p-3">
+                    <span
+                      aria-hidden="true"
+                      className="grid h-10 w-10 place-items-center rounded-full bg-gradient-to-br from-pink-200 to-violet-200 text-sm font-bold text-ink"
+                    >
+                      {initials || "🙂"}
+                    </span>
+                    <div className="min-w-0 flex-1">
+                      <p className="truncate text-sm font-bold text-ink">{user.displayName}</p>
+                      <p className="text-xs text-muted">{isStaff(grants) ? "Staff Member" : "Candidate Account"}</p>
+                    </div>
+                  </div>
+                  <form method="post" action="/logout">
+                    <CsrfInput />
+                    <button type="submit" className="btn-secondary w-full py-2.5 text-danger hover:text-danger font-semibold">
+                      <LogOut className="h-4 w-4 mr-1.5 inline" /> Sign out
+                    </button>
+                  </form>
+                </div>
+              ) : (
+                <div className="grid grid-cols-2 gap-3">
+                  <Link to="/login" className="btn-secondary w-full py-2.5 text-center font-semibold">
+                    <LogIn className="h-4 w-4 mr-1.5 inline" /> Sign in
+                  </Link>
+                  <Link to="/register" className="btn-primary w-full py-2.5 text-center font-semibold">
+                    <UserPlus className="h-4 w-4 mr-1.5 inline" /> Sign up
+                  </Link>
+                </div>
+              )}
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
     </header>
   );
 }
 
 function Footer() {
   return (
-    <footer className="mt-16 px-4 pb-6">
-      <div className="mx-auto grid max-w-6xl gap-8 rounded-[var(--radius-card)] bg-white p-8 shadow-[var(--shadow-soft)] sm:grid-cols-[2fr_1fr_1fr]">
-        <div className="space-y-3">
+    <footer className="mt-20 border-t border-line/60 bg-white py-12 px-4 sm:px-6 lg:px-10">
+      <div className="mx-auto grid w-full max-w-[1500px] gap-10 sm:grid-cols-2 lg:grid-cols-[2fr_1fr_1fr]">
+        <div className="space-y-4">
           <Logo />
-          <p className="max-w-sm text-sm text-muted">
-            Faculty recruitment for PSG College of Technology, Peelamedu, Coimbatore – 641 004. Autonomous,
-            affiliated to Anna University, ISO 9001:2015 certified.
+          <p className="max-w-md text-sm text-muted leading-relaxed">
+            Faculty recruitment for PSG College of Technology, Peelamedu, Coimbatore – 641 004.
+            Autonomous, affiliated to Anna University, accredited with an ISO 9001:2015 certified legacy.
           </p>
+          <div className="flex items-center gap-2 text-xs text-muted pt-2">
+            <span>© {new Date().getFullYear()} PSG College of Technology</span>
+            <span>·</span>
+            <span>All rights reserved</span>
+          </div>
         </div>
         <div>
-          <h2 className="text-sm">Candidates</h2>
-          <ul className="mt-3 space-y-2 text-sm">
+          <h2 className="text-sm font-bold uppercase tracking-wider text-muted">Candidates</h2>
+          <ul className="mt-4 space-y-2.5 text-sm">
             <li>
               <Link to="/vacancies">Open vacancies</Link>
             </li>
@@ -209,8 +413,8 @@ function Footer() {
           </ul>
         </div>
         <div>
-          <h2 className="text-sm">Institution</h2>
-          <ul className="mt-3 space-y-2 text-sm">
+          <h2 className="text-sm font-bold uppercase tracking-wider text-muted">Institution</h2>
+          <ul className="mt-4 space-y-2.5 text-sm">
             <li>
               <Link to="/privacy">Privacy notice</Link>
             </li>
@@ -229,13 +433,13 @@ function Footer() {
 
 export default function App() {
   return (
-    <>
+    <div className="min-h-screen flex flex-col justify-between">
       <Header />
-      <main id="main" className="mx-auto max-w-6xl px-4 py-8">
+      <main id="main" className="mx-auto w-full max-w-[1500px] flex-1 px-4 py-8 sm:px-6 sm:py-10 lg:px-10 lg:py-12">
         <Outlet />
       </main>
       <Footer />
-    </>
+    </div>
   );
 }
 

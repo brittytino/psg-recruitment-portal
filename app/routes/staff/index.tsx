@@ -81,17 +81,19 @@ export default function StaffIndex({ loaderData }: Route.ComponentProps) {
   ];
   return (
     <div className="space-y-8">
-      <div className="flex flex-wrap items-end justify-between gap-4">
+      <div className="flex flex-wrap items-end justify-between gap-4 border-b border-line/70 pb-6">
         <div>
           <p className="eyebrow">Recruitment workspace</p>
-          <h1 className="mt-1">Welcome back, {firstName} 👋</h1>
-          <p className="mt-1 text-muted">
-            Every figure below is counted live from submitted applications in your scope.
+          <h1 className="mt-1.5 text-3xl sm:text-4xl lg:text-5xl font-extrabold text-ink">
+            Welcome back, {firstName} 👋
+          </h1>
+          <p className="mt-2 text-base text-muted">
+            Live recruitment status, candidate screening queues, and applicant files within your scope.
           </p>
         </div>
         {canExport && (
           <a href={`/staff/export.csv${location.search}`} className="btn-secondary">
-            ⬇️ Export CSV
+            ⬇️ Export Applications CSV
           </a>
         )}
       </div>

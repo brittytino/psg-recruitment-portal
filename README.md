@@ -69,12 +69,14 @@ docker compose run --rm -e SEED_DEMO=true -e NODE_ENV=development migrate node b
 
 Demo accounts (`@example.test`, password = `SEED_DEMO_PASSWORD` in `.env`): `candidate@`, `candidate2@`, `hr@`, `reviewer.cse@`, `reviewer.ece@`, `admin@`, `superadmin@`, `auditor@`.
 
-## 8. Docker Compose commands
+## 8. Docker Compose commands & Windows one-click runner
 
 | Task                           | Command                                                       |
 | ------------------------------ | ------------------------------------------------------------- |
-| Start / rebuild                | `docker compose up -d --build`                                |
-| Dev (host ports)               | `docker compose -f compose.yaml -f compose.dev.yaml up -d`    |
+| **One-click All-in-One (.bat)**| `.\run.bat` (or double-click `run.bat` in root)               |
+| Clean rebuild & run            | `.\run.bat rebuild` (or `docker compose build --no-cache && docker compose up -d`) |
+| Start / rebuild (manual)       | `docker compose up -d --build`                                |
+| Dev (host ports + DB viewer)   | `docker compose -f compose.yaml -f compose.dev.yaml up -d`    |
 | Logs                           | `docker compose logs -f app worker`                           |
 | Status                         | `docker compose ps`                                           |
 | Graceful stop                  | `docker compose stop`                                         |
@@ -88,10 +90,11 @@ More: [docs/deployment/docker-local.md](docs/deployment/docker-local.md).
 | Service                                                                                                                                                          |          Host |   Container | Exposure                |
 | ---------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------: | ----------: | ----------------------- |
 | Application                                                                                                                                                      |          6969 |        3000 | local stack             |
+| Database Viewer (Adminer Web GUI)                                                                                                                                |          6981 |        8080 | local stack / dev       |
+| Mailpit UI / SMTP                                                                                                                                                |  6980 / 61025 | 8025 / 1025 | dev override            |
 | PostgreSQL                                                                                                                                                       |         65432 |        5432 | dev override, loopback  |
 | Redis                                                                                                                                                            |         63879 |        6379 | dev override, loopback  |
 | Converter / ClamAV                                                                                                                                               | 63100 / 63310 | 3100 / 3310 | dev override, loopback  |
-| Mailpit UI / SMTP                                                                                                                                                |  6980 / 61025 | 8025 / 1025 | dev override            |
 | Blue-green simulation Nginx                                                                                                                                      |          6970 |          80 | local `.env.production` |
 | Production                                                                                                                                                       |       80, 443 |  Nginx only | public                  |
 | Blue/green have no published ports (diagnostics 6971/6972 deliberately not exposed; smoke tests run inside the containers). All host ports are `.env` variables. |
