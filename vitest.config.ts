@@ -5,7 +5,14 @@ export default defineConfig({
   plugins: [tsconfigPaths()],
   test: {
     projects: [
-      { extends: true, test: { name: "unit", include: ["tests/unit/**/*.test.ts", "tests/security/**/*.test.ts"], environment: "node" } },
+      {
+        extends: true,
+        test: {
+          name: "unit",
+          include: ["tests/unit/**/*.test.ts", "tests/security/**/*.test.ts"],
+          environment: "node",
+        },
+      },
       {
         extends: true,
         test: {
@@ -20,7 +27,15 @@ export default defineConfig({
           globalSetup: ["tests/integration/global-setup.ts"],
         },
       },
-      { extends: true, test: { name: "pdf", include: ["tests/pdf-regression/**/*.test.ts"], environment: "node", testTimeout: 180000 } },
+      {
+        extends: true,
+        test: {
+          name: "pdf",
+          include: ["tests/pdf-regression/**/*.test.ts"],
+          environment: "node",
+          testTimeout: 180000,
+        },
+      },
     ],
   },
 });

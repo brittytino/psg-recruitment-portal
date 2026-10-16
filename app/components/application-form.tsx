@@ -1,5 +1,13 @@
 import { useId, useRef } from "react";
-import type { Answers, FieldDef, ListField, ScalarField, SectionDef, TableField, TableRow } from "~/modules/forms/types";
+import type {
+  Answers,
+  FieldDef,
+  ListField,
+  ScalarField,
+  SectionDef,
+  TableField,
+  TableRow,
+} from "~/modules/forms/types";
 import type { FieldIssue } from "~/modules/forms/validation";
 
 /**
@@ -22,7 +30,14 @@ export function SectionFields({
   return (
     <div className="space-y-6">
       {section.fields.map((f) => (
-        <FieldRenderer key={f.key} field={f} value={answers[f.key]} derived={derived[f.key]} issues={issues} onChange={(v) => onChange(f.key, v)} />
+        <FieldRenderer
+          key={f.key}
+          field={f}
+          value={answers[f.key]}
+          derived={derived[f.key]}
+          issues={issues}
+          onChange={(v) => onChange(f.key, v)}
+        />
       ))}
     </div>
   );
@@ -43,13 +58,31 @@ function FieldRenderer({
   issues: FieldIssue[];
   onChange: (v: Answers[string]) => void;
 }) {
-  if (field.kind === "table") return <TableEditor field={field} rows={Array.isArray(value) ? (value as TableRow[]) : []} issues={issues} onChange={onChange} />;
-  if (field.kind === "list") return <ListEditor field={field} items={Array.isArray(value) ? (value as string[]) : []} issues={issues} onChange={onChange} />;
+  if (field.kind === "table")
+    return (
+      <TableEditor
+        field={field}
+        rows={Array.isArray(value) ? (value as TableRow[]) : []}
+        issues={issues}
+        onChange={onChange}
+      />
+    );
+  if (field.kind === "list")
+    return (
+      <ListEditor
+        field={field}
+        items={Array.isArray(value) ? (value as string[]) : []}
+        issues={issues}
+        onChange={onChange}
+      />
+    );
   return (
     <ScalarInput
       field={field}
       path={field.key}
-      value={field.kind === "derived" ? (derived ?? null) : ((value as string | number | null | undefined) ?? null)}
+      value={
+        field.kind === "derived" ? (derived ?? null) : ((value as string | number | null | undefined) ?? null)
+      }
       error={issueFor(issues, field.key)}
       onChange={onChange}
     />
@@ -90,19 +123,39 @@ export function ScalarInput({
   switch (field.kind) {
     case "derived":
       input = (
-        <p id={id} className="rounded border border-dashed border-line bg-brand-50 px-3 py-2 text-sm" aria-describedby={describedBy}>
+        <p
+          id={id}
+          className="rounded border border-dashed border-line bg-brand-50 px-3 py-2 text-sm"
+          aria-describedby={describedBy}
+        >
           {str || "Calculated automatically"}
         </p>
       );
       break;
     case "textarea":
-      input = <textarea {...common} rows={field.rows ?? 4} maxLength={field.maxLength} value={str} onChange={(e) => set(e.target.value)} />;
+      input = (
+        <textarea
+          {...common}
+          rows={field.rows ?? 4}
+          maxLength={field.maxLength}
+          value={str}
+          onChange={(e) => set(e.target.value)}
+        />
+      );
       break;
     case "date":
       input = <input {...common} type="date" value={str} onChange={(e) => set(e.target.value)} />;
       break;
     case "monthYear":
-      input = <input {...common} type="month" value={str} placeholder="YYYY-MM" onChange={(e) => set(e.target.value)} />;
+      input = (
+        <input
+          {...common}
+          type="month"
+          value={str}
+          placeholder="YYYY-MM"
+          onChange={(e) => set(e.target.value)}
+        />
+      );
       break;
     case "number":
       input = (
@@ -184,10 +237,18 @@ function RemoveButton({ label, onConfirm }: { label: string; onConfirm: () => vo
   const titleId = useId();
   return (
     <>
-      <button type="button" className="btn-secondary py-1 text-danger" onClick={() => ref.current?.showModal()}>
+      <button
+        type="button"
+        className="btn-secondary py-1 text-danger"
+        onClick={() => ref.current?.showModal()}
+      >
         Remove <span className="sr-only">{label}</span>
       </button>
-      <dialog ref={ref} aria-labelledby={titleId} className="m-auto w-full max-w-md rounded-md border border-line p-0">
+      <dialog
+        ref={ref}
+        aria-labelledby={titleId}
+        className="m-auto w-full max-w-md rounded-md border border-line p-0"
+      >
         <div className="p-6">
           <h2 id={titleId}>Remove {label}?</h2>
           <p className="mt-2 text-sm">The entry will be removed from your draft when you next save.</p>
@@ -212,10 +273,21 @@ function RemoveButton({ label, onConfirm }: { label: string; onConfirm: () => vo
   );
 }
 
-function TableEditor({ field, rows, issues, onChange }: { field: TableField; rows: TableRow[]; issues: FieldIssue[]; onChange: (v: TableRow[]) => void }) {
+function TableEditor({
+  field,
+  rows,
+  issues,
+  onChange,
+}: {
+  field: TableField;
+  rows: TableRow[];
+  issues: FieldIssue[];
+  onChange: (v: TableRow[]) => void;
+}) {
   const headingId = `t-${field.key}`;
   const tableError = issueFor(issues, field.key);
-  const update = (i: number, key: string, v: string | number | null) => onChange(rows.map((r, j) => (j === i ? { ...r, [key]: v } : r)));
+  const update = (i: number, key: string, v: string | number | null) =>
+    onChange(rows.map((r, j) => (j === i ? { ...r, [key]: v } : r)));
   const add = () => onChange([...rows, Object.fromEntries(field.columns.map((c) => [c.key, null]))]);
   const remove = (i: number) => onChange(rows.filter((_, j) => j !== i));
   const move = (i: number, d: -1 | 1) => {
@@ -236,8 +308,9 @@ function TableEditor({ field, rows, issues, onChange }: { field: TableField; row
         )}
       </legend>
       <p className="text-xs text-muted">
-        Official form, page {field.source.page}: “{field.source.label}”. The printed form has {field.templateRows} rows; additional entries are added to
-        the same table. Up to {field.maxRows} entries.
+        Official form, page {field.source.page}: “{field.source.label}”. The printed form has{" "}
+        {field.templateRows} rows; additional entries are added to the same table. Up to {field.maxRows}{" "}
+        entries.
       </p>
       {field.help && <p className="text-xs text-muted">{field.help}</p>}
       {tableError && (
@@ -252,10 +325,22 @@ function TableEditor({ field, rows, issues, onChange }: { field: TableField; row
             <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
               <p className="text-sm font-semibold">Entry {i + 1}</p>
               <div className="flex gap-2">
-                <button type="button" className="btn-secondary py-1" disabled={i === 0} onClick={() => move(i, -1)} aria-label={`Move entry ${i + 1} up`}>
+                <button
+                  type="button"
+                  className="btn-secondary py-1"
+                  disabled={i === 0}
+                  onClick={() => move(i, -1)}
+                  aria-label={`Move entry ${i + 1} up`}
+                >
                   Up
                 </button>
-                <button type="button" className="btn-secondary py-1" disabled={i === rows.length - 1} onClick={() => move(i, 1)} aria-label={`Move entry ${i + 1} down`}>
+                <button
+                  type="button"
+                  className="btn-secondary py-1"
+                  disabled={i === rows.length - 1}
+                  onClick={() => move(i, 1)}
+                  aria-label={`Move entry ${i + 1} down`}
+                >
                   Down
                 </button>
                 <RemoveButton label={`entry ${i + 1}`} onConfirm={() => remove(i)} />
@@ -284,7 +369,17 @@ function TableEditor({ field, rows, issues, onChange }: { field: TableField; row
   );
 }
 
-function ListEditor({ field, items, issues, onChange }: { field: ListField; items: string[]; issues: FieldIssue[]; onChange: (v: string[]) => void }) {
+function ListEditor({
+  field,
+  items,
+  issues,
+  onChange,
+}: {
+  field: ListField;
+  items: string[];
+  issues: FieldIssue[];
+  onChange: (v: string[]) => void;
+}) {
   const headingId = `l-${field.key}`;
   return (
     <fieldset className="space-y-3 rounded border border-line p-4" aria-labelledby={headingId}>
@@ -292,8 +387,9 @@ function ListEditor({ field, items, issues, onChange }: { field: ListField; item
         {field.label}
       </legend>
       <p className="text-xs text-muted">
-        Official form, page {field.source.page}: “{field.source.label}”. Space for about {field.templateCapacity} entries is printed; longer lists
-        continue on additional lines without truncation.
+        Official form, page {field.source.page}: “{field.source.label}”. Space for about{" "}
+        {field.templateCapacity} entries is printed; longer lists continue on additional lines without
+        truncation.
       </p>
       {field.help && <p className="text-xs text-muted">{field.help}</p>}
       {items.length === 0 && <p className="text-sm text-muted">No entries yet.</p>}
@@ -317,7 +413,10 @@ function ListEditor({ field, items, issues, onChange }: { field: ListField; item
                   value={it}
                   onChange={(e) => onChange(items.map((x, j) => (j === i ? e.target.value : x)))}
                 />
-                <RemoveButton label={`${field.itemLabel.toLowerCase()} ${i + 1}`} onConfirm={() => onChange(items.filter((_, j) => j !== i))} />
+                <RemoveButton
+                  label={`${field.itemLabel.toLowerCase()} ${i + 1}`}
+                  onConfirm={() => onChange(items.filter((_, j) => j !== i))}
+                />
               </div>
               {err && (
                 <p id={`${id}-err`} className="text-sm text-danger">
@@ -328,7 +427,12 @@ function ListEditor({ field, items, issues, onChange }: { field: ListField; item
           );
         })}
       </ol>
-      <button type="button" className="btn-secondary" onClick={() => onChange([...items, ""])} disabled={items.length >= field.maxItems}>
+      <button
+        type="button"
+        className="btn-secondary"
+        onClick={() => onChange([...items, ""])}
+        disabled={items.length >= field.maxItems}
+      >
         Add {field.itemLabel.toLowerCase()}
       </button>
     </fieldset>

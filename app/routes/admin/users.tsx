@@ -5,7 +5,14 @@ import { handleAction, readForm, requireUser } from "~/lib/http.server";
 import { hasPermission, ROLE_LABELS, type RoleName } from "~/modules/auth/permissions";
 import { ForbiddenError, ValidationError } from "~/modules/core/errors";
 import { prisma } from "~/modules/core/db.server";
-import { createStaffUser, grantableRoles, grantRole, listUsers, revokeRole, setUserStatus } from "~/modules/users/service.server";
+import {
+  createStaffUser,
+  grantableRoles,
+  grantRole,
+  listUsers,
+  revokeRole,
+  setUserStatus,
+} from "~/modules/users/service.server";
 import { data } from "react-router";
 
 export const meta: Route.MetaFunction = () => [{ title: "Users and roles — Administration" }];
@@ -20,7 +27,14 @@ export async function loader({ request, context }: Route.LoaderArgs) {
     prisma.department.findMany({ orderBy: { name: "asc" }, select: { id: true, name: true } }),
     prisma.recruitmentCycle.findMany({ orderBy: { opensAt: "desc" }, select: { id: true, title: true } }),
   ]);
-  return { users, departments, cycles, roles, canCreate: hasPermission(user.grants, "user:manage"), selfId: user.id };
+  return {
+    users,
+    departments,
+    cycles,
+    roles,
+    canCreate: hasPermission(user.grants, "user:manage"),
+    selfId: user.id,
+  };
 }
 
 export async function action({ request, context }: Route.ActionArgs) {
@@ -38,7 +52,11 @@ export async function action({ request, context }: Route.ActionArgs) {
         await revokeRole(user, String(form.get("roleId")));
         return { message: "Role revoked." };
       case "status":
-        await setUserStatus(user, String(form.get("userId")), form.get("status") === "DISABLED" ? "DISABLED" : "ACTIVE");
+        await setUserStatus(
+          user,
+          String(form.get("userId")),
+          form.get("status") === "DISABLED" ? "DISABLED" : "ACTIVE",
+        );
         return { message: "Account status updated." };
       default:
         throw new ValidationError("Unknown action");
@@ -56,8 +74,12 @@ export default function Users({ loaderData, actionData }: Route.ComponentProps) 
   return (
     <div className="space-y-6">
       <h1>Users and roles</h1>
-      {actionData && "message" in actionData && actionData.message && <Alert tone="success">{actionData.message}</Alert>}
-      {actionData && "formError" in actionData && actionData.formError && <Alert tone="danger">{actionData.formError}</Alert>}
+      {actionData && "message" in actionData && actionData.message && (
+        <Alert tone="success">{actionData.message}</Alert>
+      )}
+      {actionData && "formError" in actionData && actionData.formError && (
+        <Alert tone="danger">{actionData.formError}</Alert>
+      )}
       {canCreate && (
         <section className="card" aria-labelledby="new-staff">
           <h2 id="new-staff">Create a staff account</h2>
@@ -77,7 +99,13 @@ export default function Users({ loaderData, actionData }: Route.ComponentProps) 
           <label htmlFor="q" className="block text-sm font-medium">
             Search staff
           </label>
-          <input id="q" name="q" type="search" defaultValue={params.get("q") ?? ""} className="field-input mt-1" />
+          <input
+            id="q"
+            name="q"
+            type="search"
+            defaultValue={params.get("q") ?? ""}
+            className="field-input mt-1"
+          />
         </div>
         <button type="submit" className="btn-secondary">
           Search
@@ -92,15 +120,31 @@ export default function Users({ loaderData, actionData }: Route.ComponentProps) 
                 <p className="text-sm text-muted">{u.email}</p>
               </div>
               <div className="flex items-center gap-2">
-                <Badge tone={u.status === "ACTIVE" ? "success" : "danger"}>{u.status === "ACTIVE" ? "Active" : "Disabled"}</Badge>
+                <Badge tone={u.status === "ACTIVE" ? "success" : "danger"}>
+                  {u.status === "ACTIVE" ? "Active" : "Disabled"}
+                </Badge>
                 {canCreate && u.id !== selfId && (
                   <Form method="post">
                     <CsrfInput />
                     <input type="hidden" name="intent" value="status" />
                     <input type="hidden" name="userId" value={u.id} />
-                    <input type="hidden" name="status" value={u.status === "ACTIVE" ? "DISABLED" : "ACTIVE"} />
-                    <ConfirmDialog trigger={u.status === "ACTIVE" ? "Disable" : "Enable"} triggerClassName="btn-secondary py-1" tone={u.status === "ACTIVE" ? "danger" : "primary"} title={`${u.status === "ACTIVE" ? "Disable" : "Enable"} this account?`} confirmLabel="Confirm">
-                      <p>{u.status === "ACTIVE" ? "The user is signed out immediately and cannot sign in." : "The user will be able to sign in again."}</p>
+                    <input
+                      type="hidden"
+                      name="status"
+                      value={u.status === "ACTIVE" ? "DISABLED" : "ACTIVE"}
+                    />
+                    <ConfirmDialog
+                      trigger={u.status === "ACTIVE" ? "Disable" : "Enable"}
+                      triggerClassName="btn-secondary py-1"
+                      tone={u.status === "ACTIVE" ? "danger" : "primary"}
+                      title={`${u.status === "ACTIVE" ? "Disable" : "Enable"} this account?`}
+                      confirmLabel="Confirm"
+                    >
+                      <p>
+                        {u.status === "ACTIVE"
+                          ? "The user is signed out immediately and cannot sign in."
+                          : "The user will be able to sign in again."}
+                      </p>
                     </ConfirmDialog>
                   </Form>
                 )}
@@ -108,7 +152,10 @@ export default function Users({ loaderData, actionData }: Route.ComponentProps) 
             </div>
             <ul className="flex flex-wrap gap-2">
               {u.roles.map((r) => (
-                <li key={r.id} className="flex items-center gap-1 rounded border border-line px-2 py-1 text-sm">
+                <li
+                  key={r.id}
+                  className="flex items-center gap-1 rounded border border-line px-2 py-1 text-sm"
+                >
                   {ROLE_LABELS[r.role as RoleName]}
                   {r.department ? ` — ${r.department.name}` : ""}
                   {r.role === "HR_OFFICER" ? ` — ${r.cycle?.title ?? "all cycles"}` : ""}
@@ -117,7 +164,11 @@ export default function Users({ loaderData, actionData }: Route.ComponentProps) 
                       <CsrfInput />
                       <input type="hidden" name="intent" value="revoke" />
                       <input type="hidden" name="roleId" value={r.id} />
-                      <button type="submit" className="btn-link ml-1 py-0 text-xs text-danger" aria-label={`Revoke ${ROLE_LABELS[r.role as RoleName]}`}>
+                      <button
+                        type="submit"
+                        className="btn-link ml-1 py-0 text-xs text-danger"
+                        aria-label={`Revoke ${ROLE_LABELS[r.role as RoleName]}`}
+                      >
                         Revoke
                       </button>
                     </Form>

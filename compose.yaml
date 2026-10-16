@@ -145,7 +145,13 @@ services:
       redis: { condition: service_healthy }
       converter: { condition: service_healthy }
     healthcheck:
-      test: ["CMD", "node", "-e", "require('fs').statSync('/tmp/worker-alive').mtimeMs > Date.now() - 60000 || process.exit(1)"]
+      test:
+        [
+          "CMD",
+          "node",
+          "-e",
+          "require('fs').statSync('/tmp/worker-alive').mtimeMs > Date.now() - 60000 || process.exit(1)",
+        ]
       interval: 20s
       timeout: 5s
       retries: 3

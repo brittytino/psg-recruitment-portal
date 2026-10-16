@@ -17,11 +17,27 @@ export function loader({ context }: Route.LoaderArgs) {
 export async function action({ request, context }: Route.ActionArgs) {
   const form = await readForm(request, context);
   return handleAction(async () => {
-    const r = await login(String(form.get("email") ?? ""), String(form.get("password") ?? ""), clientIp(request), request.headers.get("user-agent"));
+    const r = await login(
+      String(form.get("email") ?? ""),
+      String(form.get("password") ?? ""),
+      clientIp(request),
+      request.headers.get("user-agent"),
+    );
     if (!r.ok) return { formError: r.message };
-    const roles = await prisma.userRole.findMany({ where: { userId: r.userId }, select: { role: true, departmentId: true, cycleId: true } });
-    const fallback = hasPermission(roles, "application:list") ? "/staff" : hasPermission(roles, "recruitment:manage") ? "/admin" : hasPermission(roles, "user:manage") ? "/admin/users" : "/account";
-    throw redirect(safeNext(String(form.get("next") ?? ""), fallback), { headers: { "Set-Cookie": r.setCookie } });
+    const roles = await prisma.userRole.findMany({
+      where: { userId: r.userId },
+      select: { role: true, departmentId: true, cycleId: true },
+    });
+    const fallback = hasPermission(roles, "application:list")
+      ? "/staff"
+      : hasPermission(roles, "recruitment:manage")
+        ? "/admin"
+        : hasPermission(roles, "user:manage")
+          ? "/admin/users"
+          : "/account";
+    throw redirect(safeNext(String(form.get("next") ?? ""), fallback), {
+      headers: { "Set-Cookie": r.setCookie },
+    });
   });
 }
 
@@ -37,9 +53,17 @@ export default function Login({ actionData }: Route.ComponentProps) {
       <Form method="post" className="card mt-6 space-y-4">
         <CsrfInput />
         <input type="hidden" name="next" value={params.get("next") ?? ""} />
-        {actionData && "formError" in actionData && actionData.formError && <Alert tone="danger">{actionData.formError}</Alert>}
+        {actionData && "formError" in actionData && actionData.formError && (
+          <Alert tone="danger">{actionData.formError}</Alert>
+        )}
         <TextInput label="E-mail address" name="email" type="email" required autoComplete="username" />
-        <TextInput label="Password" name="password" type="password" required autoComplete="current-password" />
+        <TextInput
+          label="Password"
+          name="password"
+          type="password"
+          required
+          autoComplete="current-password"
+        />
         <button type="submit" className="btn-primary w-full" disabled={nav.state !== "idle"}>
           {nav.state !== "idle" ? "Signing in…" : "Sign in"}
         </button>

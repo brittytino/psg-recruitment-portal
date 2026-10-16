@@ -16,6 +16,6 @@ server {
     server_tokens off;
     client_max_body_size 12m;
     add_header Strict-Transport-Security "max-age=31536000; includeSubDomains" always;
-    location = /healthz/ready { allow 127.0.0.1; allow 172.16.0.0/12; deny all; proxy_pass http://app_active; }
+    location = /healthz/ready { allow 127.0.0.1; deny all; proxy_pass http://app_active; }
     location / { proxy_pass http://app_active; include /etc/nginx/proxy_params.conf; }
 }

@@ -1,5 +1,14 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { data, Link, redirect, useBlocker, useFetcher, useNavigate, useSearchParams, type ShouldRevalidateFunctionArgs } from "react-router";
+import {
+  data,
+  Link,
+  redirect,
+  useBlocker,
+  useFetcher,
+  useNavigate,
+  useSearchParams,
+  type ShouldRevalidateFunctionArgs,
+} from "react-router";
 import type { Route } from "./+types/application";
 import { SectionFields } from "~/components/application-form";
 import { Alert, Badge, ErrorSummary, formatDateTime, statusTone, useCsrf } from "~/components/forms";
@@ -18,13 +27,21 @@ export async function loader({ request, params, context }: Route.LoaderArgs) {
   const user = requireUser(context, request);
   const app = await getOwnApplication(user, params.id);
   if (!EDITABLE.includes(app.status as AppStatus)) throw redirect(`/applications/${app.id}/receipt`);
-  const clarification = app.status === "NEEDS_CLARIFICATION" ? [...app.statusHistory].reverse().find((h) => h.toStatus === "NEEDS_CLARIFICATION")?.reason : null;
+  const clarification =
+    app.status === "NEEDS_CLARIFICATION"
+      ? [...app.statusHistory].reverse().find((h) => h.toStatus === "NEEDS_CLARIFICATION")?.reason
+      : null;
   return {
     id: app.id,
     status: app.status,
     formCode: app.formTemplate.code as FormCode,
     formVersion: app.formTemplate.version,
-    vacancy: { title: app.vacancy.title, code: app.vacancy.code, department: app.vacancy.department.name, closesAt: app.vacancy.closesAt },
+    vacancy: {
+      title: app.vacancy.title,
+      code: app.vacancy.code,
+      department: app.vacancy.department.name,
+      closesAt: app.vacancy.closesAt,
+    },
     answers: app.draftAnswers as Answers,
     version: app.draftVersion,
     lastSavedAt: app.lastSavedAt,
@@ -34,7 +51,12 @@ export async function loader({ request, params, context }: Route.LoaderArgs) {
 }
 
 /** Section changes are client-side only; keep unsaved edits by not reloading the draft. */
-export function shouldRevalidate({ currentUrl, nextUrl, formMethod, defaultShouldRevalidate }: ShouldRevalidateFunctionArgs) {
+export function shouldRevalidate({
+  currentUrl,
+  nextUrl,
+  formMethod,
+  defaultShouldRevalidate,
+}: ShouldRevalidateFunctionArgs) {
   if (!formMethod && currentUrl.pathname === nextUrl.pathname) return false;
   return defaultShouldRevalidate;
 }
@@ -54,7 +76,8 @@ export async function action({ request, params, context }: Route.ActionArgs) {
   });
 }
 
-type SaveResponse = { ok: true; version: number; savedAt: string } | { formError?: string; details?: unknown; ok?: undefined };
+type SaveResponse =
+  { ok: true; version: number; savedAt: string } | { formError?: string; details?: unknown; ok?: undefined };
 
 export default function ApplicationEditor({ loaderData }: Route.ComponentProps) {
   const L = loaderData;
@@ -63,12 +86,17 @@ export default function ApplicationEditor({ loaderData }: Route.ComponentProps) 
   const navigate = useNavigate();
   const csrf = useCsrf();
   const fetcher = useFetcher<SaveResponse>();
-  const sectionIndex = Math.max(0, def.sections.findIndex((s) => s.id === params.get("section")));
+  const sectionIndex = Math.max(
+    0,
+    def.sections.findIndex((s) => s.id === params.get("section")),
+  );
   const section = def.sections[sectionIndex]!;
 
   const [answers, setAnswers] = useState<Answers>(L.answers);
   const [version, setVersion] = useState(L.version);
-  const [savedAt, setSavedAt] = useState<string | null>(L.lastSavedAt ? new Date(L.lastSavedAt).toISOString() : null);
+  const [savedAt, setSavedAt] = useState<string | null>(
+    L.lastSavedAt ? new Date(L.lastSavedAt).toISOString() : null,
+  );
   const [dirty, setDirty] = useState(false);
   const [showIssues, setShowIssues] = useState(false);
   const [serverIssues, setServerIssues] = useState<FieldIssue[]>([]);
@@ -81,16 +109,24 @@ export default function ApplicationEditor({ loaderData }: Route.ComponentProps) 
   const derived = useMemo(
     () => ({
       department: L.vacancy.department,
-      age: typeof answers.dateOfBirth === "string" ? ageOn(answers.dateOfBirth, new Date().toISOString().slice(0, 10)) : null,
+      age:
+        typeof answers.dateOfBirth === "string"
+          ? ageOn(answers.dateOfBirth, new Date().toISOString().slice(0, 10))
+          : null,
     }),
     [answers.dateOfBirth, L.vacancy.department],
   );
   const allIssues = useMemo(() => validateAnswers(def, answers, "submit"), [def, answers]);
-  const sectionIssues = showIssues ? [...serverIssues, ...allIssues].filter((i) => i.sectionId === section.id) : serverIssues.filter((i) => i.sectionId === section.id);
+  const sectionIssues = showIssues
+    ? [...serverIssues, ...allIssues].filter((i) => i.sectionId === section.id)
+    : serverIssues.filter((i) => i.sectionId === section.id);
 
   const save = (thenGo?: string) => {
     afterSave.current = thenGo ?? null;
-    fetcher.submit({ _csrf: csrf, version: String(version), answers: JSON.stringify(answers) }, { method: "post" });
+    fetcher.submit(
+      { _csrf: csrf, version: String(version), answers: JSON.stringify(answers) },
+      { method: "post" },
+    );
   };
 
   // Handle save responses.
@@ -130,7 +166,10 @@ export default function ApplicationEditor({ loaderData }: Route.ComponentProps) 
   }, [dirty]);
 
   // Block in-app navigation away from the editor with unsaved changes.
-  const blocker = useBlocker(({ currentLocation, nextLocation }) => dirtyRef.current && currentLocation.pathname !== nextLocation.pathname);
+  const blocker = useBlocker(
+    ({ currentLocation, nextLocation }) =>
+      dirtyRef.current && currentLocation.pathname !== nextLocation.pathname,
+  );
 
   const onChange = (key: string, value: Answers[string]) => {
     setAnswers((a) => ({ ...a, [key]: value }));
@@ -188,7 +227,12 @@ export default function ApplicationEditor({ loaderData }: Route.ComponentProps) 
           <p className="px-2 text-sm font-semibold" id="progress-label">
             Progress: {complete} of {def.sections.length} sections complete
           </p>
-          <progress className="mx-2 mt-2 h-2 w-[calc(100%-1rem)]" max={def.sections.length} value={complete} aria-labelledby="progress-label" />
+          <progress
+            className="mx-2 mt-2 h-2 w-[calc(100%-1rem)]"
+            max={def.sections.length}
+            value={complete}
+            aria-labelledby="progress-label"
+          />
           <ol className="mt-3 space-y-1">
             {def.sections.map((s, i) => {
               const n = issueCount(s.id);
@@ -202,19 +246,29 @@ export default function ApplicationEditor({ loaderData }: Route.ComponentProps) 
                     <span>
                       {i + 1}. {s.title}
                     </span>
-                    <span className={`text-xs ${n ? "text-warning" : "text-success"}`}>{n ? `${n} to do` : "Complete"}</span>
+                    <span className={`text-xs ${n ? "text-warning" : "text-success"}`}>
+                      {n ? `${n} to do` : "Complete"}
+                    </span>
                   </Link>
                 </li>
               );
             })}
             <li>
-              <Link to={`/applications/${L.id}/documents`} className="block rounded px-2 py-1.5 text-sm no-underline text-ink hover:bg-brand-50">
+              <Link
+                to={`/applications/${L.id}/documents`}
+                className="block rounded px-2 py-1.5 text-sm no-underline text-ink hover:bg-brand-50"
+              >
                 Documents and photograph{" "}
-                <span className={`text-xs ${L.hasPhoto ? "text-success" : "text-warning"}`}>{L.hasPhoto ? "Photo uploaded" : "Photo needed"}</span>
+                <span className={`text-xs ${L.hasPhoto ? "text-success" : "text-warning"}`}>
+                  {L.hasPhoto ? "Photo uploaded" : "Photo needed"}
+                </span>
               </Link>
             </li>
             <li>
-              <Link to={`/applications/${L.id}/review`} className="block rounded px-2 py-1.5 text-sm font-medium no-underline hover:bg-brand-50">
+              <Link
+                to={`/applications/${L.id}/review`}
+                className="block rounded px-2 py-1.5 text-sm font-medium no-underline hover:bg-brand-50"
+              >
                 Review and submit
               </Link>
             </li>
@@ -225,8 +279,8 @@ export default function ApplicationEditor({ loaderData }: Route.ComponentProps) 
           <div>
             <p className="text-sm text-muted">
               Section {sectionIndex + 1} of {def.sections.length}
-              {section.sourceHeading ? ` · Official heading: “${section.sourceHeading}”` : ""} · Page{section.pages.length > 1 ? "s" : ""}{" "}
-              {section.pages.join(", ")}
+              {section.sourceHeading ? ` · Official heading: “${section.sourceHeading}”` : ""} · Page
+              {section.pages.length > 1 ? "s" : ""} {section.pages.join(", ")}
             </p>
             <h2 id="section-title" className="text-xl">
               {section.title}
@@ -235,13 +289,28 @@ export default function ApplicationEditor({ loaderData }: Route.ComponentProps) 
           </div>
           <ErrorSummary
             title="Please check this section"
-            messages={sectionIssues.map((i) => ({ text: i.message, href: `#q-${i.path.replace(/\./g, "-")}` }))}
+            messages={sectionIssues.map((i) => ({
+              text: i.message,
+              href: `#q-${i.path.replace(/\./g, "-")}`,
+            }))}
           />
-          <SectionFields section={section} answers={answers} derived={derived} issues={sectionIssues} onChange={onChange} />
+          <SectionFields
+            section={section}
+            answers={answers}
+            derived={derived}
+            issues={sectionIssues}
+            onChange={onChange}
+          />
 
           <div className="flex flex-wrap items-center justify-between gap-3 border-t border-line pt-4">
             <p className="text-sm text-muted" role="status" aria-live="polite">
-              {saving ? "Saving…" : dirty ? "Unsaved changes" : savedAt ? `All changes saved · last saved ${formatDateTime(savedAt)}` : "Not saved yet"}
+              {saving
+                ? "Saving…"
+                : dirty
+                  ? "Unsaved changes"
+                  : savedAt
+                    ? `All changes saved · last saved ${formatDateTime(savedAt)}`
+                    : "Not saved yet"}
             </p>
             <div className="flex flex-wrap gap-2">
               {sectionIndex > 0 && (
@@ -252,14 +321,25 @@ export default function ApplicationEditor({ loaderData }: Route.ComponentProps) 
               <button type="button" className="btn-secondary" onClick={() => setShowIssues(true)}>
                 Check this section
               </button>
-              <button type="button" className="btn-secondary" disabled={saving || !!conflict} onClick={() => save()}>
+              <button
+                type="button"
+                className="btn-secondary"
+                disabled={saving || !!conflict}
+                onClick={() => save()}
+              >
                 Save draft
               </button>
               <button
                 type="button"
                 className="btn-primary"
                 disabled={saving || !!conflict}
-                onClick={() => save(sectionIndex < def.sections.length - 1 ? `/applications/${L.id}${sectionUrl(sectionIndex + 1)}` : `/applications/${L.id}/documents`)}
+                onClick={() =>
+                  save(
+                    sectionIndex < def.sections.length - 1
+                      ? `/applications/${L.id}${sectionUrl(sectionIndex + 1)}`
+                      : `/applications/${L.id}/documents`,
+                  )
+                }
               >
                 Save and continue
               </button>
@@ -270,4 +350,3 @@ export default function ApplicationEditor({ loaderData }: Route.ComponentProps) 
     </div>
   );
 }
-

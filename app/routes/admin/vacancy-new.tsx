@@ -12,8 +12,15 @@ export const meta: Route.MetaFunction = () => [{ title: "Create vacancy — Admi
 export async function loader({ request, context }: Route.LoaderArgs) {
   requireStaff(context, request, "recruitment:manage");
   const [cycles, departments] = await Promise.all([
-    prisma.recruitmentCycle.findMany({ where: { status: { in: ["DRAFT", "PUBLISHED"] } }, orderBy: { opensAt: "desc" } }),
-    prisma.department.findMany({ where: { active: true }, orderBy: { name: "asc" }, include: { disciplines: { orderBy: { name: "asc" } } } }),
+    prisma.recruitmentCycle.findMany({
+      where: { status: { in: ["DRAFT", "PUBLISHED"] } },
+      orderBy: { opensAt: "desc" },
+    }),
+    prisma.department.findMany({
+      where: { active: true },
+      orderBy: { name: "asc" },
+      include: { disciplines: { orderBy: { name: "asc" } } },
+    }),
   ]);
   return { cycles, departments };
 }
@@ -22,7 +29,10 @@ export async function action({ request, context }: Route.ActionArgs) {
   const user = requireStaff(context, request, "recruitment:manage");
   const form = await readForm(request, context);
   return handleAction(async () => {
-    await createVacancy(user, { ...Object.fromEntries(form), requiredDocuments: form.getAll("requiredDocuments") });
+    await createVacancy(user, {
+      ...Object.fromEntries(form),
+      requiredDocuments: form.getAll("requiredDocuments"),
+    });
     throw redirect("/admin");
   });
 }
@@ -30,18 +40,30 @@ export async function action({ request, context }: Route.ActionArgs) {
 export default function VacancyNew({ loaderData, actionData }: Route.ComponentProps) {
   const { cycles, departments } = loaderData;
   const fe = actionData && "fieldErrors" in actionData ? actionData.fieldErrors : undefined;
-  const summary = fe ? Object.entries(fe).flatMap(([k, v]) => (v ?? []).map((text) => ({ text: `${k}: ${text}`, href: `#f-${k}` }))) : [];
+  const summary = fe
+    ? Object.entries(fe).flatMap(([k, v]) =>
+        (v ?? []).map((text) => ({ text: `${k}: ${text}`, href: `#f-${k}` })),
+      )
+    : [];
   return (
     <div className="max-w-3xl space-y-6">
       <p className="text-sm">
         <Link to="/admin">← Administration</Link>
       </p>
       <h1>Create vacancy</h1>
-      {actionData && "formError" in actionData && actionData.formError && !summary.length && <Alert tone="danger">{actionData.formError}</Alert>}
+      {actionData && "formError" in actionData && actionData.formError && !summary.length && (
+        <Alert tone="danger">{actionData.formError}</Alert>
+      )}
       <ErrorSummary messages={summary} />
       <Form method="post" className="card space-y-4">
         <CsrfInput />
-        <TextInput label="Vacancy code" name="code" required hint="Public reference, e.g. 2026-CSE-AP" error={fe?.code?.[0]} />
+        <TextInput
+          label="Vacancy code"
+          name="code"
+          required
+          hint="Public reference, e.g. 2026-CSE-AP"
+          error={fe?.code?.[0]}
+        />
         <TextInput label="Title" name="title" required error={fe?.title?.[0]} />
         <div className="grid gap-4 sm:grid-cols-2">
           <div>
@@ -55,7 +77,10 @@ export default function VacancyNew({ loaderData, actionData }: Route.ComponentPr
                 </option>
               ))}
             </select>
-            <p className="mt-1 text-xs text-muted">Professor and Associate Professor vacancies use the official “PROFESSOR / ASSOCIATE PROFESSOR” form.</p>
+            <p className="mt-1 text-xs text-muted">
+              Professor and Associate Professor vacancies use the official “PROFESSOR / ASSOCIATE PROFESSOR”
+              form.
+            </p>
           </div>
           <div>
             <label htmlFor="f-cycleId" className="block text-sm font-medium">
@@ -99,8 +124,19 @@ export default function VacancyNew({ loaderData, actionData }: Route.ComponentPr
             </select>
           </div>
           <TextInput label="Opens" name="opensAt" type="datetime-local" required error={fe?.opensAt?.[0]} />
-          <TextInput label="Closes" name="closesAt" type="datetime-local" required error={fe?.closesAt?.[0]} />
-          <TextInput label="Number of posts" name="numberOfPosts" type="number" error={fe?.numberOfPosts?.[0]} />
+          <TextInput
+            label="Closes"
+            name="closesAt"
+            type="datetime-local"
+            required
+            error={fe?.closesAt?.[0]}
+          />
+          <TextInput
+            label="Number of posts"
+            name="numberOfPosts"
+            type="number"
+            error={fe?.numberOfPosts?.[0]}
+          />
         </div>
         <div>
           <label htmlFor="f-description" className="block text-sm font-medium">
@@ -112,16 +148,21 @@ export default function VacancyNew({ loaderData, actionData }: Route.ComponentPr
           <label htmlFor="f-eligibility" className="block text-sm font-medium">
             Eligibility criteria (one per line)
           </label>
-          <p className="text-xs text-muted">Enter only criteria approved by the college. Nothing is pre-filled.</p>
+          <p className="text-xs text-muted">
+            Enter only criteria approved by the college. Nothing is pre-filled.
+          </p>
           <textarea id="f-eligibility" name="eligibility" rows={5} className="field-input mt-1" />
         </div>
         <fieldset>
           <legend className="text-sm font-medium">Required supporting documents</legend>
-          <p className="text-xs text-muted">The passport photograph is always required (it is printed on the form).</p>
+          <p className="text-xs text-muted">
+            The passport photograph is always required (it is printed on the form).
+          </p>
           <div className="mt-2 grid gap-1 sm:grid-cols-2">
             {DOCUMENT_TYPES.filter((t) => t !== "PHOTOGRAPH").map((t) => (
               <label key={t} className="flex items-center gap-2 text-sm">
-                <input type="checkbox" name="requiredDocuments" value={t} className="h-4 w-4" /> {DOCUMENT_TYPE_LABELS[t]}
+                <input type="checkbox" name="requiredDocuments" value={t} className="h-4 w-4" />{" "}
+                {DOCUMENT_TYPE_LABELS[t]}
               </label>
             ))}
           </div>

@@ -24,7 +24,8 @@ export function serializeXml(doc: Document): string {
 
 export function children(el: Node, localName: string): Element[] {
   const out: Element[] = [];
-  for (let c = el.firstChild; c; c = c.nextSibling) if ((c as Element).localName === localName) out.push(c as Element);
+  for (let c = el.firstChild; c; c = c.nextSibling)
+    if ((c as Element).localName === localName) out.push(c as Element);
   return out;
 }
 
@@ -183,9 +184,24 @@ export const layout = { defaultSzHalfPts: 22, defaultTabTwips: 720 };
 const ARIAL: Record<string, number> = Object.fromEntries(
   [
     [" !\"#$%&'()*+,-./", [278, 278, 355, 556, 556, 889, 667, 191, 333, 333, 389, 584, 278, 333, 278, 278]],
-    ["0123456789:;<=>?@", [556, 556, 556, 556, 556, 556, 556, 556, 556, 556, 278, 278, 584, 584, 584, 556, 1015]],
-    ["ABCDEFGHIJKLMNOPQRSTUVWXYZ", [667, 667, 722, 722, 667, 611, 778, 722, 278, 500, 667, 556, 833, 722, 778, 667, 778, 722, 667, 611, 722, 667, 944, 667, 667, 611]],
-    ["abcdefghijklmnopqrstuvwxyz", [556, 556, 500, 556, 556, 278, 556, 556, 222, 222, 500, 222, 833, 556, 556, 556, 556, 333, 500, 278, 556, 500, 722, 500, 500, 500]],
+    [
+      "0123456789:;<=>?@",
+      [556, 556, 556, 556, 556, 556, 556, 556, 556, 556, 278, 278, 584, 584, 584, 556, 1015],
+    ],
+    [
+      "ABCDEFGHIJKLMNOPQRSTUVWXYZ",
+      [
+        667, 667, 722, 722, 667, 611, 778, 722, 278, 500, 667, 556, 833, 722, 778, 667, 778, 722, 667, 611,
+        722, 667, 944, 667, 667, 611,
+      ],
+    ],
+    [
+      "abcdefghijklmnopqrstuvwxyz",
+      [
+        556, 556, 500, 556, 556, 278, 556, 556, 222, 222, 500, 222, 833, 556, 556, 556, 556, 333, 500, 278,
+        556, 500, 722, 500, 500, 500,
+      ],
+    ],
     ["[\\]^_`{|}~", [278, 278, 278, 469, 556, 333, 334, 260, 334, 584]],
   ].flatMap(([chars, widths]) => [...(chars as string)].map((c, i) => [c, (widths as number[])[i]!])),
 );
@@ -230,7 +246,8 @@ function tokens(p: Element): Token[] {
     const bold = !!rPr && children(rPr, "b").length > 0;
     for (let c = r.firstChild; c; c = c.nextSibling) {
       const el = c as Element;
-      if (el.localName === "t") out.push({ kind: "text", width: textWidthTwips(el.textContent ?? "", sz, bold) });
+      if (el.localName === "t")
+        out.push({ kind: "text", width: textWidthTwips(el.textContent ?? "", sz, bold) });
       else if (el.localName === "tab") out.push({ kind: "tab", el });
     }
   }
@@ -307,7 +324,12 @@ export function appendToParagraph(p: Element, value: string): void {
 /** Clones `template` (a paragraph) with all its runs removed and inserts it after `after`. */
 export function insertEmptyParagraphAfter(after: Element, template: Element): Element {
   const p = template.cloneNode(true) as Element;
-  for (const c of [...children(p, "r"), ...children(p, "proofErr"), ...children(p, "bookmarkStart"), ...children(p, "bookmarkEnd")])
+  for (const c of [
+    ...children(p, "r"),
+    ...children(p, "proofErr"),
+    ...children(p, "bookmarkStart"),
+    ...children(p, "bookmarkEnd"),
+  ])
     p.removeChild(c);
   after.parentNode!.insertBefore(p, after.nextSibling);
   return p;
@@ -366,7 +388,9 @@ function tableFont(tc: Element): Element | null {
   const tbl = tr?.parentNode as Element | null;
   for (const scope of [tc, tr, tbl]) {
     if (!scope) continue;
-    const withFont = descendants(scope, "rPr").find((rPr) => children(rPr, "rFonts").length > 0 && !isInsideTextBox(rPr));
+    const withFont = descendants(scope, "rPr").find(
+      (rPr) => children(rPr, "rFonts").length > 0 && !isInsideTextBox(rPr),
+    );
     if (withFont) return withoutEmphasis(withFont);
   }
   const own = firstRunProps(tc);
@@ -506,7 +530,14 @@ export function imageInfo(data: Uint8Array): ImageInfo {
 }
 
 /** Builds an inline DrawingML picture element sized to fit within (maxCx × maxCy) EMU. */
-function inlinePicture(doc: Document, relId: string, img: ImageInfo, maxCx: number, maxCy: number, docPrId: number): Element {
+function inlinePicture(
+  doc: Document,
+  relId: string,
+  img: ImageInfo,
+  maxCx: number,
+  maxCy: number,
+  docPrId: number,
+): Element {
   const ratio = Math.min(maxCx / img.widthPx, maxCy / img.heightPx);
   const cx = Math.round(img.widthPx * ratio);
   const cy = Math.round(img.heightPx * ratio);
@@ -529,7 +560,11 @@ export function placePhotoInTextBox(
   let n = 0;
   const boxes = descendants(doc, "txbxContent");
   for (const tb of boxes) {
-    const text = norm(descendants(tb, "t").map((t) => t.textContent ?? "").join(""));
+    const text = norm(
+      descendants(tb, "t")
+        .map((t) => t.textContent ?? "")
+        .join(""),
+    );
     if (text !== norm(boxText)) continue;
     const ps = children(tb, "p");
     const p = ps[0]!;
@@ -550,14 +585,22 @@ export function textBoxExtent(doc: Document, boxText: string): { cx: number; cy:
   const anchors = doc.getElementsByTagNameNS(WP_NS, "anchor");
   for (let i = 0; i < anchors.length; i++) {
     const a = anchors[i]!;
-    const text = norm(descendants(a, "t").map((t) => t.textContent ?? "").join(""));
+    const text = norm(
+      descendants(a, "t")
+        .map((t) => t.textContent ?? "")
+        .join(""),
+    );
     if (text !== norm(boxText)) continue;
     const ext = a.getElementsByTagNameNS(WP_NS, "extent")[0];
     if (ext) return { cx: Number(ext.getAttribute("cx")), cy: Number(ext.getAttribute("cy")) };
   }
   // Legacy VML text boxes (v:rect / v:shape with style="width:93.95pt;height:87.7pt").
   for (const tb of descendants(doc, "txbxContent")) {
-    const text = norm(descendants(tb, "t").map((t) => t.textContent ?? "").join(""));
+    const text = norm(
+      descendants(tb, "t")
+        .map((t) => t.textContent ?? "")
+        .join(""),
+    );
     if (text !== norm(boxText)) continue;
     const shape = tb.parentNode?.parentNode as Element | null;
     const style = shape?.getAttribute?.("style") ?? "";
@@ -600,7 +643,8 @@ export function findRow(tbl: Element, label: string, from?: Element): Element {
 /** The `count` rows following `tr` in its table. */
 export function rowsAfter(tr: Element, count: number): Element[] {
   const out: Element[] = [];
-  for (let n = tr.nextSibling; n && out.length < count; n = n.nextSibling) if ((n as Element).localName === "tr") out.push(n as Element);
+  for (let n = tr.nextSibling; n && out.length < count; n = n.nextSibling)
+    if ((n as Element).localName === "tr") out.push(n as Element);
   return out;
 }
 

@@ -8,7 +8,13 @@ export async function loader({ request, context }: Route.LoaderArgs) {
   const user = requireStaff(context, request, "application:export");
   const q = parseListQuery(new URL(request.url));
   const csv = await exportCsv(user, q);
-  await audit({ actorId: user.id, action: "applications.exported", entityType: "application", ip: clientIp(request), metadata: { filters: JSON.stringify({ ...q, page: undefined }) } });
+  await audit({
+    actorId: user.id,
+    action: "applications.exported",
+    entityType: "application",
+    ip: clientIp(request),
+    metadata: { filters: JSON.stringify({ ...q, page: undefined }) },
+  });
   return new Response("\uFEFF" + csv, {
     headers: {
       "Content-Type": "text/csv; charset=utf-8",

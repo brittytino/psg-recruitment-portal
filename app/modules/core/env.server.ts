@@ -42,7 +42,8 @@ export function env(): Env {
   const e = parsed.data;
   if (e.NODE_ENV === "production") {
     if (e.MALWARE_SCAN === "disabled") throw new Error("MALWARE_SCAN=disabled is not allowed in production");
-    if (e.SESSION_SECRET.startsWith("replace-with")) throw new Error("SESSION_SECRET still has the example value");
+    if (e.SESSION_SECRET.startsWith("replace-with"))
+      throw new Error("SESSION_SECRET still has the example value");
   }
   cached = e;
   return e;

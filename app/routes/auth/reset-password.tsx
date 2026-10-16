@@ -11,7 +11,8 @@ export async function action({ request, context }: Route.ActionArgs) {
   const form = await readForm(request, context);
   return handleAction(async () => {
     const password = String(form.get("password") ?? "");
-    if (password !== String(form.get("confirmPassword") ?? "")) throw new ValidationError("Passwords do not match", { confirmPassword: ["Passwords do not match"] });
+    if (password !== String(form.get("confirmPassword") ?? ""))
+      throw new ValidationError("Passwords do not match", { confirmPassword: ["Passwords do not match"] });
     await resetPassword(String(form.get("token") ?? ""), password, clientIp(request));
     throw redirect("/login?reset=1");
   });
@@ -27,9 +28,26 @@ export default function ResetPassword({ actionData }: Route.ComponentProps) {
       <Form method="post" className="card mt-6 space-y-4">
         <CsrfInput />
         <input type="hidden" name="token" value={params.get("token") ?? ""} />
-        {actionData && "formError" in actionData && actionData.formError && <Alert tone="danger">{actionData.formError}</Alert>}
-        <TextInput label="New password" name="password" type="password" required autoComplete="new-password" hint="At least 10 characters." error={errorFor(fe, "password")} />
-        <TextInput label="Confirm new password" name="confirmPassword" type="password" required autoComplete="new-password" error={errorFor(fe, "confirmPassword")} />
+        {actionData && "formError" in actionData && actionData.formError && (
+          <Alert tone="danger">{actionData.formError}</Alert>
+        )}
+        <TextInput
+          label="New password"
+          name="password"
+          type="password"
+          required
+          autoComplete="new-password"
+          hint="At least 10 characters."
+          error={errorFor(fe, "password")}
+        />
+        <TextInput
+          label="Confirm new password"
+          name="confirmPassword"
+          type="password"
+          required
+          autoComplete="new-password"
+          error={errorFor(fe, "confirmPassword")}
+        />
         <button type="submit" className="btn-primary w-full" disabled={nav.state !== "idle"}>
           Set new password
         </button>

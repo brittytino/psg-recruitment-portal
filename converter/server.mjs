@@ -13,16 +13,26 @@ const TOKEN = process.env.CONVERTER_TOKEN ?? "";
 const MAX_CONCURRENT = Number(process.env.CONVERTER_CONCURRENCY ?? 2);
 let active = 0;
 
-const log = (level, msg, extra = {}) => console.log(JSON.stringify({ level, time: new Date().toISOString(), service: "converter", msg, ...extra }));
+const log = (level, msg, extra = {}) =>
+  console.log(JSON.stringify({ level, time: new Date().toISOString(), service: "converter", msg, ...extra }));
 
 function run(cmd, args, timeoutMs) {
   return new Promise((resolve, reject) => {
     const p = spawn(cmd, args, { stdio: ["ignore", "pipe", "pipe"] });
     let err = "";
     p.stderr.on("data", (d) => (err += d));
-    const t = setTimeout(() => { p.kill("SIGKILL"); reject(new Error("conversion timed out")); }, timeoutMs);
-    p.on("close", (code) => { clearTimeout(t); code === 0 ? resolve() : reject(new Error(`soffice exited ${code}: ${err.slice(0, 500)}`)); });
-    p.on("error", (e) => { clearTimeout(t); reject(e); });
+    const t = setTimeout(() => {
+      p.kill("SIGKILL");
+      reject(new Error("conversion timed out"));
+    }, timeoutMs);
+    p.on("close", (code) => {
+      clearTimeout(t);
+      code === 0 ? resolve() : reject(new Error(`soffice exited ${code}: ${err.slice(0, 500)}`));
+    });
+    p.on("error", (e) => {
+      clearTimeout(t);
+      reject(e);
+    });
   });
 }
 
@@ -32,11 +42,22 @@ async function convert(input, ext) {
     const src = join(dir, `input.${ext}`);
     await writeFile(src, input);
     // A per-request profile directory lets conversions run concurrently and isolates state.
-    await run("soffice", [
-      `-env:UserInstallation=file://${join(dir, "profile")}`,
-      "--headless", "--norestore", "--nolockcheck", "--nodefault",
-      "--convert-to", "pdf:writer_pdf_Export", "--outdir", dir, src,
-    ], TIMEOUT_MS);
+    await run(
+      "soffice",
+      [
+        `-env:UserInstallation=file://${join(dir, "profile")}`,
+        "--headless",
+        "--norestore",
+        "--nolockcheck",
+        "--nodefault",
+        "--convert-to",
+        "pdf:writer_pdf_Export",
+        "--outdir",
+        dir,
+        src,
+      ],
+      TIMEOUT_MS,
+    );
     return await readFile(join(dir, "input.pdf"));
   } finally {
     await rm(dir, { recursive: true, force: true });
@@ -77,4 +98,8 @@ createServer(async (req, res) => {
   }
 }).listen(PORT, () => log("info", `listening on ${PORT}`));
 
-for (const sig of ["SIGTERM", "SIGINT"]) process.on(sig, () => { log("info", `received ${sig}, exiting`); process.exit(0); });
+for (const sig of ["SIGTERM", "SIGINT"])
+  process.on(sig, () => {
+    log("info", `received ${sig}, exiting`);
+    process.exit(0);
+  });

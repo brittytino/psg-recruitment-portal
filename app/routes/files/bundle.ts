@@ -12,8 +12,14 @@ export async function loader({ request, params, context }: Route.LoaderArgs) {
   if (!/^[0-9a-f-]{36}$/.test(params.id)) throw new Response("Not found", { status: 404 });
   const g = await authorizeGeneratedDownload(user, params.id, clientIp(request)).catch(() => null);
   if (!g || !g.storageKey) throw new Response("Not found", { status: 404 });
-  const app = await prisma.application.findUnique({ where: { id: g.applicationId }, select: { referenceNo: true } });
-  const rev = await prisma.applicationRevision.findUnique({ where: { id: g.revisionId }, select: { revisionNo: true } });
+  const app = await prisma.application.findUnique({
+    where: { id: g.applicationId },
+    select: { referenceNo: true },
+  });
+  const rev = await prisma.applicationRevision.findUnique({
+    where: { id: g.revisionId },
+    select: { revisionNo: true },
+  });
   const name = `${app?.referenceNo ?? "application"}-r${rev?.revisionNo ?? 1}-v${g.version}.pdf`;
   return new Response(Readable.toWeb(streamFile(g.storageKey)) as ReadableStream, {
     headers: {

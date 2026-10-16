@@ -44,42 +44,61 @@ export default function handleRequest(
 ) {
   const nonce = loadContext.get(nonceContext);
   securityHeaders(responseHeaders, nonce);
-  if (request.method.toUpperCase() === "HEAD") return new Response(null, { status: responseStatusCode, headers: responseHeaders });
+  if (request.method.toUpperCase() === "HEAD")
+    return new Response(null, { status: responseStatusCode, headers: responseHeaders });
 
   return new Promise((resolve, reject) => {
     let shellRendered = false;
     const userAgent = request.headers.get("user-agent");
-    const readyOption: keyof RenderToPipeableStreamOptions = (userAgent && isbot(userAgent)) || routerContext.isSpaMode ? "onAllReady" : "onShellReady";
-    let timeoutId: ReturnType<typeof setTimeout> | undefined = setTimeout(() => abort(), streamTimeout + 1000);
+    const readyOption: keyof RenderToPipeableStreamOptions =
+      (userAgent && isbot(userAgent)) || routerContext.isSpaMode ? "onAllReady" : "onShellReady";
+    let timeoutId: ReturnType<typeof setTimeout> | undefined = setTimeout(
+      () => abort(),
+      streamTimeout + 1000,
+    );
 
-    const { pipe, abort } = renderToPipeableStream(<ServerRouter context={routerContext} url={request.url} nonce={nonce} />, {
-      nonce,
-      [readyOption]() {
-        shellRendered = true;
-        const body = new PassThrough({
-          final(callback) {
-            clearTimeout(timeoutId);
-            timeoutId = undefined;
-            callback();
-          },
-        });
-        responseHeaders.set("Content-Type", "text/html; charset=utf-8");
-        pipe(body);
-        resolve(new Response(createReadableStreamFromReadable(body), { headers: responseHeaders, status: responseStatusCode }));
+    const { pipe, abort } = renderToPipeableStream(
+      <ServerRouter context={routerContext} url={request.url} nonce={nonce} />,
+      {
+        nonce,
+        [readyOption]() {
+          shellRendered = true;
+          const body = new PassThrough({
+            final(callback) {
+              clearTimeout(timeoutId);
+              timeoutId = undefined;
+              callback();
+            },
+          });
+          responseHeaders.set("Content-Type", "text/html; charset=utf-8");
+          pipe(body);
+          resolve(
+            new Response(createReadableStreamFromReadable(body), {
+              headers: responseHeaders,
+              status: responseStatusCode,
+            }),
+          );
+        },
+        onShellError(error: unknown) {
+          reject(error);
+        },
+        onError(error: unknown) {
+          responseStatusCode = 500;
+          if (shellRendered) logger.error({ err: String(error) }, "render error");
+        },
       },
-      onShellError(error: unknown) {
-        reject(error);
-      },
-      onError(error: unknown) {
-        responseStatusCode = 500;
-        if (shellRendered) logger.error({ err: String(error) }, "render error");
-      },
-    });
+    );
   });
 }
 
 /** Logs unexpected server errors without leaking them to the client. */
 export function handleError(error: unknown, { request }: { request: Request }) {
   if (request.signal.aborted) return;
-  logger.error({ err: error instanceof Error ? { message: error.message, stack: error.stack } : String(error), path: new URL(request.url).pathname }, "unhandled error");
+  logger.error(
+    {
+      err: error instanceof Error ? { message: error.message, stack: error.stack } : String(error),
+      path: new URL(request.url).pathname,
+    },
+    "unhandled error",
+  );
 }

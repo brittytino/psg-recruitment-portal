@@ -51,5 +51,7 @@ export function hrScope(user: SessionUser): Prisma.ApplicationWhereInput | null 
 }
 
 export function reviewerDepartments(user: SessionUser): string[] {
-  return user.grants.filter((g) => g.role === "DEPARTMENT_REVIEWER" && g.departmentId).map((g) => g.departmentId!);
+  return user.grants
+    .filter((g) => g.role === "DEPARTMENT_REVIEWER" && g.departmentId)
+    .map((g) => g.departmentId!);
 }

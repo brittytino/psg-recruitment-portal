@@ -1,5 +1,15 @@
 import { newNonce } from "./lib/nonce.server";
-import { isRouteErrorResponse, Link, Links, Meta, NavLink, Outlet, Scripts, ScrollRestoration, useRouteLoaderData } from "react-router";
+import {
+  isRouteErrorResponse,
+  Link,
+  Links,
+  Meta,
+  NavLink,
+  Outlet,
+  Scripts,
+  ScrollRestoration,
+  useRouteLoaderData,
+} from "react-router";
 import type { Route } from "./+types/root";
 import "./app.css";
 import { nonceContext, userContext } from "./context";
@@ -21,7 +31,8 @@ export const middleware: Route.MiddlewareFunction[] = [
       const origin = request.headers.get("origin");
       const allowed = new URL(env().APP_ORIGIN).origin;
       const sameSite = request.headers.get("sec-fetch-site");
-      if (origin ? origin !== allowed : sameSite !== "same-origin") throw new Response("Cross-origin request blocked", { status: 403 });
+      if (origin ? origin !== allowed : sameSite !== "same-origin")
+        throw new Response("Cross-origin request blocked", { status: 403 });
     }
     context.set(userContext, await getSessionUser(request));
     return next();
@@ -67,7 +78,8 @@ function Header() {
   const root = useRouteLoaderData<typeof loader>("root");
   const user = root?.user;
   const grants = user?.grants ?? [];
-  const nav = "rounded px-2 py-1 text-sm no-underline text-ink hover:bg-brand-50 aria-[current=page]:font-semibold aria-[current=page]:text-brand-700";
+  const nav =
+    "rounded px-2 py-1 text-sm no-underline text-ink hover:bg-brand-50 aria-[current=page]:font-semibold aria-[current=page]:text-brand-700";
   return (
     <header className="border-b border-line bg-white">
       <a href="#main" className="skip-link">
@@ -165,7 +177,8 @@ export default function App() {
 
 export function ErrorBoundary({ error }: Route.ErrorBoundaryProps) {
   let title = "Something went wrong";
-  let detail = "An unexpected error occurred. Please try again. If the problem continues, contact the recruitment office.";
+  let detail =
+    "An unexpected error occurred. Please try again. If the problem continues, contact the recruitment office.";
   if (isRouteErrorResponse(error)) {
     if (error.status === 404) {
       title = "Page not found";

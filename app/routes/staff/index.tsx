@@ -3,9 +3,19 @@ import type { Route } from "./+types/index";
 import { Badge, formatDateTime, statusTone } from "~/components/forms";
 import { requireStaff } from "~/lib/http.server";
 import { POSITION_LABELS } from "~/lib/labels";
-import { APPLICATION_STATUSES, PROCESSING_LABELS, STATUS_LABELS, type AppStatus } from "~/modules/applications/workflow";
+import {
+  APPLICATION_STATUSES,
+  PROCESSING_LABELS,
+  STATUS_LABELS,
+  type AppStatus,
+} from "~/modules/applications/workflow";
 import { hasPermission } from "~/modules/auth/permissions";
-import { dashboardCounts, filterOptions, listApplications, parseListQuery } from "~/modules/reporting/applications.server";
+import {
+  dashboardCounts,
+  filterOptions,
+  listApplications,
+  parseListQuery,
+} from "~/modules/reporting/applications.server";
 import { PAGE_SIZES } from "~/modules/reporting/constants";
 
 export const meta: Route.MetaFunction = () => [{ title: "Applications — Recruitment workspace" }];
@@ -13,7 +23,11 @@ export const meta: Route.MetaFunction = () => [{ title: "Applications — Recrui
 export async function loader({ request, context }: Route.LoaderArgs) {
   const user = requireStaff(context, request, "application:list");
   const q = parseListQuery(new URL(request.url));
-  const [list, counts, options] = await Promise.all([listApplications(user, q), dashboardCounts(user, q.cycleId), filterOptions()]);
+  const [list, counts, options] = await Promise.all([
+    listApplications(user, q),
+    dashboardCounts(user, q.cycleId),
+    filterOptions(),
+  ]);
   return { list, counts, options, q, canExport: hasPermission(user.grants, "application:export") };
 }
 
@@ -40,7 +54,8 @@ export default function StaffIndex({ loaderData }: Route.ComponentProps) {
     const next = current === key ? (desc ? key : `-${key}`) : key === "submittedAt" ? "-submittedAt" : key;
     return withParams({ sort: next, page: 1 });
   };
-  const ariaSort = (key: string): "ascending" | "descending" | "none" => (q.sort.replace(/^-/, "") === key ? (q.sort.startsWith("-") ? "descending" : "ascending") : "none");
+  const ariaSort = (key: string): "ascending" | "descending" | "none" =>
+    q.sort.replace(/^-/, "") === key ? (q.sort.startsWith("-") ? "descending" : "ascending") : "none";
   const tiles: [string, number | null, string][] = [
     ["Total (non-draft)", counts.total, ""],
     ["Drafts in progress", counts.drafts, ""],
@@ -84,15 +99,59 @@ export default function StaffIndex({ loaderData }: Route.ComponentProps) {
           <label htmlFor="q" className="block text-sm font-medium">
             Search
           </label>
-          <input id="q" name="q" type="search" defaultValue={q.q ?? ""} placeholder="Reference, candidate name or e-mail" className="field-input mt-1" />
+          <input
+            id="q"
+            name="q"
+            type="search"
+            defaultValue={q.q ?? ""}
+            placeholder="Reference, candidate name or e-mail"
+            className="field-input mt-1"
+          />
         </div>
-        <Select name="cycleId" label="Recruitment cycle" value={q.cycleId} options={options.cycles.map((c) => [c.id, c.title])} />
-        <Select name="vacancyId" label="Vacancy" value={q.vacancyId} options={options.vacancies.map((v) => [v.id, `${v.code} — ${v.title}`])} />
-        <Select name="position" label="Position" value={q.position} options={Object.entries(POSITION_LABELS)} />
-        <Select name="departmentId" label="Department" value={q.departmentId} options={options.departments.map((d) => [d.id, d.name])} />
-        <Select name="disciplineId" label="Discipline" value={q.disciplineId} options={options.departments.flatMap((d) => d.disciplines.map((x) => [x.id, `${d.name} — ${x.name}`] as [string, string]))} />
-        <Select name="status" label="Status" value={q.status} options={APPLICATION_STATUSES.filter((s) => s !== "DRAFT").map((s) => [s, STATUS_LABELS[s]])} />
-        <Select name="processing" label="PDF status" value={q.processing} options={Object.entries(PROCESSING_LABELS)} />
+        <Select
+          name="cycleId"
+          label="Recruitment cycle"
+          value={q.cycleId}
+          options={options.cycles.map((c) => [c.id, c.title])}
+        />
+        <Select
+          name="vacancyId"
+          label="Vacancy"
+          value={q.vacancyId}
+          options={options.vacancies.map((v) => [v.id, `${v.code} — ${v.title}`])}
+        />
+        <Select
+          name="position"
+          label="Position"
+          value={q.position}
+          options={Object.entries(POSITION_LABELS)}
+        />
+        <Select
+          name="departmentId"
+          label="Department"
+          value={q.departmentId}
+          options={options.departments.map((d) => [d.id, d.name])}
+        />
+        <Select
+          name="disciplineId"
+          label="Discipline"
+          value={q.disciplineId}
+          options={options.departments.flatMap((d) =>
+            d.disciplines.map((x) => [x.id, `${d.name} — ${x.name}`] as [string, string]),
+          )}
+        />
+        <Select
+          name="status"
+          label="Status"
+          value={q.status}
+          options={APPLICATION_STATUSES.filter((s) => s !== "DRAFT").map((s) => [s, STATUS_LABELS[s]])}
+        />
+        <Select
+          name="processing"
+          label="PDF status"
+          value={q.processing}
+          options={Object.entries(PROCESSING_LABELS)}
+        />
         <div>
           <label htmlFor="from" className="block text-sm font-medium">
             Submitted from
@@ -131,9 +190,11 @@ export default function StaffIndex({ loaderData }: Route.ComponentProps) {
             </span>
           </h2>
           <Form method="get" className="flex items-center gap-2 text-sm">
-            {[...params].filter(([k]) => k !== "size" && k !== "page").map(([k, v]) => (
-              <input key={k} type="hidden" name={k} value={v} />
-            ))}
+            {[...params]
+              .filter(([k]) => k !== "size" && k !== "page")
+              .map(([k, v]) => (
+                <input key={k} type="hidden" name={k} value={v} />
+              ))}
             <label htmlFor="size">Rows per page</label>
             <select id="size" name="size" defaultValue={q.size} className="field-input w-20 py-1">
               {PAGE_SIZES.map((s) => (
@@ -175,7 +236,10 @@ export default function StaffIndex({ loaderData }: Route.ComponentProps) {
               {list.rows.map((r) => (
                 <tr key={r.id}>
                   <td>
-                    <Link to={`/staff/applications/${r.id}`} state={{ back: location.pathname + location.search }}>
+                    <Link
+                      to={`/staff/applications/${r.id}`}
+                      state={{ back: location.pathname + location.search }}
+                    >
                       {r.referenceNo}
                     </Link>
                   </td>
@@ -192,7 +256,9 @@ export default function StaffIndex({ loaderData }: Route.ComponentProps) {
                   </td>
                   <td>{formatDateTime(r.submittedAt)}</td>
                   <td>
-                    <Badge tone={statusTone(r.processingStatus)}>{PROCESSING_LABELS[r.processingStatus]}</Badge>
+                    <Badge tone={statusTone(r.processingStatus)}>
+                      {PROCESSING_LABELS[r.processingStatus]}
+                    </Badge>
                   </td>
                   <td>{r._count.reviews}</td>
                 </tr>
@@ -234,7 +300,17 @@ function SortIcon({ dir }: { dir: "ascending" | "descending" | "none" }) {
   return <span aria-hidden="true">{dir === "ascending" ? "▲" : dir === "descending" ? "▼" : "↕"}</span>;
 }
 
-function Select({ name, label, value, options }: { name: string; label: string; value?: string; options: [string, string][] }) {
+function Select({
+  name,
+  label,
+  value,
+  options,
+}: {
+  name: string;
+  label: string;
+  value?: string;
+  options: [string, string][];
+}) {
   return (
     <div>
       <label htmlFor={name} className="block text-sm font-medium">

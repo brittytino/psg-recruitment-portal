@@ -12,7 +12,14 @@ export async function loader({ request, context }: Route.LoaderArgs) {
   const entityId = url.searchParams.get("entityId") || undefined;
   const action = url.searchParams.get("action") || undefined;
   const page = Math.max(1, Number(url.searchParams.get("page")) || 1);
-  return { log: await auditLog(user, { entityId: entityId && /^[0-9a-f-]{36}$/.test(entityId) ? entityId : undefined, action: action?.slice(0, 60), page }), page };
+  return {
+    log: await auditLog(user, {
+      entityId: entityId && /^[0-9a-f-]{36}$/.test(entityId) ? entityId : undefined,
+      action: action?.slice(0, 60),
+      page,
+    }),
+    page,
+  };
 }
 
 export default function Audit({ loaderData }: Route.ComponentProps) {
@@ -26,19 +33,32 @@ export default function Audit({ loaderData }: Route.ComponentProps) {
   return (
     <div className="space-y-6">
       <h1>Audit log</h1>
-      <p className="text-sm text-muted">Append-only record of sign-ins, submissions, decisions, privileged access and configuration changes.</p>
+      <p className="text-sm text-muted">
+        Append-only record of sign-ins, submissions, decisions, privileged access and configuration changes.
+      </p>
       <Form method="get" className="card flex flex-wrap items-end gap-3">
         <div>
           <label htmlFor="action" className="block text-sm font-medium">
             Action starts with
           </label>
-          <input id="action" name="action" defaultValue={params.get("action") ?? ""} placeholder="e.g. application." className="field-input mt-1" />
+          <input
+            id="action"
+            name="action"
+            defaultValue={params.get("action") ?? ""}
+            placeholder="e.g. application."
+            className="field-input mt-1"
+          />
         </div>
         <div>
           <label htmlFor="entityId" className="block text-sm font-medium">
             Entity id
           </label>
-          <input id="entityId" name="entityId" defaultValue={params.get("entityId") ?? ""} className="field-input mt-1 w-96" />
+          <input
+            id="entityId"
+            name="entityId"
+            defaultValue={params.get("entityId") ?? ""}
+            className="field-input mt-1 w-96"
+          />
         </div>
         <button type="submit" className="btn-secondary">
           Filter

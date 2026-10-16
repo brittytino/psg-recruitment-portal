@@ -22,13 +22,16 @@ export default function ForgotPassword({ actionData }: Route.ComponentProps) {
       {actionData && "ok" in actionData && actionData.ok ? (
         <div className="mt-6">
           <Alert tone="success" title="Check your e-mail">
-            If an account exists for that address, we have sent a link to reset the password. The link is valid for 60 minutes.
+            If an account exists for that address, we have sent a link to reset the password. The link is
+            valid for 60 minutes.
           </Alert>
         </div>
       ) : (
         <Form method="post" className="card mt-6 space-y-4">
           <CsrfInput />
-          {actionData && "formError" in actionData && actionData.formError && <Alert tone="danger">{actionData.formError}</Alert>}
+          {actionData && "formError" in actionData && actionData.formError && (
+            <Alert tone="danger">{actionData.formError}</Alert>
+          )}
           <TextInput label="E-mail address" name="email" type="email" required autoComplete="email" />
           <button type="submit" className="btn-primary w-full" disabled={nav.state !== "idle"}>
             Send reset link

@@ -12,7 +12,9 @@ export type OutboxEventInput =
   | { type: "documents.scan"; payload: { documentId: string } };
 
 export async function enqueueOutbox(tx: Tx, event: OutboxEventInput): Promise<void> {
-  await tx.outboxEvent.create({ data: { type: event.type, payload: event.payload as Prisma.InputJsonObject } });
+  await tx.outboxEvent.create({
+    data: { type: event.type, payload: event.payload as Prisma.InputJsonObject },
+  });
 }
 
 /** Creates a notification and its delivery event in the caller's transaction. */

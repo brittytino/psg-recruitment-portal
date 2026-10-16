@@ -22,7 +22,13 @@ export const assistantMinimal: Answers = {
   motherTongue: "Tamil",
   nationality: "Indian",
   academicQualifications: [
-    { degree: "B.E.", university: "Example University", institution: "Example College of Engineering", classOrMarks: "First / 82%", monthYearOfPassing: "2011-05" },
+    {
+      degree: "B.E.",
+      university: "Example University",
+      institution: "Example College of Engineering",
+      classOrMarks: "First / 82%",
+      monthYearOfPassing: "2011-05",
+    },
   ],
   specialisation: "Computer Science",
   joiningTime: "One month",
@@ -54,14 +60,18 @@ export const assistantFull: Answers = {
     months: 0,
     nature: ["Teaching", "Industrial", "Research"][i % 3]!,
   })),
-  memberships: "Life Member, Example Society for Technical Education\nMember, Institute of Example Engineers\nSenior Member, Example Professional Body",
-  publications: repeat(40, (i) =>
-    `Author A, Author B, "A deliberately long research title number ${i + 1} on scalable distributed systems for heterogeneous environments", Example Journal of Research, Vol. ${i + 1}, pp. ${i * 10}-${i * 10 + 9}, ${2015 + (i % 10)}.`,
+  memberships:
+    "Life Member, Example Society for Technical Education\nMember, Institute of Example Engineers\nSenior Member, Example Professional Body",
+  publications: repeat(
+    40,
+    (i) =>
+      `Author A, Author B, "A deliberately long research title number ${i + 1} on scalable distributed systems for heterogeneous environments", Example Journal of Research, Vol. ${i + 1}, pp. ${i * 10}-${i * 10 + 9}, ${2015 + (i % 10)}.`,
   ).join("\n"),
   presentPost: "Assistant Professor",
   basicPay: 68900,
   totalEmoluments: 145000,
-  otherInformation: "Special characters: ä ö ü — “quotes” & ampersands < > é அ (Tamil letter A).\nSecond line of other information.",
+  otherInformation:
+    "Special characters: ä ö ü — “quotes” & ampersands < > é அ (Tamil letter A).\nSecond line of other information.",
 };
 
 export const associateMinimal: Answers = {
@@ -88,11 +98,42 @@ export const associateMinimal: Answers = {
   reference1: "Dr. A. Referee, Professor, Example Institute, Chennai",
   reference2: "Dr. B. Referee, Professor, Sample University, Madurai",
   educationalQualifications: [
-    { level: "UG", degree: "B.E.", monthYear: "2003-04", college: "Example College", university: "Example University", classPercent: "First, 78%" },
-    { level: "PG", degree: "M.E.", monthYear: "2005-06", college: "Sample College", university: "Sample University", classPercent: "First, 85%", specialisation: "VLSI" },
-    { level: "RESEARCH", degree: "Ph.D.", monthYear: "2012-09", college: "Example Institute", university: "Example University", thesis: "A study of low-power circuits", specialisation: "VLSI" },
+    {
+      level: "UG",
+      degree: "B.E.",
+      monthYear: "2003-04",
+      college: "Example College",
+      university: "Example University",
+      classPercent: "First, 78%",
+    },
+    {
+      level: "PG",
+      degree: "M.E.",
+      monthYear: "2005-06",
+      college: "Sample College",
+      university: "Sample University",
+      classPercent: "First, 85%",
+      specialisation: "VLSI",
+    },
+    {
+      level: "RESEARCH",
+      degree: "Ph.D.",
+      monthYear: "2012-09",
+      college: "Example Institute",
+      university: "Example University",
+      thesis: "A study of low-power circuits",
+      specialisation: "VLSI",
+    },
   ],
-  jobsHeld: [{ designation: "Assistant Professor", organisation: "Example College", from: "2006-06-01", years: 19, months: 4 }],
+  jobsHeld: [
+    {
+      designation: "Assistant Professor",
+      organisation: "Example College",
+      from: "2006-06-01",
+      years: 19,
+      months: 4,
+    },
+  ],
   station: "Coimbatore",
   declarationDate: "2026-10-01",
 };
@@ -106,7 +147,11 @@ export const associateFull: Answers = {
   maritalStatus: "Y",
   spouseNameOccupation: "Example Spouse, Software Engineer",
   spouseOfficialAddress: "Example Technologies, 1 Example Park, Coimbatore 641014",
-  children: repeat(5, (i) => ({ name: `Child ${i + 1}`, age: 4 + i * 2, status: i % 2 ? "Studying" : "Employed" })),
+  children: repeat(5, (i) => ({
+    name: `Child ${i + 1}`,
+    age: 4 + i * 2,
+    status: i % 2 ? "Studying" : "Employed",
+  })),
   jobsHeld: repeat(8, (i) => ({
     designation: `Associate Professor ${i + 1}`,
     scaleOfPay: "Level 13A",
@@ -120,32 +165,96 @@ export const associateFull: Answers = {
   })),
   educationalQualifications: [
     ...(associateMinimal.educationalQualifications as Record<string, string>[]),
-    { level: "OTHERS", degree: "PG Diploma in Management", monthYear: "2015-05", college: "Example School of Management", university: "Open University" },
+    {
+      level: "OTHERS",
+      degree: "PG Diploma in Management",
+      monthYear: "2015-05",
+      college: "Example School of Management",
+      university: "Open University",
+    },
   ],
   subjectsUg: repeat(14, (i) => `UG Subject ${i + 1}: Digital Signal Processing`),
   subjectsPg: repeat(6, (i) => `PG Subject ${i + 1}: Advanced VLSI Design`),
   courseMaterials: repeat(5, (i) => ({ title: `Course material ${i + 1}`, year: String(2020 + i) })),
   labManuals: repeat(2, (i) => ({ title: `Lab manual ${i + 1}`, year: String(2021 + i) })),
   monographs: repeat(1, () => ({ title: "Monograph on example topic", year: "2022" })),
-  books: repeat(4, (i) => ({ name: `Book title ${i + 1}`, publisher: "Example Press", year: String(2018 + i) })),
-  internationalJournals: repeat(45, (i) =>
-    `A. Author, B. Author, "Long international paper title ${i + 1} about energy-efficient architectures", International Journal of Examples, vol. ${i}, no. 2, pp. 1-12, ${2021 + (i % 5)}.`,
+  books: repeat(4, (i) => ({
+    name: `Book title ${i + 1}`,
+    publisher: "Example Press",
+    year: String(2018 + i),
+  })),
+  internationalJournals: repeat(
+    45,
+    (i) =>
+      `A. Author, B. Author, "Long international paper title ${i + 1} about energy-efficient architectures", International Journal of Examples, vol. ${i}, no. 2, pp. 1-12, ${2021 + (i % 5)}.`,
   ),
-  nationalJournals: repeat(6, (i) => `National paper ${i + 1}, Indian Journal of Examples, ${2022 + (i % 3)}.`),
-  consultancy: repeat(5, (i) => ({ job: `Consultancy project ${i + 1}`, organisation: "Example Industries", projectLeader: "Dr. X", revenue: "Rs. 2,00,000" })),
-  testing: repeat(2, (i) => ({ job: `Testing job ${i + 1}`, organisation: "Example Labs", testsDone: "12", revenue: "Rs. 50,000" })),
-  summerPrograms: repeat(3, (i) => ({ programme: `FDP ${i + 1}`, heldAt: "Example IIT", duration: "1 week" })),
-  conferencePapers: repeat(25, (i) => `Conference paper ${i + 1}, Proc. International Conference on Examples, ${2023 + (i % 3)}.`),
-  memberships: repeat(3, (i) => ({ body: `Professional body ${i + 1}`, type: "Life", position: i === 0 ? "Secretary" : "Member" })),
-  labModels: "Developed a low-cost FPGA trainer kit.\nDevised six new experiments for the embedded systems laboratory.",
-  labDevelopment: repeat(5, (i) => ({ equipment: `Equipment ${i + 1}`, cost: "Rs. 4,50,000", whenPurchased: "2024", involvement: "Specification and procurement" })),
-  teachingInnovations: "Flipped classroom for VLSI design. Open-book assessments with rubric-based evaluation.",
-  ceOrganised: repeat(2, (i) => ({ programme: `Workshop ${i + 1}`, duration: "3 days", period: "Jan 2025", participants: 40, involvement: "Coordinator" })),
-  sponsoredResearch: repeat(3, (i) => ({ project: `Funded project ${i + 1}`, sponsor: "Example Agency", period: "2023-2026", grant: "Rs. 25 lakhs", principalInvestigator: "Self" })),
+  nationalJournals: repeat(
+    6,
+    (i) => `National paper ${i + 1}, Indian Journal of Examples, ${2022 + (i % 3)}.`,
+  ),
+  consultancy: repeat(5, (i) => ({
+    job: `Consultancy project ${i + 1}`,
+    organisation: "Example Industries",
+    projectLeader: "Dr. X",
+    revenue: "Rs. 2,00,000",
+  })),
+  testing: repeat(2, (i) => ({
+    job: `Testing job ${i + 1}`,
+    organisation: "Example Labs",
+    testsDone: "12",
+    revenue: "Rs. 50,000",
+  })),
+  summerPrograms: repeat(3, (i) => ({
+    programme: `FDP ${i + 1}`,
+    heldAt: "Example IIT",
+    duration: "1 week",
+  })),
+  conferencePapers: repeat(
+    25,
+    (i) => `Conference paper ${i + 1}, Proc. International Conference on Examples, ${2023 + (i % 3)}.`,
+  ),
+  memberships: repeat(3, (i) => ({
+    body: `Professional body ${i + 1}`,
+    type: "Life",
+    position: i === 0 ? "Secretary" : "Member",
+  })),
+  labModels:
+    "Developed a low-cost FPGA trainer kit.\nDevised six new experiments for the embedded systems laboratory.",
+  labDevelopment: repeat(5, (i) => ({
+    equipment: `Equipment ${i + 1}`,
+    cost: "Rs. 4,50,000",
+    whenPurchased: "2024",
+    involvement: "Specification and procurement",
+  })),
+  teachingInnovations:
+    "Flipped classroom for VLSI design. Open-book assessments with rubric-based evaluation.",
+  ceOrganised: repeat(2, (i) => ({
+    programme: `Workshop ${i + 1}`,
+    duration: "3 days",
+    period: "Jan 2025",
+    participants: 40,
+    involvement: "Coordinator",
+  })),
+  sponsoredResearch: repeat(3, (i) => ({
+    project: `Funded project ${i + 1}`,
+    sponsor: "Example Agency",
+    period: "2023-2026",
+    grant: "Rs. 25 lakhs",
+    principalInvestigator: "Self",
+  })),
   studentProjectsUg: repeat(9, (i) => `UG project ${i + 1}`),
   studentProjectsPg: repeat(3, (i) => `PG project ${i + 1}`),
-  mentorship: repeat(3, (i) => ({ class: `II B.E. ECE Section ${i + 1}`, year: "2024", contribution: "Academic counselling" })),
-  tours: repeat(2, (i) => ({ class: "III B.E. ECE", visitTo: `Example Plant ${i + 1}`, duration: "1 day", yearMonth: "2025 / Feb" })),
+  mentorship: repeat(3, (i) => ({
+    class: `II B.E. ECE Section ${i + 1}`,
+    year: "2024",
+    contribution: "Academic counselling",
+  })),
+  tours: repeat(2, (i) => ({
+    class: "III B.E. ECE",
+    visitTo: `Example Plant ${i + 1}`,
+    duration: "1 day",
+    yearMonth: "2025 / Feb",
+  })),
   awardsPatents: repeat(6, (i) => `Award or patent ${i + 1}: Best Teacher Award, Example Foundation, 2024`),
 };
 

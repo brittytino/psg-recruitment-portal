@@ -29,14 +29,17 @@ export default function Register({ loaderData, actionData }: Route.ComponentProp
       <div className="mx-auto max-w-lg space-y-4">
         <h1>Check your e-mail</h1>
         <Alert tone="success" title="Registration received">
-          If the address can be registered, we have sent a verification link to it. Open the link to activate your account, then sign in.
+          If the address can be registered, we have sent a verification link to it. Open the link to activate
+          your account, then sign in.
         </Alert>
         <p>
           <Link to="/login">Go to sign in</Link>
         </p>
       </div>
     );
-  const summary = fe ? Object.entries(fe).flatMap(([k, v]) => (v ?? []).map((text) => ({ text, href: `#f-${k}` }))) : [];
+  const summary = fe
+    ? Object.entries(fe).flatMap(([k, v]) => (v ?? []).map((text) => ({ text, href: `#f-${k}` })))
+    : [];
   return (
     <div className="mx-auto max-w-lg">
       <h1>Create a candidate account</h1>
@@ -52,8 +55,22 @@ export default function Register({ loaderData, actionData }: Route.ComponentProp
         <ErrorSummary messages={summary} />
         <Form method="post" className="card space-y-4" noValidate>
           <CsrfInput />
-          <TextInput label="Full name" name="fullName" required autoComplete="name" error={errorFor(fe, "fullName")} maxLength={120} />
-          <TextInput label="E-mail address" name="email" type="email" required autoComplete="email" error={errorFor(fe, "email")} />
+          <TextInput
+            label="Full name"
+            name="fullName"
+            required
+            autoComplete="name"
+            error={errorFor(fe, "fullName")}
+            maxLength={120}
+          />
+          <TextInput
+            label="E-mail address"
+            name="email"
+            type="email"
+            required
+            autoComplete="email"
+            error={errorFor(fe, "email")}
+          />
           <TextInput
             label="Password"
             name="password"
@@ -63,13 +80,26 @@ export default function Register({ loaderData, actionData }: Route.ComponentProp
             hint="At least 10 characters. A passphrase of several words is a good choice."
             error={errorFor(fe, "password")}
           />
-          <TextInput label="Confirm password" name="confirmPassword" type="password" required autoComplete="new-password" error={errorFor(fe, "confirmPassword")} />
+          <TextInput
+            label="Confirm password"
+            name="confirmPassword"
+            type="password"
+            required
+            autoComplete="new-password"
+            error={errorFor(fe, "confirmPassword")}
+          />
           <div className="space-y-1">
             <div className="flex items-start gap-2">
-              <input id="f-privacy" name="privacy" type="checkbox" className="mt-1 h-4 w-4" aria-describedby={errorFor(fe, "privacy") ? "f-privacy-error" : undefined} />
+              <input
+                id="f-privacy"
+                name="privacy"
+                type="checkbox"
+                className="mt-1 h-4 w-4"
+                aria-describedby={errorFor(fe, "privacy") ? "f-privacy-error" : undefined}
+              />
               <label htmlFor="f-privacy" className="text-sm">
-                I have read the <Link to="/privacy">privacy notice</Link> (version {PRIVACY_NOTICE_VERSION}) and agree to my data being processed for
-                recruitment.
+                I have read the <Link to="/privacy">privacy notice</Link> (version {PRIVACY_NOTICE_VERSION})
+                and agree to my data being processed for recruitment.
               </label>
             </div>
             {errorFor(fe, "privacy") && (

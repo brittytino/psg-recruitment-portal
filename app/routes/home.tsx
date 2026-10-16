@@ -21,9 +21,10 @@ export default function Home({ loaderData }: Route.ComponentProps) {
       <section aria-labelledby="intro" className="card border-l-4 border-l-brand-600">
         <h1 id="intro">Faculty recruitment at PSG College of Technology</h1>
         <p className="mt-3 max-w-3xl text-muted">
-          PSG College of Technology, Coimbatore — autonomous and affiliated to Anna University, an ISO 9001:2015 certified institution — invites
-          applications for faculty positions through this portal. Browse open vacancies, complete the official application form online, upload
-          your supporting documents and track the status of your application.
+          PSG College of Technology, Coimbatore — autonomous and affiliated to Anna University, an ISO
+          9001:2015 certified institution — invites applications for faculty positions through this portal.
+          Browse open vacancies, complete the official application form online, upload your supporting
+          documents and track the status of your application.
         </p>
         <div className="mt-5 flex flex-wrap gap-3">
           <Link to="/vacancies" className="btn-primary">
@@ -41,8 +42,14 @@ export default function Home({ loaderData }: Route.ComponentProps) {
           {[
             ["Register", "Create an account and verify your e-mail address."],
             ["Choose a vacancy", "Read the position details, eligibility and the documents required."],
-            ["Complete the official form", "Fill in each section of the official application. Your progress is saved as a draft."],
-            ["Upload and submit", "Upload your photograph and attested copies, review the form and submit. You will receive a reference number."],
+            [
+              "Complete the official form",
+              "Fill in each section of the official application. Your progress is saved as a draft.",
+            ],
+            [
+              "Upload and submit",
+              "Upload your photograph and attested copies, review the form and submit. You will receive a reference number.",
+            ],
           ].map(([t, d], i) => (
             <li key={t} className="card">
               <p className="text-sm font-semibold text-brand-700">Step {i + 1}</p>
@@ -59,7 +66,9 @@ export default function Home({ loaderData }: Route.ComponentProps) {
           <Link to="/vacancies">All vacancies</Link>
         </div>
         {vacancies.length === 0 ? (
-          <p className="mt-3 text-muted">There are no open vacancies at the moment. Please check again later.</p>
+          <p className="mt-3 text-muted">
+            There are no open vacancies at the moment. Please check again later.
+          </p>
         ) : (
           <ul className="mt-3 grid gap-4 md:grid-cols-2">
             {vacancies.map((v) => (

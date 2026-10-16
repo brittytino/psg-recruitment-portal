@@ -29,7 +29,10 @@ export async function convertDocxToPdf(docx: Uint8Array): Promise<Uint8Array> {
   try {
     res = await fetch(`${e.CONVERTER_URL}/convert?from=docx`, {
       method: "POST",
-      headers: { "content-type": "application/octet-stream", ...(e.CONVERTER_TOKEN ? { authorization: `Bearer ${e.CONVERTER_TOKEN}` } : {}) },
+      headers: {
+        "content-type": "application/octet-stream",
+        ...(e.CONVERTER_TOKEN ? { authorization: `Bearer ${e.CONVERTER_TOKEN}` } : {}),
+      },
       body: Buffer.from(docx),
       signal: AbortSignal.timeout(180_000),
     });
@@ -63,7 +66,9 @@ export function orderManifest(entries: ManifestEntry[]): ManifestEntry[] {
   return entries
     .map((e, i) => ({ e, i }))
     .filter(({ e }) => e.documentType !== "PHOTOGRAPH")
-    .sort((a, b) => BUNDLE_ORDER.indexOf(a.e.documentType) - BUNDLE_ORDER.indexOf(b.e.documentType) || a.i - b.i)
+    .sort(
+      (a, b) => BUNDLE_ORDER.indexOf(a.e.documentType) - BUNDLE_ORDER.indexOf(b.e.documentType) || a.i - b.i,
+    )
     .map(({ e }) => e);
 }
 
@@ -75,7 +80,14 @@ export interface BundleReport {
   sourcePageCount: number;
   deviations: string[];
   photoPlaced: boolean;
-  attachments: { documentId: string; documentType: DocType; label: string; originalName: string; pages: number; sha256: string }[];
+  attachments: {
+    documentId: string;
+    documentType: DocType;
+    label: string;
+    originalName: string;
+    pages: number;
+    sha256: string;
+  }[];
   totalPages: number;
 }
 
@@ -83,7 +95,10 @@ export interface BundleReport {
  * Generates the consolidated bundle for one GeneratedDocument row. Idempotent: a READY row is
  * left untouched; output is stored under a new random key and recorded with its checksum.
  */
-export async function generateBundle(generatedDocumentId: string, attempt: number): Promise<"done" | "skipped"> {
+export async function generateBundle(
+  generatedDocumentId: string,
+  attempt: number,
+): Promise<"done" | "skipped"> {
   const gen = await prisma.generatedDocument.findUnique({
     where: { id: generatedDocumentId },
     include: { revision: true, application: { include: { vacancy: { include: { department: true } } } } },
@@ -91,31 +106,57 @@ export async function generateBundle(generatedDocumentId: string, attempt: numbe
   if (!gen) throw new PipelineError("Generated document record not found");
   if (gen.status === "READY") return "skipped";
 
-  await prisma.generatedDocument.update({ where: { id: gen.id }, data: { status: "PROCESSING", attempts: attempt, error: null } });
-  await prisma.application.updateMany({ where: { id: gen.applicationId, currentRevisionId: gen.revisionId }, data: { processingStatus: "PROCESSING" } });
+  await prisma.generatedDocument.update({
+    where: { id: gen.id },
+    data: { status: "PROCESSING", attempts: attempt, error: null },
+  });
+  await prisma.application.updateMany({
+    where: { id: gen.applicationId, currentRevisionId: gen.revisionId },
+    data: { processingStatus: "PROCESSING" },
+  });
 
   const rev = gen.revision;
   const code = rev.formCode as FormCode;
   const def = getFormDefinition(code, rev.formVersion);
-  const tplRow = await prisma.formTemplate.findUniqueOrThrow({ where: { code_version: { code, version: rev.formVersion } } });
+  const tplRow = await prisma.formTemplate.findUniqueOrThrow({
+    where: { code_version: { code, version: rev.formVersion } },
+  });
   const template = new Uint8Array(await readFile(resolve(def.templatePath)));
-  if (sha256Hex(template) !== tplRow.sha256) throw new PipelineError(`Template file ${def.templatePath} does not match its registered checksum`);
+  if (sha256Hex(template) !== tplRow.sha256)
+    throw new PipelineError(`Template file ${def.templatePath} does not match its registered checksum`);
 
   const manifest = rev.attachmentManifest as unknown as ManifestEntry[];
-  const docs = await prisma.applicationDocument.findMany({ where: { id: { in: manifest.map((m) => m.documentId) } } });
+  const docs = await prisma.applicationDocument.findMany({
+    where: { id: { in: manifest.map((m) => m.documentId) } },
+  });
   const byId = new Map(docs.map((d) => [d.id, d]));
   for (const m of manifest) {
     const d = byId.get(m.documentId);
     if (!d) throw new PipelineError(`Attachment "${m.originalName}" is missing from storage records`);
-    if (d.sha256 !== m.sha256) throw new PipelineError(`Attachment "${m.originalName}" does not match the submitted checksum`);
-    if (d.scanStatus === "PENDING") throw new RetryableError(`Attachment "${m.originalName}" is awaiting malware scan`);
-    if (d.scanStatus === "INFECTED") throw new PipelineError(`Attachment "${m.originalName}" (${DOCUMENT_TYPE_LABELS[m.documentType]}) was flagged by the malware scanner and cannot be included. Return the application to the candidate for a clean copy.`);
-    if (d.scanStatus === "FAILED") throw new RetryableError(`Malware scan failed for "${m.originalName}": ${d.scanDetail ?? "unknown error"}`);
+    if (d.sha256 !== m.sha256)
+      throw new PipelineError(`Attachment "${m.originalName}" does not match the submitted checksum`);
+    if (d.scanStatus === "PENDING")
+      throw new RetryableError(`Attachment "${m.originalName}" is awaiting malware scan`);
+    if (d.scanStatus === "INFECTED")
+      throw new PipelineError(
+        `Attachment "${m.originalName}" (${DOCUMENT_TYPE_LABELS[m.documentType]}) was flagged by the malware scanner and cannot be included. Return the application to the candidate for a clean copy.`,
+      );
+    if (d.scanStatus === "FAILED")
+      throw new RetryableError(
+        `Malware scan failed for "${m.originalName}": ${d.scanDetail ?? "unknown error"}`,
+      );
   }
 
   const photoEntry = manifest.find((m) => m.documentType === "PHOTOGRAPH");
-  const photo = photoEntry ? await getVerifiedFile(byId.get(photoEntry.documentId)!.storageKey, photoEntry.sha256) : null;
-  const { docx, report } = await renderApplicationDocx({ formCode: code, template, answers: rev.answers as Answers, photo });
+  const photo = photoEntry
+    ? await getVerifiedFile(byId.get(photoEntry.documentId)!.storageKey, photoEntry.sha256)
+    : null;
+  const { docx, report } = await renderApplicationDocx({
+    formCode: code,
+    template,
+    answers: rev.answers as Answers,
+    photo,
+  });
   const formPdfBytes = await convertDocxToPdf(docx);
   let formPdf: PDFDocument;
   try {
@@ -124,7 +165,9 @@ export async function generateBundle(generatedDocumentId: string, attempt: numbe
     throw new PipelineError("The converted application PDF could not be read");
   }
   if (formPdf.getPageCount() < def.sourcePageCount)
-    throw new PipelineError(`Converted application has ${formPdf.getPageCount()} pages; the template has ${def.sourcePageCount}`);
+    throw new PipelineError(
+      `Converted application has ${formPdf.getPageCount()} pages; the template has ${def.sourcePageCount}`,
+    );
 
   const out = await PDFDocument.create();
   out.setTitle(`Application ${gen.application.referenceNo ?? ""} (revision ${rev.revisionNo})`);
@@ -138,20 +181,33 @@ export async function generateBundle(generatedDocumentId: string, attempt: numbe
     const bytes = await getVerifiedFile(d.storageKey, m.sha256);
     let src: PDFDocument;
     try {
-      src = d.mimeType === "application/pdf" ? await PDFDocument.load(bytes) : await imageToPdf(bytes, d.mimeType);
+      src =
+        d.mimeType === "application/pdf"
+          ? await PDFDocument.load(bytes)
+          : await imageToPdf(bytes, d.mimeType);
     } catch (err) {
-      throw new PipelineError(`Attachment "${m.originalName}" could not be read as ${d.mimeType}: ${(err as Error).message}`);
+      throw new PipelineError(
+        `Attachment "${m.originalName}" could not be read as ${d.mimeType}: ${(err as Error).message}`,
+      );
     }
     const pages = await out.copyPages(src, src.getPageIndices());
     pages.forEach((p) => out.addPage(p));
-    attachments.push({ documentId: m.documentId, documentType: m.documentType, label: DOCUMENT_TYPE_LABELS[m.documentType], originalName: m.originalName, pages: pages.length, sha256: m.sha256 });
+    attachments.push({
+      documentId: m.documentId,
+      documentType: m.documentType,
+      label: DOCUMENT_TYPE_LABELS[m.documentType],
+      originalName: m.originalName,
+      pages: pages.length,
+      sha256: m.sha256,
+    });
   }
 
   const finalBytes = await out.save();
   // Validate the merged output by re-reading it and checking every page was included.
   const expectedPages = formPdf.getPageCount() + attachments.reduce((n, a) => n + a.pages, 0);
   const check = await PDFDocument.load(finalBytes);
-  if (check.getPageCount() !== expectedPages) throw new PipelineError(`Merged PDF has ${check.getPageCount()} pages; expected ${expectedPages}`);
+  if (check.getPageCount() !== expectedPages)
+    throw new PipelineError(`Merged PDF has ${check.getPageCount()} pages; expected ${expectedPages}`);
 
   const key = newKey("generated", "pdf", gen.applicationId);
   const { sha256, size } = await putFile(key, finalBytes);
@@ -169,11 +225,26 @@ export async function generateBundle(generatedDocumentId: string, attempt: numbe
   await prisma.$transaction(async (tx) => {
     await tx.generatedDocument.update({
       where: { id: gen.id },
-      data: { status: "READY", storageKey: key, sha256, sizeBytes: size, pageCount: expectedPages, completedAt: new Date(), report: bundleReport as object, error: null },
+      data: {
+        status: "READY",
+        storageKey: key,
+        sha256,
+        sizeBytes: size,
+        pageCount: expectedPages,
+        completedAt: new Date(),
+        report: bundleReport as object,
+        error: null,
+      },
     });
-    await tx.application.updateMany({ where: { id: gen.applicationId, currentRevisionId: gen.revisionId }, data: { processingStatus: "READY" } });
+    await tx.application.updateMany({
+      where: { id: gen.applicationId, currentRevisionId: gen.revisionId },
+      data: { processingStatus: "READY" },
+    });
   });
-  logger.info({ generatedDocumentId: gen.id, pages: expectedPages, attachments: attachments.length }, "bundle generated");
+  logger.info(
+    { generatedDocumentId: gen.id, pages: expectedPages, attachments: attachments.length },
+    "bundle generated",
+  );
   return "done";
 }
 
@@ -182,7 +253,13 @@ export async function markBundleFailed(generatedDocumentId: string, message: str
   const gen = await prisma.generatedDocument.findUnique({ where: { id: generatedDocumentId } });
   if (!gen || gen.status === "READY") return;
   await prisma.$transaction(async (tx) => {
-    await tx.generatedDocument.update({ where: { id: gen.id }, data: { status: "FAILED", error: message.slice(0, 1000) } });
-    await tx.application.updateMany({ where: { id: gen.applicationId, currentRevisionId: gen.revisionId }, data: { processingStatus: "FAILED" } });
+    await tx.generatedDocument.update({
+      where: { id: gen.id },
+      data: { status: "FAILED", error: message.slice(0, 1000) },
+    });
+    await tx.application.updateMany({
+      where: { id: gen.applicationId, currentRevisionId: gen.revisionId },
+      data: { processingStatus: "FAILED" },
+    });
   });
 }

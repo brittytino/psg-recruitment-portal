@@ -3,7 +3,12 @@ import type { Route } from "./+types/receipt";
 import { Alert, Badge, ConfirmDialog, CsrfInput, formatDateTime, statusTone } from "~/components/forms";
 import { handleAction, readForm, requireUser } from "~/lib/http.server";
 import { getOwnApplication, withdraw } from "~/modules/applications/service.server";
-import { availableTransitions, PROCESSING_LABELS, STATUS_LABELS, type AppStatus } from "~/modules/applications/workflow";
+import {
+  availableTransitions,
+  PROCESSING_LABELS,
+  STATUS_LABELS,
+  type AppStatus,
+} from "~/modules/applications/workflow";
 import { prisma } from "~/modules/core/db.server";
 
 export const meta: Route.MetaFunction = () => [{ title: "Application status — PSG Tech Recruitment" }];
@@ -27,7 +32,11 @@ export async function loader({ request, params, context }: Route.LoaderArgs) {
     revisionNo: app.currentRevision?.revisionNo ?? null,
     title: app.vacancy.title,
     department: app.vacancy.department.name,
-    history: app.statusHistory.map((h) => ({ to: h.toStatus as AppStatus, at: h.createdAt, candidateVisibleReason: h.toStatus === "NEEDS_CLARIFICATION" ? h.reason : null })),
+    history: app.statusHistory.map((h) => ({
+      to: h.toStatus as AppStatus,
+      at: h.createdAt,
+      candidateVisibleReason: h.toStatus === "NEEDS_CLARIFICATION" ? h.reason : null,
+    })),
     bundle,
     canWithdraw: availableTransitions(app.status as AppStatus, "candidate").some((t) => t.to === "WITHDRAWN"),
   };
@@ -51,8 +60,12 @@ export default function Receipt({ loaderData: L, actionData }: Route.ComponentPr
           Your application has been submitted. A confirmation has been sent to your e-mail address.
         </Alert>
       )}
-      {actionData && "message" in actionData && actionData.message && <Alert tone="success">{actionData.message}</Alert>}
-      {actionData && "formError" in actionData && actionData.formError && <Alert tone="danger">{actionData.formError}</Alert>}
+      {actionData && "message" in actionData && actionData.message && (
+        <Alert tone="success">{actionData.message}</Alert>
+      )}
+      {actionData && "formError" in actionData && actionData.formError && (
+        <Alert tone="danger">{actionData.formError}</Alert>
+      )}
       <section className="card" aria-labelledby="rcpt">
         <h1 id="rcpt">Application {L.referenceNo ?? "(not yet submitted)"}</h1>
         <dl className="mt-4 grid gap-3 text-sm sm:grid-cols-2">
@@ -79,7 +92,9 @@ export default function Receipt({ loaderData: L, actionData }: Route.ComponentPr
             <dt className="text-muted">Application PDF</dt>
             <dd>
               {L.bundle ? (
-                <a href={`/files/bundles/${L.bundle.id}`}>Download your submitted application ({L.bundle.pageCount} pages)</a>
+                <a href={`/files/bundles/${L.bundle.id}`}>
+                  Download your submitted application ({L.bundle.pageCount} pages)
+                </a>
               ) : (
                 <span>{PROCESSING_LABELS[L.processingStatus] ?? L.processingStatus}</span>
               )}
@@ -101,7 +116,11 @@ export default function Receipt({ loaderData: L, actionData }: Route.ComponentPr
           {L.history.map((h, i) => (
             <li key={i}>
               <span className="font-medium">{STATUS_LABELS[h.to]}</span> — {formatDateTime(h.at)}
-              {h.candidateVisibleReason && <span className="block whitespace-pre-line text-muted">Message: {h.candidateVisibleReason}</span>}
+              {h.candidateVisibleReason && (
+                <span className="block whitespace-pre-line text-muted">
+                  Message: {h.candidateVisibleReason}
+                </span>
+              )}
             </li>
           ))}
         </ol>
@@ -118,8 +137,15 @@ export default function Receipt({ loaderData: L, actionData }: Route.ComponentPr
               </label>
               <textarea id="reason" name="reason" rows={2} maxLength={500} className="field-input mt-1" />
             </div>
-            <ConfirmDialog trigger="Withdraw application" tone="danger" title="Withdraw this application?" confirmLabel="Yes, withdraw">
-              <p>Withdrawing cannot be undone. Your application will no longer be considered for this vacancy.</p>
+            <ConfirmDialog
+              trigger="Withdraw application"
+              tone="danger"
+              title="Withdraw this application?"
+              confirmLabel="Yes, withdraw"
+            >
+              <p>
+                Withdrawing cannot be undone. Your application will no longer be considered for this vacancy.
+              </p>
             </ConfirmDialog>
           </Form>
         </section>

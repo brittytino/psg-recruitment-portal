@@ -10,7 +10,12 @@ import { removeDocument, uploadDocument } from "~/modules/documents/service.serv
 
 export const meta: Route.MetaFunction = () => [{ title: "Documents — PSG Tech Recruitment" }];
 
-const SCAN_LABEL: Record<string, string> = { PENDING: "Scan pending", CLEAN: "Scanned — clean", INFECTED: "Rejected by malware scan", FAILED: "Scan failed" };
+const SCAN_LABEL: Record<string, string> = {
+  PENDING: "Scan pending",
+  CLEAN: "Scanned — clean",
+  INFECTED: "Rejected by malware scan",
+  FAILED: "Scan failed",
+};
 
 export async function loader({ request, params, context }: Route.LoaderArgs) {
   const user = requireUser(context, request);
@@ -19,8 +24,19 @@ export async function loader({ request, params, context }: Route.LoaderArgs) {
   return {
     id: app.id,
     title: app.vacancy.title,
-    required: app.vacancy.requiredDocuments.map((r) => ({ type: r.documentType as DocType, label: r.label, required: r.required })),
-    documents: app.documents.map((d) => ({ id: d.id, type: d.documentType as DocType, name: d.originalName, size: d.sizeBytes, scan: d.scanStatus, uploadedAt: d.uploadedAt })),
+    required: app.vacancy.requiredDocuments.map((r) => ({
+      type: r.documentType as DocType,
+      label: r.label,
+      required: r.required,
+    })),
+    documents: app.documents.map((d) => ({
+      id: d.id,
+      type: d.documentType as DocType,
+      name: d.originalName,
+      size: d.sizeBytes,
+      scan: d.scanStatus,
+      uploadedAt: d.uploadedAt,
+    })),
     maxMb: env().MAX_UPLOAD_MB,
   };
 }
@@ -44,7 +60,10 @@ export default function Documents({ loaderData, actionData }: Route.ComponentPro
   const { id, title, required, documents, maxMb } = loaderData;
   const nav = useNavigation();
   const uploading = nav.state === "submitting" && nav.formEncType === "multipart/form-data";
-  const checklist: { type: DocType; label: string; required: boolean }[] = [{ type: "PHOTOGRAPH", label: DOCUMENT_TYPE_LABELS.PHOTOGRAPH, required: true }, ...required];
+  const checklist: { type: DocType; label: string; required: boolean }[] = [
+    { type: "PHOTOGRAPH", label: DOCUMENT_TYPE_LABELS.PHOTOGRAPH, required: true },
+    ...required,
+  ];
   return (
     <div className="space-y-6">
       <nav aria-label="Breadcrumb" className="text-sm">
@@ -52,8 +71,12 @@ export default function Documents({ loaderData, actionData }: Route.ComponentPro
       </nav>
       <h1>Documents and photograph</h1>
       <p className="text-sm text-muted">{title}</p>
-      {actionData && "message" in actionData && actionData.message && <Alert tone="success">{actionData.message}</Alert>}
-      {actionData && "formError" in actionData && actionData.formError && <Alert tone="danger">{actionData.formError}</Alert>}
+      {actionData && "message" in actionData && actionData.message && (
+        <Alert tone="success">{actionData.message}</Alert>
+      )}
+      {actionData && "formError" in actionData && actionData.formError && (
+        <Alert tone="danger">{actionData.formError}</Alert>
+      )}
 
       <section className="card" aria-labelledby="checklist">
         <h2 id="checklist">Checklist</h2>
@@ -66,7 +89,13 @@ export default function Documents({ loaderData, actionData }: Route.ComponentPro
                   {c.label}
                   {c.required ? "" : " (if applicable)"}
                 </span>
-                {have.length ? <Badge tone="success">Uploaded ({have.length})</Badge> : c.required ? <Badge tone="warning">Required — not uploaded</Badge> : <Badge>Optional</Badge>}
+                {have.length ? (
+                  <Badge tone="success">Uploaded ({have.length})</Badge>
+                ) : c.required ? (
+                  <Badge tone="warning">Required — not uploaded</Badge>
+                ) : (
+                  <Badge>Optional</Badge>
+                )}
               </li>
             );
           })}
@@ -76,10 +105,14 @@ export default function Documents({ loaderData, actionData }: Route.ComponentPro
       <section className="card" aria-labelledby="upload">
         <h2 id="upload">Upload a document</h2>
         <p className="mt-1 text-sm text-muted">
-          PDF, JPEG or PNG, up to {maxMb} MB each. The photograph must be a JPEG or PNG image (up to 2 MB) and is printed in the photograph box of
-          the official form. Password-protected PDFs cannot be accepted.
+          PDF, JPEG or PNG, up to {maxMb} MB each. The photograph must be a JPEG or PNG image (up to 2 MB) and
+          is printed in the photograph box of the official form. Password-protected PDFs cannot be accepted.
         </p>
-        <Form method="post" encType="multipart/form-data" className="mt-4 grid gap-4 sm:grid-cols-[1fr_1fr_auto] sm:items-end">
+        <Form
+          method="post"
+          encType="multipart/form-data"
+          className="mt-4 grid gap-4 sm:grid-cols-[1fr_1fr_auto] sm:items-end"
+        >
           <CsrfInput />
           <div>
             <label htmlFor="documentType" className="block text-sm font-medium">
@@ -97,7 +130,14 @@ export default function Documents({ loaderData, actionData }: Route.ComponentPro
             <label htmlFor="file" className="block text-sm font-medium">
               File
             </label>
-            <input id="file" name="file" type="file" required accept=".pdf,.jpg,.jpeg,.png,application/pdf,image/jpeg,image/png" className="field-input mt-1" />
+            <input
+              id="file"
+              name="file"
+              type="file"
+              required
+              accept=".pdf,.jpg,.jpeg,.png,application/pdf,image/jpeg,image/png"
+              className="field-input mt-1"
+            />
           </div>
           <button type="submit" className="btn-primary" disabled={uploading}>
             {uploading ? "Uploading…" : "Upload"}
@@ -140,9 +180,16 @@ export default function Documents({ loaderData, actionData }: Route.ComponentPro
                       <CsrfInput />
                       <input type="hidden" name="intent" value="remove" />
                       <input type="hidden" name="documentId" value={d.id} />
-                      <ConfirmDialog trigger="Remove" triggerClassName="btn-secondary py-1" tone="danger" title="Remove this document?" confirmLabel="Remove document">
+                      <ConfirmDialog
+                        trigger="Remove"
+                        triggerClassName="btn-secondary py-1"
+                        tone="danger"
+                        title="Remove this document?"
+                        confirmLabel="Remove document"
+                      >
                         <p>
-                          “{d.name}” will be removed from your application. You can upload a replacement afterwards.
+                          “{d.name}” will be removed from your application. You can upload a replacement
+                          afterwards.
                         </p>
                       </ConfirmDialog>
                     </Form>

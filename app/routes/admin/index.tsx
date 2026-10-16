@@ -1,10 +1,25 @@
 import { Form, Link } from "react-router";
 import type { Route } from "./+types/index";
-import { Alert, Badge, ConfirmDialog, CsrfInput, formatDateTime, statusTone, TextInput } from "~/components/forms";
+import {
+  Alert,
+  Badge,
+  ConfirmDialog,
+  CsrfInput,
+  formatDateTime,
+  statusTone,
+  TextInput,
+} from "~/components/forms";
 import { handleAction, readForm, requireStaff } from "~/lib/http.server";
 import { FORM_LABELS, POSITION_LABELS } from "~/lib/labels";
 import { ValidationError } from "~/modules/core/errors";
-import { addDiscipline, adminOverview, createCycle, createDepartment, setCycleStatus, setVacancyStatus } from "~/modules/recruitment/service.server";
+import {
+  addDiscipline,
+  adminOverview,
+  createCycle,
+  createDepartment,
+  setCycleStatus,
+  setVacancyStatus,
+} from "~/modules/recruitment/service.server";
 
 export const meta: Route.MetaFunction = () => [{ title: "Recruitment administration" }];
 
@@ -51,8 +66,12 @@ export default function AdminIndex({ loaderData, actionData }: Route.ComponentPr
           Create vacancy
         </Link>
       </div>
-      {actionData && "message" in actionData && actionData.message && <Alert tone="success">{actionData.message}</Alert>}
-      {actionData && "formError" in actionData && actionData.formError && <Alert tone="danger">{actionData.formError}</Alert>}
+      {actionData && "message" in actionData && actionData.message && (
+        <Alert tone="success">{actionData.message}</Alert>
+      )}
+      {actionData && "formError" in actionData && actionData.formError && (
+        <Alert tone="danger">{actionData.formError}</Alert>
+      )}
 
       <section className="card overflow-x-auto" aria-labelledby="vac">
         <h2 id="vac">Vacancies</h2>
@@ -100,9 +119,23 @@ export default function AdminIndex({ loaderData, actionData }: Route.ComponentPr
                       <CsrfInput />
                       <input type="hidden" name="intent" value="vacancy-status" />
                       <input type="hidden" name="id" value={v.id} />
-                      <input type="hidden" name="status" value={v.status === "PUBLISHED" ? "CLOSED" : "PUBLISHED"} />
-                      <ConfirmDialog trigger={v.status === "PUBLISHED" ? "Close" : "Publish"} triggerClassName="btn-secondary py-1" title={`${v.status === "PUBLISHED" ? "Close" : "Publish"} ${v.code}?`} confirmLabel="Confirm" tone={v.status === "PUBLISHED" ? "danger" : "primary"}>
-                        <p>{v.status === "PUBLISHED" ? "Candidates will no longer be able to start or submit applications." : "The vacancy becomes publicly visible and open for applications within its window."}</p>
+                      <input
+                        type="hidden"
+                        name="status"
+                        value={v.status === "PUBLISHED" ? "CLOSED" : "PUBLISHED"}
+                      />
+                      <ConfirmDialog
+                        trigger={v.status === "PUBLISHED" ? "Close" : "Publish"}
+                        triggerClassName="btn-secondary py-1"
+                        title={`${v.status === "PUBLISHED" ? "Close" : "Publish"} ${v.code}?`}
+                        confirmLabel="Confirm"
+                        tone={v.status === "PUBLISHED" ? "danger" : "primary"}
+                      >
+                        <p>
+                          {v.status === "PUBLISHED"
+                            ? "Candidates will no longer be able to start or submit applications."
+                            : "The vacancy becomes publicly visible and open for applications within its window."}
+                        </p>
                       </ConfirmDialog>
                     </Form>
                   )}
@@ -117,9 +150,13 @@ export default function AdminIndex({ loaderData, actionData }: Route.ComponentPr
         <h2 id="cyc">Recruitment cycles</h2>
         <ul className="space-y-2 text-sm">
           {cycles.map((c) => (
-            <li key={c.id} className="flex flex-wrap items-center justify-between gap-2 rounded border border-line p-2">
+            <li
+              key={c.id}
+              className="flex flex-wrap items-center justify-between gap-2 rounded border border-line p-2"
+            >
               <span>
-                <span className="font-medium">{c.title}</span> ({c.code}) · {formatDateTime(c.opensAt)} – {formatDateTime(c.closesAt)} · {c._count.vacancies} vacancies
+                <span className="font-medium">{c.title}</span> ({c.code}) · {formatDateTime(c.opensAt)} –{" "}
+                {formatDateTime(c.closesAt)} · {c._count.vacancies} vacancies
               </span>
               <span className="flex items-center gap-2">
                 <Badge tone={statusTone(c.status)}>{c.status}</Badge>
@@ -128,7 +165,13 @@ export default function AdminIndex({ loaderData, actionData }: Route.ComponentPr
                     <CsrfInput />
                     <input type="hidden" name="intent" value="cycle-status" />
                     <input type="hidden" name="id" value={c.id} />
-                    <input type="hidden" name="status" value={c.status === "DRAFT" ? "PUBLISHED" : c.status === "PUBLISHED" ? "CLOSED" : "ARCHIVED"} />
+                    <input
+                      type="hidden"
+                      name="status"
+                      value={
+                        c.status === "DRAFT" ? "PUBLISHED" : c.status === "PUBLISHED" ? "CLOSED" : "ARCHIVED"
+                      }
+                    />
                     <button type="submit" className="btn-secondary py-1">
                       {c.status === "DRAFT" ? "Publish" : c.status === "PUBLISHED" ? "Close" : "Archive"}
                     </button>
@@ -144,7 +187,13 @@ export default function AdminIndex({ loaderData, actionData }: Route.ComponentPr
           <TextInput label="Cycle code" name="code" required hint="e.g. FAC-2026-27" error={fe?.code?.[0]} />
           <TextInput label="Title" name="title" required error={fe?.title?.[0]} />
           <TextInput label="Opens" name="opensAt" type="datetime-local" required error={fe?.opensAt?.[0]} />
-          <TextInput label="Closes" name="closesAt" type="datetime-local" required error={fe?.closesAt?.[0]} />
+          <TextInput
+            label="Closes"
+            name="closesAt"
+            type="datetime-local"
+            required
+            error={fe?.closesAt?.[0]}
+          />
           <div className="md:col-span-2">
             <button type="submit" className="btn-secondary">
               Create cycle
@@ -161,7 +210,9 @@ export default function AdminIndex({ loaderData, actionData }: Route.ComponentPr
               <p>
                 <span className="font-medium">{d.name}</span> ({d.code}) · {d._count.vacancies} vacancies
               </p>
-              <p className="text-muted">Disciplines: {d.disciplines.length ? d.disciplines.map((x) => x.name).join(", ") : "none"}</p>
+              <p className="text-muted">
+                Disciplines: {d.disciplines.length ? d.disciplines.map((x) => x.name).join(", ") : "none"}
+              </p>
               <Form method="post" className="mt-2 flex flex-wrap items-end gap-2">
                 <CsrfInput />
                 <input type="hidden" name="intent" value="discipline" />
@@ -169,7 +220,13 @@ export default function AdminIndex({ loaderData, actionData }: Route.ComponentPr
                 <label htmlFor={`disc-${d.id}`} className="sr-only">
                   New discipline for {d.name}
                 </label>
-                <input id={`disc-${d.id}`} name="name" placeholder="New discipline" className="field-input w-64 py-1" required />
+                <input
+                  id={`disc-${d.id}`}
+                  name="name"
+                  placeholder="New discipline"
+                  className="field-input w-64 py-1"
+                  required
+                />
                 <button type="submit" className="btn-secondary py-1">
                   Add discipline
                 </button>
@@ -193,7 +250,8 @@ export default function AdminIndex({ loaderData, actionData }: Route.ComponentPr
         <ul className="mt-2 space-y-1 text-sm">
           {templates.map((t) => (
             <li key={t.id}>
-              {FORM_LABELS[t.code]} — version {t.version} {t.active ? "(active)" : "(inactive)"} · SHA-256 <code className="text-xs">{t.sha256.slice(0, 16)}…</code>
+              {FORM_LABELS[t.code]} — version {t.version} {t.active ? "(active)" : "(inactive)"} · SHA-256{" "}
+              <code className="text-xs">{t.sha256.slice(0, 16)}…</code>
             </li>
           ))}
         </ul>

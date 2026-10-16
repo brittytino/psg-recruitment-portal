@@ -74,7 +74,8 @@ export function fmtMonthYear(v: ScalarValue | undefined): string {
 
 const s = (v: unknown): string => (v === null || v === undefined ? "" : String(v));
 const rowsOf = (a: Answers, k: string): TableRow[] => (Array.isArray(a[k]) ? (a[k] as TableRow[]) : []);
-const listOf = (a: Answers, k: string): string[] => (Array.isArray(a[k]) ? (a[k] as string[]).filter((x) => typeof x === "string") : []);
+const listOf = (a: Answers, k: string): string[] =>
+  Array.isArray(a[k]) ? (a[k] as string[]).filter((x) => typeof x === "string") : [];
 
 /** Wraps text to lines of at most `width` characters (word boundaries). */
 export function wrap(text: string, width: number): string[] {
@@ -121,10 +122,17 @@ class Binder {
     keys.forEach((k) => this.bound.add(k));
   }
   /** Fills a regular data table, cloning the last row when entries exceed template rows. */
-  table(templateRows: Element[], entries: TableRow[], cols: ((r: TableRow, i: number) => string)[], name: string) {
+  table(
+    templateRows: Element[],
+    entries: TableRow[],
+    cols: ((r: TableRow, i: number) => string)[],
+    name: string,
+  ) {
     const target = ensureRows(templateRows, Math.max(entries.length, templateRows.length));
     if (entries.length > templateRows.length)
-      this.deviations.push(`${name}: ${entries.length - templateRows.length} row(s) added beyond the ${templateRows.length} printed rows`);
+      this.deviations.push(
+        `${name}: ${entries.length - templateRows.length} row(s) added beyond the ${templateRows.length} printed rows`,
+      );
     entries.forEach((r, i) => {
       const tcs = cells(target[i]!);
       cols.forEach((fn, c) => setCell(tcs[c]!, fn(r, i)));
@@ -145,7 +153,9 @@ class Binder {
 }
 
 const hasPageBreak = (p: Element) =>
-  Array.from(p.getElementsByTagNameNS(W_NS, "br") as unknown as ArrayLike<Element>).some((br) => br.getAttribute("w:type") === "page");
+  Array.from(p.getElementsByTagNameNS(W_NS, "br") as unknown as ArrayLike<Element>).some(
+    (br) => br.getAttribute("w:type") === "page",
+  );
 
 /** Consecutive empty top-level paragraphs after `p` (the template's writing space). */
 function blankLinesAfter(p: Element): Element[] {
@@ -154,7 +164,12 @@ function blankLinesAfter(p: Element): Element[] {
     const el = n as Element;
     if (el.localName === "tbl") break;
     if (el.localName !== "p") continue;
-    if (paragraphText(el).trim() !== "" || el.getElementsByTagNameNS(W_NS, "drawing").length || hasPageBreak(el)) break;
+    if (
+      paragraphText(el).trim() !== "" ||
+      el.getElementsByTagNameNS(W_NS, "drawing").length ||
+      hasPageBreak(el)
+    )
+      break;
     out.push(el);
   }
   return out;
@@ -166,7 +181,14 @@ function blankLinesAfter(p: Element): Element[] {
  * spacer; only when those run out are new paragraphs inserted. This keeps pagination close to the
  * original form. Returns the number of inserted paragraphs.
  */
-function writeLines(b: Binder, after: Element, lines: string[], tabTwips: number, slots: Element[] = [], prefix = "\t"): number {
+function writeLines(
+  b: Binder,
+  after: Element,
+  lines: string[],
+  tabTwips: number,
+  slots: Element[] = [],
+  prefix = "\t",
+): number {
   const style = firstRunPropsPublic(after);
   const anchor = slots[slots.length - 1] ?? after;
   const blanks = blankLinesAfter(anchor);
@@ -187,7 +209,14 @@ function writeLines(b: Binder, after: Element, lines: string[], tabTwips: number
 }
 
 /** Writes multi-line text: first line after the label's colon, the rest aligned below it. */
-function afterColonMultiline(b: Binder, p: Element, occurrence: number, text: string, tabTwips: number, slots: Element[] = []): number {
+function afterColonMultiline(
+  b: Binder,
+  p: Element,
+  occurrence: number,
+  text: string,
+  tabTwips: number,
+  slots: Element[] = [],
+): number {
   const lines = text.split(/\r?\n/).filter((l) => l.trim() !== "");
   if (!lines.length) return 0;
   insertAfterMarker(p, ":", occurrence, lines[0]!);
@@ -234,7 +263,13 @@ function bindAssistant(b: Binder) {
   b.table(
     rows(acad).slice(1, 6),
     b.rows("academicQualifications"),
-    [(r) => s(r.degree), (r) => s(r.university), (r) => s(r.institution), (r) => s(r.classOrMarks), (r) => fmtMonthYear(r.monthYearOfPassing)],
+    [
+      (r) => s(r.degree),
+      (r) => s(r.university),
+      (r) => s(r.institution),
+      (r) => s(r.classOrMarks),
+      (r) => fmtMonthYear(r.monthYearOfPassing),
+    ],
     "Academic Qualifications",
   );
   replaceBlank(findParagraph(d, "Specialisation"), b.v("specialisation"));
@@ -257,10 +292,19 @@ function bindAssistant(b: Binder) {
     "Experience",
   );
 
-  afterColonMultiline(b, findParagraph(d, "8. Membership of Professional Bodies"), 1, b.v("memberships"), 5040);
+  afterColonMultiline(
+    b,
+    findParagraph(d, "8. Membership of Professional Bodies"),
+    1,
+    b.v("memberships"),
+    5040,
+  );
 
   const pubLabel2 = findParagraph(d, "sheets, If necessary)");
-  const pubs = b.v("publications").split(/\r?\n/).filter((l) => l.trim());
+  const pubs = b
+    .v("publications")
+    .split(/\r?\n/)
+    .filter((l) => l.trim());
   if (pubs.length) {
     const lines = pubs.flatMap((p, i) => wrap(`${i + 1}. ${p}`, 80));
     const added = writeLines(b, pubLabel2, lines, 720);
@@ -277,7 +321,10 @@ function bindAssistant(b: Binder) {
   const refHead = findParagraph(d, "1.", findParagraph(d, "12. Name and address"));
   const r1 = b.v("reference1") ? wrap(b.v("reference1"), 38) : [];
   const r2 = b.v("reference2") ? wrap(b.v("reference2"), 38) : [];
-  const refLines = Array.from({ length: Math.max(r1.length, r2.length) }, (_, i) => `      ${r1[i] ?? ""}\t${r2[i] ?? ""}`);
+  const refLines = Array.from(
+    { length: Math.max(r1.length, r2.length) },
+    (_, i) => `      ${r1[i] ?? ""}\t${r2[i] ?? ""}`,
+  );
   writeLines(b, refHead, refLines, 4680, [], "");
 
   const otherP = findParagraph(d, "13. Any other information");
@@ -300,14 +347,24 @@ function bindAssociate(b: Binder) {
   const t0 = findTable(d, "NAME (BLOCK LETTERS)");
   const boxes = (label: string, value: string) => {
     if (fillLetterBoxes(findRow(t0, label), 1, value) === "merged")
-      b.deviations.push(`${label}: value longer than the printed letter boxes; boxes merged to keep the full value`);
+      b.deviations.push(
+        `${label}: value longer than the printed letter boxes; boxes merged to keep the full value`,
+      );
   };
   boxes("NAME (BLOCK LETTERS)", b.v("name").toUpperCase());
   boxes(
     "DATE OF BIRTH, AGE & GENDER",
-    [fmtDate(b.v("dateOfBirth")).replace(/-/g, "/"), b.v("age"), b.v("gender").toUpperCase()].filter(Boolean).join(" "),
+    [fmtDate(b.v("dateOfBirth")).replace(/-/g, "/"), b.v("age"), b.v("gender").toUpperCase()]
+      .filter(Boolean)
+      .join(" "),
   );
-  boxes("QUALIFICATIONS", b.v("qualificationsSummary").toUpperCase().replace(/\s*\n\s*/g, " "));
+  boxes(
+    "QUALIFICATIONS",
+    b
+      .v("qualificationsSummary")
+      .toUpperCase()
+      .replace(/\s*\n\s*/g, " "),
+  );
 
   const addrRows: [string, string][] = [
     ["DOOR NO.", "DoorNo"],
@@ -342,7 +399,8 @@ function bindAssociate(b: Binder) {
   const childRows = [findRow(t0, "DETAILS OF CHILDREN")];
   childRows.push(...rowsAfter(childRows[0]!, 2));
   const kids = b.rows("children");
-  if (kids.length > 3) b.deviations.push(`Children: ${kids.length - 3} additional child(ren) listed in the third column`);
+  if (kids.length > 3)
+    b.deviations.push(`Children: ${kids.length - 3} additional child(ren) listed in the third column`);
   ["name", "age", "status"].forEach((f, r) => {
     const tcs = cells(childRows[r]!);
     for (let c = 0; c < 3; c++) {
@@ -395,13 +453,26 @@ function bindAssociate(b: Binder) {
   const t2 = findTable(d, "SUBJECTS TAUGHT DURING LAST FIVE YEARS");
   const ug = b.list("subjectsUg");
   const pg = b.list("subjectsPg");
-  const subjRows = ensureRows(rows(t2).slice(2, 7), Math.max(5, Math.ceil(ug.length / 2), Math.ceil(pg.length / 2)));
+  const subjRows = ensureRows(
+    rows(t2).slice(2, 7),
+    Math.max(5, Math.ceil(ug.length / 2), Math.ceil(pg.length / 2)),
+  );
   if (subjRows.length > 5) b.deviations.push(`Subjects taught: ${subjRows.length - 5} row(s) added`);
   ug.forEach((x, i) => setCell(cells(subjRows[Math.floor(i / 2)]!)[i % 2]!, x));
   pg.forEach((x, i) => setCell(cells(subjRows[Math.floor(i / 2)]!)[2 + (i % 2)]!, x));
   const group = (head: string, n: number) => rowsAfter(findRow(t2, head), n);
-  b.transposed(group("COURSE MATERIALS PREPARED", 2), b.rows("courseMaterials"), ["title", "year"], "Course materials");
-  b.transposed(group("LABORATORY MANUALS PREPARED", 2), b.rows("labManuals"), ["title", "year"], "Laboratory manuals");
+  b.transposed(
+    group("COURSE MATERIALS PREPARED", 2),
+    b.rows("courseMaterials"),
+    ["title", "year"],
+    "Course materials",
+  );
+  b.transposed(
+    group("LABORATORY MANUALS PREPARED", 2),
+    b.rows("labManuals"),
+    ["title", "year"],
+    "Laboratory manuals",
+  );
   b.transposed(group("MONOGRAPHS PREPARED", 2), b.rows("monographs"), ["title", "year"], "Monographs");
   b.transposed(group("BOOKS PUBLISHED", 3), b.rows("books"), ["name", "publisher", "year"], "Books");
 
@@ -416,27 +487,74 @@ function bindAssociate(b: Binder) {
   // Page 5.
   const t3 = findTable(d, "PARTICIPATION IN CONSULTANCY ACTIVITIES");
   const after = (t: Element, label: string, n: number) => rowsAfter(findRow(t, label), n);
-  b.table(after(t3, "CONSULTANCY JOB / PROJECT", 4), b.rows("consultancy"), [(r) => s(r.job), (r) => s(r.organisation), (r) => s(r.projectLeader), (r) => s(r.revenue)], "Consultancy");
-  b.table(after(t3, "TESTING JOB", 4), b.rows("testing"), [(r) => s(r.job), (r) => s(r.organisation), (r) => s(r.testsDone), (r) => s(r.revenue)], "Testing");
-  b.table(after(t3, "PROGRAMME", 4), b.rows("summerPrograms"), [(r) => s(r.programme), (r) => s(r.heldAt), (r) => s(r.duration)], "Summer / continuing education programmes");
+  b.table(
+    after(t3, "CONSULTANCY JOB / PROJECT", 4),
+    b.rows("consultancy"),
+    [(r) => s(r.job), (r) => s(r.organisation), (r) => s(r.projectLeader), (r) => s(r.revenue)],
+    "Consultancy",
+  );
+  b.table(
+    after(t3, "TESTING JOB", 4),
+    b.rows("testing"),
+    [(r) => s(r.job), (r) => s(r.organisation), (r) => s(r.testsDone), (r) => s(r.revenue)],
+    "Testing",
+  );
+  b.table(
+    after(t3, "PROGRAMME", 4),
+    b.rows("summerPrograms"),
+    [(r) => s(r.programme), (r) => s(r.heldAt), (r) => s(r.duration)],
+    "Summer / continuing education programmes",
+  );
 
   // Page 6.
   const conf = b.list("conferencePapers");
   const addC = fillBlankLines(findParagraph(d, "PAPERS PRESENTED IN CONFERENCES"), conf, 95);
   if (addC) b.deviations.push(`Conference papers: ${addC} continuation line(s) added`);
   const t4 = findTable(d, "MEMBERSHIP OF PROFESSIONAL BODIES");
-  b.table(after(t4, "PROFESSIONAL BODY", 5), b.rows("memberships"), [(r) => s(r.body), (r) => s(r.type), (r) => s(r.position)], "Memberships");
+  b.table(
+    after(t4, "PROFESSIONAL BODY", 5),
+    b.rows("memberships"),
+    [(r) => s(r.body), (r) => s(r.type), (r) => s(r.position)],
+    "Memberships",
+  );
 
   // Page 7.
   const t5 = findTable(d, "ANY LABORATORY MODELS");
   setCell(cells(rows(t5)[1]!)[0]!, b.v("labModels"));
-  b.table(after(t5, "EQUIPMENT", 4), b.rows("labDevelopment"), [(r) => s(r.equipment), (r) => s(r.cost), (r) => s(r.whenPurchased), (r) => s(r.involvement)], "Laboratory development");
+  b.table(
+    after(t5, "EQUIPMENT", 4),
+    b.rows("labDevelopment"),
+    [(r) => s(r.equipment), (r) => s(r.cost), (r) => s(r.whenPurchased), (r) => s(r.involvement)],
+    "Laboratory development",
+  );
   setCell(cells(rowsAfter(findRow(t5, "STATE ANY INNOVATIONS"), 1)[0]!)[0]!, b.v("teachingInnovations"));
 
   // Page 8.
   const t6 = findTable(d, "PARTICIPATION IN THE ORGANISATION OF CONTINUING");
-  b.table(after(t6, "PROGRAMME", 4), b.rows("ceOrganised"), [(r) => s(r.programme), (r) => s(r.duration), (r) => s(r.period), (r) => s(r.participants), (r) => s(r.involvement)], "Continuing education programmes organised");
-  b.table(after(t6, "PROJECT", 4), b.rows("sponsoredResearch"), [(r) => s(r.project), (r) => s(r.sponsor), (r) => s(r.period), (r) => s(r.grant), (r) => s(r.principalInvestigator)], "Sponsored research");
+  b.table(
+    after(t6, "PROGRAMME", 4),
+    b.rows("ceOrganised"),
+    [
+      (r) => s(r.programme),
+      (r) => s(r.duration),
+      (r) => s(r.period),
+      (r) => s(r.participants),
+      (r) => s(r.involvement),
+    ],
+    "Continuing education programmes organised",
+  );
+  b.table(
+    after(t6, "PROJECT", 4),
+    b.rows("sponsoredResearch"),
+    [
+      (r) => s(r.project),
+      (r) => s(r.sponsor),
+      (r) => s(r.period),
+      (r) => s(r.grant),
+      (r) => s(r.principalInvestigator),
+    ],
+    "Sponsored research",
+  );
   const sug = b.list("studentProjectsUg");
   const spg = b.list("studentProjectsPg");
   const spRows = ensureRows(after(t6, "UNDER GRADUATE", 7), Math.max(7, sug.length, spg.length));
@@ -446,9 +564,19 @@ function bindAssociate(b: Binder) {
 
   // Page 9.
   const t7 = findTable(d, "MENTORSHIP DURING THE LAST THREE YEARS");
-  b.table(after(t7, "CLASS", 4), b.rows("mentorship"), [(r) => s(r.class), (r) => s(r.year), (r) => s(r.contribution)], "Mentorship");
+  b.table(
+    after(t7, "CLASS", 4),
+    b.rows("mentorship"),
+    [(r) => s(r.class), (r) => s(r.year), (r) => s(r.contribution)],
+    "Mentorship",
+  );
   const toursHead = findRow(t7, "CLASS", findRow(t7, "ACCOMPANYING STUDENTS"));
-  b.table(rowsAfter(toursHead, 3), b.rows("tours"), [(r) => s(r.class), (r) => s(r.visitTo), (r) => s(r.duration), (r) => s(r.yearMonth)], "Educational tours / industrial visits");
+  b.table(
+    rowsAfter(toursHead, 3),
+    b.rows("tours"),
+    [(r) => s(r.class), (r) => s(r.visitTo), (r) => s(r.duration), (r) => s(r.yearMonth)],
+    "Educational tours / industrial visits",
+  );
   const t8 = findTable(d, "DISTINCTIONS AND AWARDS");
   const awards = b.list("awardsPatents");
   const awRows = ensureRows(rows(t8).slice(1, 5), Math.max(4, awards.length));
@@ -468,7 +596,9 @@ const BINDERS: Record<FormCode, (b: Binder) => void> = {
 const IMAGE_CT: Record<string, string> = { png: "image/png", jpeg: "image/jpeg" };
 
 /** Populates the template and returns the DOCX bytes plus a traceability report. */
-export async function renderApplicationDocx(input: RenderInput): Promise<{ docx: Uint8Array; report: RenderReport }> {
+export async function renderApplicationDocx(
+  input: RenderInput,
+): Promise<{ docx: Uint8Array; report: RenderReport }> {
   const zip = await JSZip.loadAsync(input.template);
   const docFile = zip.file("word/document.xml");
   if (!docFile) throw new Error("Template has no word/document.xml");
@@ -489,7 +619,10 @@ export async function renderApplicationDocx(input: RenderInput): Promise<{ docx:
     const relsPath = "word/_rels/document.xml.rels";
     const rels = parseXml(await zip.file(relsPath)!.async("string"));
     const relId = "rIdApplicantPhoto";
-    const rel = rels.createElementNS("http://schemas.openxmlformats.org/package/2006/relationships", "Relationship");
+    const rel = rels.createElementNS(
+      "http://schemas.openxmlformats.org/package/2006/relationships",
+      "Relationship",
+    );
     rel.setAttribute("Id", relId);
     rel.setAttribute("Type", "http://schemas.openxmlformats.org/officeDocument/2006/relationships/image");
     rel.setAttribute("Target", `media/applicant-photo.${img.ext}`);
@@ -499,9 +632,13 @@ export async function renderApplicationDocx(input: RenderInput): Promise<{ docx:
     const ct = parseXml(await zip.file("[Content_Types].xml")!.async("string"));
     const defaults = ct.getElementsByTagName("Default");
     let has = false;
-    for (let i = 0; i < defaults.length; i++) if (defaults[i]!.getAttribute("Extension") === img.ext) has = true;
+    for (let i = 0; i < defaults.length; i++)
+      if (defaults[i]!.getAttribute("Extension") === img.ext) has = true;
     if (!has) {
-      const def = ct.createElementNS("http://schemas.openxmlformats.org/package/2006/content-types", "Default");
+      const def = ct.createElementNS(
+        "http://schemas.openxmlformats.org/package/2006/content-types",
+        "Default",
+      );
       def.setAttribute("Extension", img.ext);
       def.setAttribute("ContentType", IMAGE_CT[img.ext]!);
       ct.documentElement!.insertBefore(def, ct.documentElement!.firstChild);

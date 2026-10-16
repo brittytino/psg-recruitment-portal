@@ -69,13 +69,7 @@ export interface DerivedField extends BaseField {
 }
 
 export type ScalarField =
-  | TextField
-  | TextAreaField
-  | DateField
-  | MonthYearField
-  | NumberField
-  | SelectField
-  | DerivedField;
+  TextField | TextAreaField | DateField | MonthYearField | NumberField | SelectField | DerivedField;
 
 export interface TableField extends BaseField {
   kind: "table";

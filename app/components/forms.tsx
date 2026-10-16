@@ -109,14 +109,26 @@ export function TextInput({
 }
 
 /** Error summary shown at the top of a form; receives focus so screen readers announce it. */
-export function ErrorSummary({ title = "There is a problem", messages }: { title?: string; messages: { text: string; href?: string }[] }) {
+export function ErrorSummary({
+  title = "There is a problem",
+  messages,
+}: {
+  title?: string;
+  messages: { text: string; href?: string }[];
+}) {
   const ref = useRef<HTMLDivElement>(null);
   useEffect(() => {
     if (messages.length) ref.current?.focus();
   }, [messages.length, messages[0]?.text]);
   if (!messages.length) return null;
   return (
-    <div ref={ref} tabIndex={-1} role="alert" aria-labelledby="error-summary-title" className="mb-6 rounded border-2 border-danger bg-danger-50 p-4">
+    <div
+      ref={ref}
+      tabIndex={-1}
+      role="alert"
+      aria-labelledby="error-summary-title"
+      className="mb-6 rounded border-2 border-danger bg-danger-50 p-4"
+    >
       <h2 id="error-summary-title" className="text-base font-semibold text-danger">
         {title}
       </h2>
@@ -129,7 +141,15 @@ export function ErrorSummary({ title = "There is a problem", messages }: { title
   );
 }
 
-export function Alert({ tone = "info", title, children }: { tone?: "info" | "success" | "warning" | "danger"; title?: string; children: ReactNode }) {
+export function Alert({
+  tone = "info",
+  title,
+  children,
+}: {
+  tone?: "info" | "success" | "warning" | "danger";
+  title?: string;
+  children: ReactNode;
+}) {
   const styles = {
     info: "border-brand-600 bg-brand-50",
     success: "border-success bg-success-50",
@@ -149,7 +169,13 @@ export function Alert({ tone = "info", title, children }: { tone?: "info" | "suc
 }
 
 /** Status badge: always shows text (never colour alone). */
-export function Badge({ children, tone = "neutral" }: { children: ReactNode; tone?: "neutral" | "info" | "success" | "warning" | "danger" }) {
+export function Badge({
+  children,
+  tone = "neutral",
+}: {
+  children: ReactNode;
+  tone?: "neutral" | "info" | "success" | "warning" | "danger";
+}) {
   const styles = {
     neutral: "border-line bg-white text-ink",
     info: "border-brand-600 bg-brand-50 text-brand-800",
@@ -157,7 +183,11 @@ export function Badge({ children, tone = "neutral" }: { children: ReactNode; ton
     warning: "border-warning bg-warning-50 text-warning",
     danger: "border-danger bg-danger-50 text-danger",
   }[tone];
-  return <span className={`inline-flex items-center rounded border px-2 py-0.5 text-xs font-medium ${styles}`}>{children}</span>;
+  return (
+    <span className={`inline-flex items-center rounded border px-2 py-0.5 text-xs font-medium ${styles}`}>
+      {children}
+    </span>
+  );
 }
 
 export function statusTone(s: string): "neutral" | "info" | "success" | "warning" | "danger" {
@@ -194,10 +224,19 @@ export function ConfirmDialog({
   const titleId = useId();
   return (
     <>
-      <button type="button" className={triggerClassName ?? (tone === "danger" ? "btn-danger" : "btn-primary")} onClick={() => ref.current?.showModal()} disabled={disabled}>
+      <button
+        type="button"
+        className={triggerClassName ?? (tone === "danger" ? "btn-danger" : "btn-primary")}
+        onClick={() => ref.current?.showModal()}
+        disabled={disabled}
+      >
         {trigger}
       </button>
-      <dialog ref={ref} aria-labelledby={titleId} className="m-auto w-full max-w-lg rounded-md border border-line p-0">
+      <dialog
+        ref={ref}
+        aria-labelledby={titleId}
+        className="m-auto w-full max-w-lg rounded-md border border-line p-0"
+      >
         <div className="p-6">
           <h2 id={titleId}>{title}</h2>
           <div className="mt-3 space-y-3 text-sm">{children}</div>
@@ -205,7 +244,11 @@ export function ConfirmDialog({
             <button type="button" className="btn-secondary" onClick={() => ref.current?.close()}>
               Cancel
             </button>
-            <button type="submit" className={tone === "danger" ? "btn-danger" : "btn-primary"} onClick={() => setTimeout(() => ref.current?.close(), 0)}>
+            <button
+              type="submit"
+              className={tone === "danger" ? "btn-danger" : "btn-primary"}
+              onClick={() => setTimeout(() => ref.current?.close(), 0)}
+            >
               {confirmLabel}
             </button>
           </div>
@@ -217,10 +260,18 @@ export function ConfirmDialog({
 
 export function formatDateTime(d: string | Date | null | undefined): string {
   if (!d) return "—";
-  return new Intl.DateTimeFormat("en-IN", { dateStyle: "medium", timeStyle: "short", timeZone: "Asia/Kolkata" }).format(new Date(d)) + " IST";
+  return (
+    new Intl.DateTimeFormat("en-IN", {
+      dateStyle: "medium",
+      timeStyle: "short",
+      timeZone: "Asia/Kolkata",
+    }).format(new Date(d)) + " IST"
+  );
 }
 
 export function formatDate(d: string | Date | null | undefined): string {
   if (!d) return "—";
-  return new Intl.DateTimeFormat("en-IN", { dateStyle: "medium", timeZone: "Asia/Kolkata" }).format(new Date(d));
+  return new Intl.DateTimeFormat("en-IN", { dateStyle: "medium", timeZone: "Asia/Kolkata" }).format(
+    new Date(d),
+  );
 }

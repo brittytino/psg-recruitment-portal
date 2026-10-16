@@ -1,6 +1,8 @@
 #!/usr/bin/env sh
 # Shared helpers for blue-green deployment. Sourced by deploy.sh / switch.sh / rollback.sh / smoke.sh.
 set -eu
+# Git Bash on Windows: do not rewrite container paths such as /data.
+export MSYS_NO_PATHCONV=1
 BG_DIR="$(cd "$(dirname "$0")" && pwd)"
 ROOT="$(cd "$BG_DIR/../.." && pwd)"
 STATE="$BG_DIR/state"

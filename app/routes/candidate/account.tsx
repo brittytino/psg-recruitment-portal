@@ -40,8 +40,12 @@ export default function Account({ loaderData, actionData }: Route.ComponentProps
         <h1>My applications</h1>
         <p className="mt-1 text-sm text-muted">Signed in as {name}</p>
       </div>
-      {actionData && "message" in actionData && actionData.message && <Alert tone="success">{actionData.message}</Alert>}
-      {actionData && "formError" in actionData && actionData.formError && <Alert tone="danger">{actionData.formError}</Alert>}
+      {actionData && "message" in actionData && actionData.message && (
+        <Alert tone="success">{actionData.message}</Alert>
+      )}
+      {actionData && "formError" in actionData && actionData.formError && (
+        <Alert tone="danger">{actionData.formError}</Alert>
+      )}
       {!verified && (
         <Alert tone="warning" title="Verify your e-mail address">
           <p>You must verify your e-mail address before you can start an application.</p>

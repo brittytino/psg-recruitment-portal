@@ -4,7 +4,13 @@ import { renderApplicationDocx } from "~/modules/documents/docx/render";
 import { getFormDefinition } from "~/modules/forms/registry";
 import { withDerived } from "~/modules/forms/validation";
 import type { Answers, FormCode } from "~/modules/forms/types";
-import { assistantFull, assistantMinimal, associateFull, associateMinimal, testPhotoPng } from "../tests/fixtures/applications";
+import {
+  assistantFull,
+  assistantMinimal,
+  associateFull,
+  associateMinimal,
+  testPhotoPng,
+} from "../tests/fixtures/applications";
 
 const OUT = "tests/pdf-regression/output";
 const CONVERTER = process.env.CONVERTER_URL ?? "http://localhost:63100";
@@ -24,14 +30,20 @@ const cases: [string, FormCode, Answers][] = [
 ];
 for (const code of ["ASSISTANT_PROFESSOR", "ASSOCIATE_PROFESSOR"] as const) {
   const def = getFormDefinition(code, 1);
-  writeFileSync(`${OUT}/${code.toLowerCase()}-original.pdf`, await toPdf(new Uint8Array(readFileSync(def.templatePath))));
+  writeFileSync(
+    `${OUT}/${code.toLowerCase()}-original.pdf`,
+    await toPdf(new Uint8Array(readFileSync(def.templatePath))),
+  );
 }
 for (const [name, code, answers] of cases) {
   const def = getFormDefinition(code, 1);
   const { docx, report } = await renderApplicationDocx({
     formCode: code,
     template: new Uint8Array(readFileSync(def.templatePath)),
-    answers: withDerived(def, answers, { department: "Computer Science and Engineering", asOf: "2026-10-01" }),
+    answers: withDerived(def, answers, {
+      department: "Computer Science and Engineering",
+      asOf: "2026-10-01",
+    }),
     photo: testPhotoPng(),
   });
   writeFileSync(`${OUT}/${name}.docx`, docx);

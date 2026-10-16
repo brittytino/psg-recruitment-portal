@@ -24,7 +24,8 @@ export function passwordProblems(pw: string, email?: string): string[] {
   if (pw.length > 128) p.push("Use at most 128 characters");
   if (/^(.)\1+$/.test(pw)) p.push("Do not repeat a single character");
   const local = email?.split("@")[0]?.toLowerCase();
-  if (local && local.length >= 4 && pw.toLowerCase().includes(local)) p.push("Do not include your e-mail name");
+  if (local && local.length >= 4 && pw.toLowerCase().includes(local))
+    p.push("Do not include your e-mail name");
   if (["password123", "1234567890", "qwertyuiop", "psgtech123", "password1234"].includes(pw.toLowerCase()))
     p.push("This password is too common");
   return p;

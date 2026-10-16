@@ -19,11 +19,14 @@ function root(): string {
 export function newKey(area: Area, ext: string, group?: string): string {
   const id = randomUUID();
   const safeExt = ext.replace(/[^a-z0-9]/g, "").slice(0, 5);
-  return area === "uploads" ? `uploads/${id.slice(0, 2)}/${id}.${safeExt}` : `generated/${group ?? "misc"}/${id}.${safeExt}`;
+  return area === "uploads"
+    ? `uploads/${id.slice(0, 2)}/${id}.${safeExt}`
+    : `generated/${group ?? "misc"}/${id}.${safeExt}`;
 }
 
 export function pathFor(key: string): string {
-  if (!/^(uploads|generated)\/[a-z0-9-]+\/[a-f0-9-]{36}\.[a-z0-9]{1,5}$/.test(key)) throw new Error("Invalid storage key");
+  if (!/^(uploads|generated)\/[a-z0-9-]+\/[a-f0-9-]{36}\.[a-z0-9]{1,5}$/.test(key))
+    throw new Error("Invalid storage key");
   const p = resolve(root(), key);
   if (!p.startsWith(root() + sep)) throw new Error("Storage key escapes storage root");
   return p;

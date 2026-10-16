@@ -1,0 +1,93 @@
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  quality:
+    name: Lint, types, unit tests, build
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: 22, cache: npm }
+      - run: npm ci
+      - run: npx prisma generate
+      - run: npm run format:check
+      - run: npm run lint
+      - run: npm run typecheck
+      - run: npm test
+      - name: Form inventory is up to date
+        run: npm run forms:inventory && git diff --exit-code docs/requirements/form-field-inventory.md
+      - run: npm run build
+      - name: Dependency audit (production, critical)
+        run: npm audit --omit=dev --audit-level=critical
+
+  integration:
+    name: Integration, PDF and e2e tests (real Postgres, Redis, LibreOffice, ClamAV)
+    runs-on: ubuntu-24.04
+    needs: quality
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: 22, cache: npm }
+      - run: npm ci && npx prisma generate
+      - run: cp .env.example .env
+      - name: Start services
+        run: docker compose -f compose.yaml -f compose.dev.yaml up -d --build --wait db redis converter mailpit clamav
+        timeout-minutes: 15
+      - name: Migration validation (fresh database)
+        run: docker compose exec -T db psql -U srp_owner -d postgres -c "CREATE DATABASE srportal_shadow" && npx prisma migrate deploy && npx prisma migrate diff --from-migrations prisma/migrations --to-schema-datamodel prisma/schema.prisma --shadow-database-url "$SHADOW" --exit-code
+        env:
+          DATABASE_URL: postgresql://srp_owner:change-me-owner@localhost:65432/srportal?schema=public
+          SHADOW: postgresql://srp_owner:change-me-owner@localhost:65432/srportal_shadow
+      - name: Integration + authorization tests
+        run: npm run test:integration
+      - name: Seed demo data and run e2e
+        run: |
+          SEED_DEMO=true npx tsx prisma/seed.ts
+          npx playwright install --with-deps chromium
+          . scripts/host-env.sh && export APP_ORIGIN=http://localhost:3000 && (npx react-router dev --port 3000 &) && for i in $(seq 60); do curl -sf localhost:3000/healthz/live && break; sleep 2; done
+          npm run test:e2e
+        env:
+          DATABASE_URL: postgresql://srp_owner:change-me-owner@localhost:65432/srportal?schema=public
+          SEED_DEMO_PASSWORD: Demo@12345-change
+      - name: PDF regression render
+        run: . scripts/host-env.sh && npx tsx scripts/render-samples.ts
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          {
+            name: pdf-and-e2e-output,
+            path: "tests/pdf-regression/output\nplaywright-report\ntest-results",
+            retention-days: 7,
+          }
+
+  containers:
+    name: Container build and scan
+    runs-on: ubuntu-24.04
+    needs: quality
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build immutable image tagged with commit SHA
+        run: |
+          docker build --target runtime --build-arg GIT_SHA=${GITHUB_SHA::12} -t psg-srp-app:${GITHUB_SHA::12} .
+          docker build -f infrastructure/docker/converter.Dockerfile -t psg-srp-converter:${GITHUB_SHA::12} .
+      - name: Vulnerability scan (fail on CRITICAL)
+        run: docker run --rm -v /var/run/docker.sock:/var/run/docker.sock aquasec/trivy:0.58.1 image --exit-code 1 --severity CRITICAL --ignore-unfixed psg-srp-app:${GITHUB_SHA::12}
+      - name: Compose files validate
+        run: |
+          cp .env.example .env
+          docker compose -f compose.yaml -f compose.dev.yaml config -q
+          cp .env.example .env.production
+          sed -i 's/^SMTP_HOST=.*/SMTP_HOST=smtp.example.test/' .env.production
+          docker compose -f compose.production.yaml --env-file .env.production config -q

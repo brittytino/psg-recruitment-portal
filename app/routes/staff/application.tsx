@@ -5,7 +5,13 @@ import { Alert, Badge, ConfirmDialog, CsrfInput, formatDateTime, statusTone } fr
 import { clientIp, handleAction, readForm, requireStaff } from "~/lib/http.server";
 import { FORM_LABELS, POSITION_LABELS, RECOMMENDATION_LABELS } from "~/lib/labels";
 import { getStaffApplication, transition } from "~/modules/applications/service.server";
-import { APPLICATION_STATUSES, availableTransitions, PROCESSING_LABELS, STATUS_LABELS, type AppStatus } from "~/modules/applications/workflow";
+import {
+  APPLICATION_STATUSES,
+  availableTransitions,
+  PROCESSING_LABELS,
+  STATUS_LABELS,
+  type AppStatus,
+} from "~/modules/applications/workflow";
 import { hasPermission } from "~/modules/auth/permissions";
 import { hrScope } from "~/modules/auth/policy.server";
 import { audit } from "~/modules/audit/audit.server";
@@ -22,7 +28,13 @@ export async function loader({ request, params, context }: Route.LoaderArgs) {
   const user = requireStaff(context, request, "application:read");
   const app = await getStaffApplication(user, params.id);
   // Privileged access to a candidate record is audited.
-  await audit({ actorId: user.id, action: "application.viewed", entityType: "application", entityId: app.id, ip: clientIp(request) });
+  await audit({
+    actorId: user.id,
+    action: "application.viewed",
+    entityType: "application",
+    entityId: app.id,
+    ip: clientIp(request),
+  });
   const isHr = !!hrScope(user);
   const myAssignment = app.assignments.find((a) => a.reviewerId === user.id && a.stage === "DEPARTMENT");
   return {
@@ -32,18 +44,67 @@ export async function loader({ request, params, context }: Route.LoaderArgs) {
       status: app.status as AppStatus,
       processingStatus: app.processingStatus,
       submittedAt: app.submittedAt,
-      vacancy: { code: app.vacancy.code, title: app.vacancy.title, position: app.vacancy.position, department: app.vacancy.department.name, discipline: app.vacancy.discipline?.name ?? null, cycle: app.vacancy.cycle.title },
+      vacancy: {
+        code: app.vacancy.code,
+        title: app.vacancy.title,
+        position: app.vacancy.position,
+        department: app.vacancy.department.name,
+        discipline: app.vacancy.discipline?.name ?? null,
+        cycle: app.vacancy.cycle.title,
+      },
       formCode: app.formTemplate.code as FormCode,
       formVersion: app.formTemplate.version,
       revision: app.currentRevision
-        ? { id: app.currentRevision.id, no: app.currentRevision.revisionNo, createdAt: app.currentRevision.createdAt, answers: app.currentRevision.answers as Answers, sha: app.currentRevision.answersSha256, manifest: app.currentRevision.attachmentManifest as { documentId: string; documentType: DocType; originalName: string; sizeBytes: number }[] }
+        ? {
+            id: app.currentRevision.id,
+            no: app.currentRevision.revisionNo,
+            createdAt: app.currentRevision.createdAt,
+            answers: app.currentRevision.answers as Answers,
+            sha: app.currentRevision.answersSha256,
+            manifest: app.currentRevision.attachmentManifest as {
+              documentId: string;
+              documentType: DocType;
+              originalName: string;
+              sizeBytes: number;
+            }[],
+          }
         : null,
       documents: app.documents.map((d) => ({ id: d.id, scan: d.scanStatus, mime: d.mimeType })),
-      required: app.vacancy.requiredDocuments.map((r) => ({ type: r.documentType as DocType, label: r.label })),
-      generated: app.generated.map((g) => ({ id: g.id, version: g.version, revisionId: g.revisionId, status: g.status, pages: g.pageCount, error: g.error, createdAt: g.createdAt, completedAt: g.completedAt, report: g.report as { deviations?: string[] } | null })),
-      history: app.statusHistory.map((h) => ({ from: h.fromStatus, to: h.toStatus, reason: h.reason, at: h.createdAt })),
-      assignments: app.assignments.map((a) => ({ id: a.id, name: a.reviewer.profile?.fullName ?? a.reviewer.email, completedAt: a.completedAt })),
-      reviews: app.reviews.map((r) => ({ id: r.id, stage: r.stage, recommendation: r.recommendation, score: r.score, comments: r.comments, at: r.createdAt, by: r.reviewer.profile?.fullName ?? r.reviewer.email })),
+      required: app.vacancy.requiredDocuments.map((r) => ({
+        type: r.documentType as DocType,
+        label: r.label,
+      })),
+      generated: app.generated.map((g) => ({
+        id: g.id,
+        version: g.version,
+        revisionId: g.revisionId,
+        status: g.status,
+        pages: g.pageCount,
+        error: g.error,
+        createdAt: g.createdAt,
+        completedAt: g.completedAt,
+        report: g.report as { deviations?: string[] } | null,
+      })),
+      history: app.statusHistory.map((h) => ({
+        from: h.fromStatus,
+        to: h.toStatus,
+        reason: h.reason,
+        at: h.createdAt,
+      })),
+      assignments: app.assignments.map((a) => ({
+        id: a.id,
+        name: a.reviewer.profile?.fullName ?? a.reviewer.email,
+        completedAt: a.completedAt,
+      })),
+      reviews: app.reviews.map((r) => ({
+        id: r.id,
+        stage: r.stage,
+        recommendation: r.recommendation,
+        score: r.score,
+        comments: r.comments,
+        at: r.createdAt,
+        by: r.reviewer.profile?.fullName ?? r.reviewer.email,
+      })),
     },
     isHr,
     canDownload: hasPermission(user.grants, "document:download"),
@@ -62,7 +123,8 @@ export async function action({ request, params, context }: Route.ActionArgs) {
     switch (form.get("intent")) {
       case "transition": {
         const to = String(form.get("to"));
-        if (!(APPLICATION_STATUSES as readonly string[]).includes(to)) throw new ValidationError("Unknown status");
+        if (!(APPLICATION_STATUSES as readonly string[]).includes(to))
+          throw new ValidationError("Unknown status");
         await transition(user, params.id, to as AppStatus, String(form.get("reason") ?? ""), ip);
         return { message: `Status changed to “${STATUS_LABELS[to as AppStatus]}”.` };
       }
@@ -122,20 +184,31 @@ export default function StaffApplication({ loaderData, actionData }: Route.Compo
         </div>
       </header>
 
-      {actionData && "message" in actionData && actionData.message && <Alert tone="success">{actionData.message}</Alert>}
-      {actionData && "formError" in actionData && actionData.formError && <Alert tone="danger">{actionData.formError}</Alert>}
+      {actionData && "message" in actionData && actionData.message && (
+        <Alert tone="success">{actionData.message}</Alert>
+      )}
+      {actionData && "formError" in actionData && actionData.formError && (
+        <Alert tone="danger">{actionData.formError}</Alert>
+      )}
 
       <div className="grid gap-6 lg:grid-cols-[1fr_22rem]">
         <div className="space-y-6">
           <section className="card" aria-labelledby="att">
             <h2 id="att">Attachment checklist</h2>
             <ul className="mt-3 space-y-2 text-sm">
-              {[{ type: "PHOTOGRAPH" as DocType, label: DOCUMENT_TYPE_LABELS.PHOTOGRAPH }, ...app.required].map((r) => {
+              {[
+                { type: "PHOTOGRAPH" as DocType, label: DOCUMENT_TYPE_LABELS.PHOTOGRAPH },
+                ...app.required,
+              ].map((r) => {
                 const have = app.revision?.manifest.filter((m) => m.documentType === r.type) ?? [];
                 return (
                   <li key={r.type} className="flex justify-between gap-2">
                     <span>{r.label}</span>
-                    {have.length ? <Badge tone="success">Provided ({have.length})</Badge> : <Badge tone="danger">Missing</Badge>}
+                    {have.length ? (
+                      <Badge tone="success">Provided ({have.length})</Badge>
+                    ) : (
+                      <Badge tone="danger">Missing</Badge>
+                    )}
                   </li>
                 );
               })}
@@ -152,10 +225,18 @@ export default function StaffApplication({ loaderData, actionData }: Route.Compo
               <tbody>
                 {app.revision?.manifest.map((m) => (
                   <tr key={m.documentId}>
-                    <td>{canDownload ? <a href={`/files/documents/${m.documentId}`}>{m.originalName}</a> : m.originalName}</td>
+                    <td>
+                      {canDownload ? (
+                        <a href={`/files/documents/${m.documentId}`}>{m.originalName}</a>
+                      ) : (
+                        m.originalName
+                      )}
+                    </td>
                     <td>{DOCUMENT_TYPE_LABELS[m.documentType]}</td>
                     <td>
-                      <Badge tone={statusTone(docScan.get(m.documentId) ?? "PENDING")}>{docScan.get(m.documentId) ?? "—"}</Badge>
+                      <Badge tone={statusTone(docScan.get(m.documentId) ?? "PENDING")}>
+                        {docScan.get(m.documentId) ?? "—"}
+                      </Badge>
                     </td>
                   </tr>
                 ))}
@@ -186,7 +267,9 @@ export default function StaffApplication({ loaderData, actionData }: Route.Compo
                   )}
                   {g.report?.deviations && g.report.deviations.length > 0 && (
                     <details className="mt-1">
-                      <summary className="cursor-pointer">Layout continuation notes ({g.report.deviations.length})</summary>
+                      <summary className="cursor-pointer">
+                        Layout continuation notes ({g.report.deviations.length})
+                      </summary>
                       <ul className="mt-1 list-disc pl-5">
                         {g.report.deviations.map((d, i) => (
                           <li key={i}>{d}</li>
@@ -201,8 +284,16 @@ export default function StaffApplication({ loaderData, actionData }: Route.Compo
               <Form method="post" className="mt-3">
                 <CsrfInput />
                 <input type="hidden" name="intent" value="regenerate" />
-                <ConfirmDialog trigger="Regenerate PDF (new version)" triggerClassName="btn-secondary" title="Regenerate the consolidated PDF?" confirmLabel="Queue regeneration">
-                  <p>A new version is generated from the same submitted revision. Earlier versions are kept unchanged.</p>
+                <ConfirmDialog
+                  trigger="Regenerate PDF (new version)"
+                  triggerClassName="btn-secondary"
+                  title="Regenerate the consolidated PDF?"
+                  confirmLabel="Queue regeneration"
+                >
+                  <p>
+                    A new version is generated from the same submitted revision. Earlier versions are kept
+                    unchanged.
+                  </p>
                 </ConfirmDialog>
               </Form>
             )}
@@ -214,7 +305,12 @@ export default function StaffApplication({ loaderData, actionData }: Route.Compo
                 <h2 id={`s-${s.id}`}>{s.title}</h2>
                 <dl className="mt-3 space-y-3 text-sm">
                   {s.fields.map((f) => (
-                    <div key={f.key} className={f.kind === "table" || f.kind === "list" ? "" : "grid gap-1 sm:grid-cols-[14rem_1fr]"}>
+                    <div
+                      key={f.key}
+                      className={
+                        f.kind === "table" || f.kind === "list" ? "" : "grid gap-1 sm:grid-cols-[14rem_1fr]"
+                      }
+                    >
                       <dt className="font-medium">{f.label}</dt>
                       <dd>
                         <AnswerView field={f} value={app.revision!.answers[f.key]} />
@@ -239,11 +335,29 @@ export default function StaffApplication({ loaderData, actionData }: Route.Compo
                     <label htmlFor={`reason-${t.to}`} className="block text-sm font-medium">
                       {t.label}: reason {t.reasonRequired ? "(required)" : "(optional)"}
                     </label>
-                    <textarea id={`reason-${t.to}`} name="reason" rows={2} maxLength={2000} required={t.reasonRequired} className="field-input" />
-                    <ConfirmDialog trigger={t.label} triggerClassName={t.to === "REJECTED" ? "btn-danger w-full" : "btn-secondary w-full"} tone={t.to === "REJECTED" ? "danger" : "primary"} title={`${t.label}?`} confirmLabel="Confirm" disabled={busy}>
+                    <textarea
+                      id={`reason-${t.to}`}
+                      name="reason"
+                      rows={2}
+                      maxLength={2000}
+                      required={t.reasonRequired}
+                      className="field-input"
+                    />
+                    <ConfirmDialog
+                      trigger={t.label}
+                      triggerClassName={t.to === "REJECTED" ? "btn-danger w-full" : "btn-secondary w-full"}
+                      tone={t.to === "REJECTED" ? "danger" : "primary"}
+                      title={`${t.label}?`}
+                      confirmLabel="Confirm"
+                      disabled={busy}
+                    >
                       <p>
-                        The status will change from “{STATUS_LABELS[app.status]}” to “{STATUS_LABELS[t.to]}”. This is recorded in the status history and audit log
-                        {["NEEDS_CLARIFICATION", "SHORTLISTED", "REJECTED", "APPROVED"].includes(t.to) ? " and the candidate is notified" : ""}.
+                        The status will change from “{STATUS_LABELS[app.status]}” to “{STATUS_LABELS[t.to]}”.
+                        This is recorded in the status history and audit log
+                        {["NEEDS_CLARIFICATION", "SHORTLISTED", "REJECTED", "APPROVED"].includes(t.to)
+                          ? " and the candidate is notified"
+                          : ""}
+                        .
                       </p>
                     </ConfirmDialog>
                   </Form>
@@ -259,7 +373,8 @@ export default function StaffApplication({ loaderData, actionData }: Route.Compo
                 {app.assignments.length === 0 && <li className="text-muted">No reviewers assigned.</li>}
                 {app.assignments.map((a) => (
                   <li key={a.id}>
-                    {a.name} — {a.completedAt ? `reviewed ${formatDateTime(a.completedAt)}` : "review pending"}
+                    {a.name} —{" "}
+                    {a.completedAt ? `reviewed ${formatDateTime(a.completedAt)}` : "review pending"}
                   </li>
                 ))}
               </ul>
@@ -297,7 +412,8 @@ export default function StaffApplication({ loaderData, actionData }: Route.Compo
                     {r.score != null ? ` · score ${r.score}` : ""}
                   </p>
                   <p className="text-xs text-muted">
-                    {r.stage === "HR" ? "HR screening" : "Department review"} · {r.by} · {formatDateTime(r.at)}
+                    {r.stage === "HR" ? "HR screening" : "Department review"} · {r.by} ·{" "}
+                    {formatDateTime(r.at)}
                   </p>
                   <p className="mt-1 whitespace-pre-line">{r.comments}</p>
                 </li>
@@ -324,7 +440,15 @@ export default function StaffApplication({ loaderData, actionData }: Route.Compo
                 <label htmlFor="comments" className="block text-sm font-medium">
                   Assessment and comments
                 </label>
-                <textarea id="comments" name="comments" rows={4} required minLength={10} maxLength={5000} className="field-input" />
+                <textarea
+                  id="comments"
+                  name="comments"
+                  rows={4}
+                  required
+                  minLength={10}
+                  maxLength={5000}
+                  className="field-input"
+                />
                 <button type="submit" className="btn-primary w-full" disabled={busy}>
                   Record {canReviewDept ? "department review" : "screening note"}
                 </button>
@@ -337,7 +461,8 @@ export default function StaffApplication({ loaderData, actionData }: Route.Compo
             <ol className="mt-2 space-y-2 text-sm">
               {app.history.map((h, i) => (
                 <li key={i}>
-                  <span className="font-medium">{STATUS_LABELS[h.to as AppStatus]}</span> · {formatDateTime(h.at)}
+                  <span className="font-medium">{STATUS_LABELS[h.to as AppStatus]}</span> ·{" "}
+                  {formatDateTime(h.at)}
                   {h.reason && <span className="block whitespace-pre-line text-muted">{h.reason}</span>}
                 </li>
               ))}

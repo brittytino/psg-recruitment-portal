@@ -21,7 +21,13 @@ export function cookieName(): string {
 }
 
 function serialize(value: string, maxAgeSeconds: number): string {
-  const parts = [`${cookieName()}=${value}`, "Path=/", "HttpOnly", "SameSite=Lax", `Max-Age=${maxAgeSeconds}`];
+  const parts = [
+    `${cookieName()}=${value}`,
+    "Path=/",
+    "HttpOnly",
+    "SameSite=Lax",
+    `Max-Age=${maxAgeSeconds}`,
+  ];
   if (env().COOKIE_SECURE) parts.push("Secure");
   return parts.join("; ");
 }
@@ -44,7 +50,12 @@ export async function createSession(userId: string, userAgent: string | null): P
   const token = randomBytes(32).toString("base64url");
   const ttlMs = env().SESSION_TTL_HOURS * 3600 * 1000;
   await prisma.session.create({
-    data: { id: hashToken(token), userId, expiresAt: new Date(Date.now() + ttlMs), userAgent: userAgent?.slice(0, 300) ?? null },
+    data: {
+      id: hashToken(token),
+      userId,
+      expiresAt: new Date(Date.now() + ttlMs),
+      userAgent: userAgent?.slice(0, 300) ?? null,
+    },
   });
   return serialize(token, Math.floor(ttlMs / 1000));
 }
@@ -75,13 +86,19 @@ export async function getSessionUser(request: Request): Promise<SessionUser | nu
     return null;
   }
   if (now - s.lastSeenAt.getTime() > TOUCH_INTERVAL_MS)
-    await prisma.session.update({ where: { id }, data: { lastSeenAt: new Date(now) } }).catch(() => undefined);
+    await prisma.session
+      .update({ where: { id }, data: { lastSeenAt: new Date(now) } })
+      .catch(() => undefined);
   return {
     id: s.user.id,
     email: s.user.email,
     emailVerified: !!s.user.emailVerifiedAt,
     displayName: s.user.profile?.fullName ?? s.user.email,
-    grants: s.user.roles.map((r) => ({ role: r.role as RoleName, departmentId: r.departmentId, cycleId: r.cycleId })),
+    grants: s.user.roles.map((r) => ({
+      role: r.role as RoleName,
+      departmentId: r.departmentId,
+      cycleId: r.cycleId,
+    })),
     sessionId: id,
   };
 }
@@ -91,7 +108,9 @@ export async function getSessionUser(request: Request): Promise<SessionUser | nu
  * the Origin check and SameSite=Lax cookies (defence in depth).
  */
 export function csrfToken(sessionId: string | null): string {
-  return createHmac("sha256", env().SESSION_SECRET).update(`csrf:${sessionId ?? "anonymous"}`).digest("base64url");
+  return createHmac("sha256", env().SESSION_SECRET)
+    .update(`csrf:${sessionId ?? "anonymous"}`)
+    .digest("base64url");
 }
 
 export function verifyCsrf(sessionId: string | null, token: unknown): boolean {

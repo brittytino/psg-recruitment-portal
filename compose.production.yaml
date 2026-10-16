@@ -80,6 +80,18 @@ services:
       ROLE: worker
       GIT_SHA: ${WORKER_VERSION:-unknown}
     networks: [data, backend]
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "node",
+          "-e",
+          "require('fs').statSync('/tmp/worker-alive').mtimeMs > Date.now() - 60000 || process.exit(1)",
+        ]
+      interval: 20s
+      timeout: 5s
+      retries: 3
+      start_period: 30s
     # Graceful drain: in-flight jobs finish before the old worker exits.
     stop_grace_period: 120s
 

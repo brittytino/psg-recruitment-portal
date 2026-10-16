@@ -30,7 +30,12 @@ export default function Vacancies({ loaderData }: Route.ComponentProps) {
           <label htmlFor="department" className="block text-sm font-medium">
             Department
           </label>
-          <select id="department" name="department" defaultValue={departmentId} className="field-input mt-1 min-w-56">
+          <select
+            id="department"
+            name="department"
+            defaultValue={departmentId}
+            className="field-input mt-1 min-w-56"
+          >
             <option value="">All departments</option>
             {departments.map((d) => (
               <option key={d.id} value={d.id}>

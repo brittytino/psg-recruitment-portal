@@ -63,7 +63,10 @@ test("HR officer sees the application workspace; candidate cannot", async ({ pag
 });
 
 test("cross-origin POST is rejected", async ({ request }) => {
-  const res = await request.post("/login", { headers: { Origin: "https://evil.example" }, form: { email: "x", password: "y" } });
+  const res = await request.post("/login", {
+    headers: { Origin: "https://evil.example" },
+    form: { email: "x", password: "y" },
+  });
   // Blocked either by React Router's built-in action origin check (400) or our middleware (403).
   expect([400, 403]).toContain(res.status());
 });

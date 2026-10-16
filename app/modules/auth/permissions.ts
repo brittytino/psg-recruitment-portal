@@ -3,7 +3,14 @@
  * every loader/action/download re-checks on the server, together with record-level scope rules in
  * policy.server.ts. See docs/architecture/authorization-matrix.md.
  */
-export const ROLES = ["CANDIDATE", "HR_OFFICER", "DEPARTMENT_REVIEWER", "RECRUITMENT_ADMIN", "SUPER_ADMIN", "AUDITOR"] as const;
+export const ROLES = [
+  "CANDIDATE",
+  "HR_OFFICER",
+  "DEPARTMENT_REVIEWER",
+  "RECRUITMENT_ADMIN",
+  "SUPER_ADMIN",
+  "AUDITOR",
+] as const;
 export type RoleName = (typeof ROLES)[number];
 
 export type Permission =

@@ -41,27 +41,44 @@ export function safeNext(next: string | null | undefined, fallback = "/"): strin
 export async function readForm(request: Request, context: Ctx): Promise<FormData> {
   const form = await request.formData();
   const user = context.get(userContext);
-  if (!verifyCsrf(user?.sessionId ?? null, form.get("_csrf"))) throw data({ formError: "Your session has expired. Reload the page and try again." }, { status: 403 });
+  if (!verifyCsrf(user?.sessionId ?? null, form.get("_csrf")))
+    throw data({ formError: "Your session has expired. Reload the page and try again." }, { status: 403 });
   return form;
 }
 
-export type ActionResult = { ok?: boolean; formError?: string; fieldErrors?: Record<string, string[] | undefined>; message?: string; details?: unknown };
+export type ActionResult = {
+  ok?: boolean;
+  formError?: string;
+  fieldErrors?: Record<string, string[] | undefined>;
+  message?: string;
+  details?: unknown;
+};
 
 /**
  * Runs an action body and converts domain errors into typed `data()` responses with a safe
  * message. Unexpected errors are logged and reported generically (no stack traces to clients).
  */
-export async function handleAction<T>(fn: () => Promise<T>): Promise<T | ReturnType<typeof data<ActionResult>>> {
+export async function handleAction<T>(
+  fn: () => Promise<T>,
+): Promise<T | ReturnType<typeof data<ActionResult>>> {
   try {
     return await fn();
   } catch (e) {
     if (e instanceof Response) throw e;
-    if (e && typeof e === "object" && "type" in e && (e as { type: string }).type === "DataWithResponseInit") throw e;
+    if (e && typeof e === "object" && "type" in e && (e as { type: string }).type === "DataWithResponseInit")
+      throw e;
     if (e instanceof UnauthenticatedError) throw redirect("/login");
     if (isDomainError(e)) {
-      const fieldErrors = e.details && typeof e.details === "object" && !Array.isArray(e.details) ? (e.details as ActionResult["fieldErrors"]) : undefined;
-      const headers: HeadersInit = e instanceof RateLimitedError ? { "Retry-After": String(e.retryAfterSeconds) } : {};
-      return data<ActionResult>({ formError: e.message, fieldErrors, details: e.details }, { status: e.status, headers });
+      const fieldErrors =
+        e.details && typeof e.details === "object" && !Array.isArray(e.details)
+          ? (e.details as ActionResult["fieldErrors"])
+          : undefined;
+      const headers: HeadersInit =
+        e instanceof RateLimitedError ? { "Retry-After": String(e.retryAfterSeconds) } : {};
+      return data<ActionResult>(
+        { formError: e.message, fieldErrors, details: e.details },
+        { status: e.status, headers },
+      );
     }
     logger.error({ err: e instanceof Error ? e.message : String(e) }, "action failed");
     return data<ActionResult>({ formError: "Something went wrong. Please try again." }, { status: 500 });

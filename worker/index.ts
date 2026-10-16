@@ -52,22 +52,40 @@ async function relayOnce(): Promise<number> {
     for (const r of rows) {
       const opts = JOB_OPTIONS[r.type as OutboxType];
       if (!opts) {
-        await tx.outboxEvent.update({ where: { id: r.id }, data: { attempts: { increment: 1 }, lastError: `Unknown event type ${r.type}`, availableAt: new Date(Date.now() + 3600_000) } });
+        await tx.outboxEvent.update({
+          where: { id: r.id },
+          data: {
+            attempts: { increment: 1 },
+            lastError: `Unknown event type ${r.type}`,
+            availableAt: new Date(Date.now() + 3600_000),
+          },
+        });
         continue;
       }
       try {
-        await queues[opts.queue].add(r.type, { v: JOB_VERSION, ...(r.payload as object) }, {
-          jobId: r.id,
-          attempts: opts.attempts,
-          backoff: opts.backoff,
-          removeOnComplete: { age: 7 * 86400 },
-          removeOnFail: { age: 30 * 86400 },
+        await queues[opts.queue].add(
+          r.type,
+          { v: JOB_VERSION, ...(r.payload as object) },
+          {
+            jobId: r.id,
+            attempts: opts.attempts,
+            backoff: opts.backoff,
+            removeOnComplete: { age: 7 * 86400 },
+            removeOnFail: { age: 30 * 86400 },
+          },
+        );
+        await tx.outboxEvent.update({
+          where: { id: r.id },
+          data: { processedAt: new Date(), attempts: { increment: 1 } },
         });
-        await tx.outboxEvent.update({ where: { id: r.id }, data: { processedAt: new Date(), attempts: { increment: 1 } } });
       } catch (err) {
         await tx.outboxEvent.update({
           where: { id: r.id },
-          data: { attempts: { increment: 1 }, lastError: String((err as Error).message).slice(0, 500), availableAt: new Date(Date.now() + 10_000) },
+          data: {
+            attempts: { increment: 1 },
+            lastError: String((err as Error).message).slice(0, 500),
+            availableAt: new Date(Date.now() + 10_000),
+          },
         });
       }
     }
@@ -104,12 +122,19 @@ async function processDocuments(job: Job) {
     const bytes = await getVerifiedFile(doc.storageKey, doc.sha256);
     const result = await scanBytes(bytes);
     if (result.status === "FAILED") {
-      await prisma.applicationDocument.update({ where: { id: doc.id }, data: { scanStatus: isFinalAttempt(job) ? "FAILED" : "PENDING", scanDetail: result.detail } });
+      await prisma.applicationDocument.update({
+        where: { id: doc.id },
+        data: { scanStatus: isFinalAttempt(job) ? "FAILED" : "PENDING", scanDetail: result.detail },
+      });
       throw new Error(result.detail);
     }
     await prisma.applicationDocument.update({
       where: { id: doc.id },
-      data: { scanStatus: result.status, scanDetail: result.status === "INFECTED" ? result.signature : null, scannedAt: new Date() },
+      data: {
+        scanStatus: result.status,
+        scanDetail: result.status === "INFECTED" ? result.signature : null,
+        scannedAt: new Date(),
+      },
     });
     logger.info({ documentId: doc.id, scan: result.status }, "document scanned");
     return;
@@ -124,8 +149,13 @@ async function processDocuments(job: Job) {
         await markBundleFailed(id, message);
         throw new UnrecoverableError(message);
       }
-      if (isFinalAttempt(job)) await markBundleFailed(id, `Gave up after ${job.attemptsMade + 1} attempts: ${message}`);
-      else await prisma.generatedDocument.updateMany({ where: { id, status: "PROCESSING" }, data: { status: "QUEUED", error: message.slice(0, 1000) } });
+      if (isFinalAttempt(job))
+        await markBundleFailed(id, `Gave up after ${job.attemptsMade + 1} attempts: ${message}`);
+      else
+        await prisma.generatedDocument.updateMany({
+          where: { id, status: "PROCESSING" },
+          data: { status: "QUEUED", error: message.slice(0, 1000) },
+        });
       throw err;
     }
     return;
@@ -135,26 +165,45 @@ async function processDocuments(job: Job) {
 
 async function processEmail(job: Job) {
   checkVersion(job);
-  const n = await prisma.notification.findUnique({ where: { id: job.data.notificationId }, include: { user: { select: { email: true } } } });
+  const n = await prisma.notification.findUnique({
+    where: { id: job.data.notificationId },
+    include: { user: { select: { email: true } } },
+  });
   if (!n || n.status === "SENT") return;
   try {
     await sendNotificationEmail(n.user.email, n.subject, n.body);
-    await prisma.notification.update({ where: { id: n.id }, data: { status: "SENT", sentAt: new Date(), attempts: { increment: 1 }, error: null } });
+    await prisma.notification.update({
+      where: { id: n.id },
+      data: { status: "SENT", sentAt: new Date(), attempts: { increment: 1 }, error: null },
+    });
   } catch (err) {
     await prisma.notification.update({
       where: { id: n.id },
-      data: { status: isFinalAttempt(job) ? "FAILED" : "PENDING", attempts: { increment: 1 }, error: String((err as Error).message).slice(0, 500) },
+      data: {
+        status: isFinalAttempt(job) ? "FAILED" : "PENDING",
+        attempts: { increment: 1 },
+        error: String((err as Error).message).slice(0, 500),
+      },
     });
     throw err;
   }
 }
 
 const workers = [
-  new Worker(DOCUMENTS, processDocuments, { connection: newRedisConnection(), concurrency: 2, lockDuration: 300_000 }),
+  new Worker(DOCUMENTS, processDocuments, {
+    connection: newRedisConnection(),
+    concurrency: 2,
+    lockDuration: 300_000,
+  }),
   new Worker(EMAIL, processEmail, { connection: newRedisConnection(), concurrency: 4 }),
 ];
 for (const w of workers) {
-  w.on("failed", (job, err) => logger.warn({ queue: w.name, job: job?.name, jobId: job?.id, attempt: job?.attemptsMade, err: err.message }, "job failed"));
+  w.on("failed", (job, err) =>
+    logger.warn(
+      { queue: w.name, job: job?.name, jobId: job?.id, attempt: job?.attemptsMade, err: err.message },
+      "job failed",
+    ),
+  );
   w.on("completed", (job) => logger.info({ queue: w.name, job: job.name, jobId: job.id }, "job completed"));
 }
 
@@ -162,7 +211,9 @@ for (const w of workers) {
 async function housekeeping() {
   const now = new Date();
   const s = await prisma.session.deleteMany({ where: { expiresAt: { lt: now } } });
-  const t = await prisma.authToken.deleteMany({ where: { expiresAt: { lt: new Date(now.getTime() - 7 * 86400_000) } } });
+  const t = await prisma.authToken.deleteMany({
+    where: { expiresAt: { lt: new Date(now.getTime() - 7 * 86400_000) } },
+  });
   if (s.count || t.count) logger.info({ sessions: s.count, tokens: t.count }, "housekeeping");
 }
 
@@ -174,7 +225,10 @@ const beat = () => {
   }
 };
 beat();
-const timers = [setInterval(beat, 15_000), setInterval(() => void housekeeping().catch(() => undefined), 3600_000)];
+const timers = [
+  setInterval(beat, 15_000),
+  setInterval(() => void housekeeping().catch(() => undefined), 3600_000),
+];
 void relayLoop();
 logger.info({ version: env().GIT_SHA }, "worker started");
 

@@ -1,7 +1,8 @@
 import { Socket } from "node:net";
 import { env } from "~/modules/core/env.server";
 
-export type ScanResult = { status: "CLEAN" } | { status: "INFECTED"; signature: string } | { status: "FAILED"; detail: string };
+export type ScanResult =
+  { status: "CLEAN" } | { status: "INFECTED"; signature: string } | { status: "FAILED"; detail: string };
 
 /**
  * Scans bytes with clamd using the INSTREAM protocol (zINSTREAM, 4-byte big-endian chunk sizes,
@@ -10,7 +11,8 @@ export type ScanResult = { status: "CLEAN" } | { status: "INFECTED"; signature: 
  */
 export async function scanBytes(data: Uint8Array, timeoutMs = 60_000): Promise<ScanResult> {
   const e = env();
-  if (e.MALWARE_SCAN === "disabled") return { status: "FAILED", detail: "Malware scanning is disabled in this environment" };
+  if (e.MALWARE_SCAN === "disabled")
+    return { status: "FAILED", detail: "Malware scanning is disabled in this environment" };
   return new Promise((resolve) => {
     const sock = new Socket();
     let reply = "";

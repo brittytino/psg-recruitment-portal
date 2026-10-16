@@ -17,7 +17,13 @@ type Opts<T> = Partial<Omit<T, "kind" | "key" | "label" | "source">> & { require
 
 const src = (page: number, label: string): SourceRef => ({ page, label });
 
-export const text = (key: string, label: string, page: number, sourceLabel: string, o: Opts<TextField> = {}): TextField => ({
+export const text = (
+  key: string,
+  label: string,
+  page: number,
+  sourceLabel: string,
+  o: Opts<TextField> = {},
+): TextField => ({
   kind: "text",
   key,
   label,
@@ -44,7 +50,13 @@ export const textarea = (
   ...o,
 });
 
-export const date = (key: string, label: string, page: number, sourceLabel: string, o: Opts<DateField> = {}): DateField => ({
+export const date = (
+  key: string,
+  label: string,
+  page: number,
+  sourceLabel: string,
+  o: Opts<DateField> = {},
+): DateField => ({
   kind: "date",
   key,
   label,
@@ -59,9 +71,22 @@ export const monthYear = (
   page: number,
   sourceLabel: string,
   o: Opts<MonthYearField> = {},
-): MonthYearField => ({ kind: "monthYear", key, label, source: src(page, sourceLabel), requirement: "optional", ...o });
+): MonthYearField => ({
+  kind: "monthYear",
+  key,
+  label,
+  source: src(page, sourceLabel),
+  requirement: "optional",
+  ...o,
+});
 
-export const num = (key: string, label: string, page: number, sourceLabel: string, o: Opts<NumberField> = {}): NumberField => ({
+export const num = (
+  key: string,
+  label: string,
+  page: number,
+  sourceLabel: string,
+  o: Opts<NumberField> = {},
+): NumberField => ({
   kind: "number",
   key,
   label,
@@ -95,7 +120,15 @@ export const derived = (
   sourceLabel: string,
   derivedFrom: string,
   o: Opts<DerivedField> = {},
-): DerivedField => ({ kind: "derived", key, label, source: src(page, sourceLabel), requirement: "optional", derivedFrom, ...o });
+): DerivedField => ({
+  kind: "derived",
+  key,
+  label,
+  source: src(page, sourceLabel),
+  requirement: "optional",
+  derivedFrom,
+  ...o,
+});
 
 export const table = (
   key: string,
