@@ -17,6 +17,7 @@ export default defineConfig({
           poolOptions: { forks: { singleFork: true } },
           testTimeout: 30000,
           setupFiles: ["tests/integration/setup.ts"],
+          globalSetup: ["tests/integration/global-setup.ts"],
         },
       },
       { extends: true, test: { name: "pdf", include: ["tests/pdf-regression/**/*.test.ts"], environment: "node", testTimeout: 180000 } },

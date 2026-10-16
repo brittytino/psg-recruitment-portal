@@ -3,7 +3,7 @@
 const defaults: Record<string, string> = {
   NODE_ENV: "test",
   APP_ORIGIN: "http://localhost:3000",
-  DATABASE_URL: "postgresql://srp_app:change-me-app@localhost:65432/srportal?schema=public",
+  DATABASE_URL: "postgresql://srp_app:change-me-app@localhost:65432/srportal_test?schema=public",
   REDIS_URL: "redis://localhost:63879",
   SESSION_SECRET: "integration-test-secret-at-least-32-characters",
   STORAGE_DIR: "./storage-test",
