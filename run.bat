@@ -12,6 +12,7 @@ if /i "%~1"=="status" goto do_status
 if /i "%~1"=="studio" goto do_studio
 if /i "%~1"=="db" goto do_open_db
 if /i "%~1"=="adminer" goto do_open_db
+if /i "%~1"=="seed" goto do_seed
 if /i "%~1"=="rebuild" goto do_clean_rebuild
 if /i "%~1"=="--clean" goto do_clean_rebuild
 
@@ -126,13 +127,14 @@ echo Select an option:
 echo   [B] Open Portal in Browser      (http://localhost:6969)
 echo   [D] Open Database Viewer        (http://localhost:6981)
 echo   [M] Open Mailbox Inbox          (http://localhost:6980)
+echo   [A] Seed / Reset Demo Accounts  (sets password to Demo@12345 for all roles)
 echo   [S] Launch Prisma Studio GUI    (npm run db:studio on host)
 echo   [L] View Container Logs
 echo   [R] Clean Rebuild (--no-cache)
 echo   [X] Stop Stack and Exit
 echo   [Q] Quit script (keeps stack running in background)
 echo.
-set /p choice="Enter choice [B/D/M/S/L/R/X/Q]: "
+set /p choice="Enter choice [B/D/M/A/S/L/R/X/Q]: "
 
 if /i "%choice%"=="B" (
     start "" "http://localhost:6969"
@@ -144,6 +146,10 @@ if /i "%choice%"=="D" (
 )
 if /i "%choice%"=="M" (
     start "" "http://localhost:6980"
+    goto interactive_loop
+)
+if /i "%choice%"=="A" (
+    call :do_seed
     goto interactive_loop
 )
 if /i "%choice%"=="S" (
@@ -212,4 +218,16 @@ exit /b 0
 :do_studio
 echo Starting Prisma Studio on host (http://localhost:5555)...
 start "Prisma Studio" cmd /c "npx prisma studio --port 5555"
+exit /b 0
+
+:do_seed
+echo.
+echo ================================================================================
+echo    SEEDING / SYNCHRONIZING DEMO ROLE ACCOUNTS
+echo ================================================================================
+set "DATABASE_URL=postgresql://srp_owner:change-me-owner@localhost:65432/srportal?schema=public"
+set "SEED_DEMO_PASSWORD=Demo@12345"
+npx tsx scripts/seed-accounts.ts
+echo.
+pause
 exit /b 0
