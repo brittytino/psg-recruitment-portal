@@ -53,7 +53,7 @@ if not exist .env (
 
 REM 3. Rebuild images with latest code
 echo [1/3] Building fresh Docker images (compiling latest UI and app code)...
-docker compose -f compose.yaml -f compose.dev.yaml build app worker migrate
+docker compose -f compose.yaml -f compose.dev.yaml build app worker migrate converter
 if errorlevel 1 (
     echo.
     echo [ERROR] Docker build failed. Please check the error messages above.
@@ -183,7 +183,7 @@ echo ===========================================================================
 echo Stopping current containers...
 docker compose -f compose.yaml -f compose.dev.yaml down
 echo Rebuilding Docker images from scratch...
-docker compose -f compose.yaml -f compose.dev.yaml build --no-cache app worker migrate
+docker compose -f compose.yaml -f compose.dev.yaml build --no-cache app worker migrate converter
 echo Starting fresh stack...
 docker compose -f compose.yaml -f compose.dev.yaml up -d --force-recreate
 goto stack_healthy
