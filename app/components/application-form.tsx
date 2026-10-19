@@ -211,11 +211,6 @@ export function ScalarInput({
           <span className="font-normal text-muted"> (optional)</span>
         )}
       </label>
-      {!compact && (
-        <p className="text-xs text-muted">
-          Official form, page {field.source.page}: “{field.source.label}”
-        </p>
-      )}
       {field.help && (
         <p id={hintId} className="text-xs text-muted">
           {field.help}
@@ -308,9 +303,8 @@ function TableEditor({
         )}
       </legend>
       <p className="text-xs text-muted">
-        Official form, page {field.source.page}: “{field.source.label}”. The printed form has{" "}
-        {field.templateRows} rows; additional entries are added to the same table. Up to {field.maxRows}{" "}
-        entries.
+        The printed form has {field.templateRows} rows; additional entries are added to the same table. Up to{" "}
+        {field.maxRows} entries.
       </p>
       {field.help && <p className="text-xs text-muted">{field.help}</p>}
       {tableError && (
@@ -387,9 +381,8 @@ function ListEditor({
         {field.label}
       </legend>
       <p className="text-xs text-muted">
-        Official form, page {field.source.page}: “{field.source.label}”. Space for about{" "}
-        {field.templateCapacity} entries is printed; longer lists continue on additional lines without
-        truncation.
+        Space for about {field.templateCapacity} entries is printed; longer lists continue on additional lines
+        without truncation.
       </p>
       {field.help && <p className="text-xs text-muted">{field.help}</p>}
       {items.length === 0 && <p className="text-sm text-muted">No entries yet.</p>}

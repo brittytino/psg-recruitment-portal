@@ -42,7 +42,7 @@ export const assistantFull: Answers = {
   ...assistantMinimal,
   name: "Venkataramanan Subramaniam Krishnaswamy Iyer",
   religion: "Example Religion",
-  community: "Example Community",
+  community: "BC",
   academicQualifications: repeat(9, (i) => ({
     degree: ["B.E.", "M.E.", "Ph.D.", "PG Diploma", "M.B.A.", "B.Sc.", "M.Sc.", "M.Phil.", "Diploma"][i]!,
     university: `Example University Number ${i + 1} with a deliberately long name`,

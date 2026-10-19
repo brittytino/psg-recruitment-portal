@@ -98,7 +98,23 @@ export const assistantProfessorV1: FormDefinition = {
           maxLength: 60,
         }),
         text("religion", "Religion", 1, "Nationality & Religion", { requirement: "policy", maxLength: 60 }),
-        text("community", "Community", 1, "Community", { requirement: "policy", maxLength: 60 }),
+        select(
+          "community",
+          "Community",
+          1,
+          "Community",
+          [
+            { value: "OC", label: "OC — Open Competition" },
+            { value: "BC", label: "BC — Backward Class" },
+            { value: "BCM", label: "BCM — Backward Class (Muslim)" },
+            { value: "MBC", label: "MBC — Most Backward Class" },
+            { value: "DNC", label: "DNC — Denotified Communities" },
+            { value: "SC", label: "SC — Scheduled Caste" },
+            { value: "SCA", label: "SCA — Scheduled Caste (Arunthathiyar)" },
+            { value: "ST", label: "ST — Scheduled Tribe" },
+          ],
+          { requirement: "policy" },
+        ),
       ],
     },
     {
@@ -217,7 +233,7 @@ export const assistantProfessorV1: FormDefinition = {
           help: "Last drawn salary certificate to be enclosed.",
         }),
         num("totalEmoluments", "Total emoluments (Rs. per month)", 2, "Total emoluments :  Rs."),
-        text("joiningTime", "Joining time required", 2, "11. Joining time required", {
+        text("joiningTime", "Joining time required (In Days)", 2, "11. Joining time required", {
           requirement: "required",
           maxLength: 100,
         }),

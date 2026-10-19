@@ -34,7 +34,7 @@ export async function loader({ request, context }: Route.LoaderArgs) {
     options,
     q,
     canExport: hasPermission(user.grants, "application:export"),
-    firstName: user.displayName.split(" ")[0] ?? "",
+    name: user.displayName,
   };
 }
 
@@ -46,7 +46,7 @@ const SORTABLE: { key: string; label: string }[] = [
 ];
 
 export default function StaffIndex({ loaderData }: Route.ComponentProps) {
-  const { list, counts, options, q, canExport, firstName } = loaderData;
+  const { list, counts, options, q, canExport, name } = loaderData;
   const [params] = useSearchParams();
   const location = useLocation();
   const nav = useNavigation();
@@ -85,7 +85,7 @@ export default function StaffIndex({ loaderData }: Route.ComponentProps) {
         <div>
           <p className="eyebrow">Recruitment workspace</p>
           <h1 className="mt-1.5 text-3xl sm:text-4xl lg:text-5xl font-extrabold text-ink">
-            Welcome back, {firstName} 👋
+            Welcome back, {name} 👋
           </h1>
           <p className="mt-2 text-base text-muted">
             Live recruitment status, candidate screening queues, and applicant files within your scope.

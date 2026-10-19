@@ -70,7 +70,7 @@ export default function Account({ loaderData, actionData }: Route.ComponentProps
         <div>
           <p className="eyebrow">Candidate workspace</p>
           <h1 className="mt-1.5 text-2xl sm:text-4xl lg:text-5xl font-extrabold text-ink">
-            Welcome back, {name.split(" ")[0]} 👋
+            Welcome back, {name} 👋
           </h1>
           <p className="mt-1.5 sm:mt-2 text-sm sm:text-base text-muted">
             Track your submitted applications, review feedback, and continue draft forms.

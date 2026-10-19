@@ -107,7 +107,16 @@ export const associateProfessorV1: FormDefinition = {
           "Community category",
           1,
           "OC/BC/MBC/DNC/SC/ST",
-          ["OC", "BC", "MBC", "DNC", "SC", "ST"],
+          [
+            { value: "OC", label: "OC — Open Competition" },
+            { value: "BC", label: "BC — Backward Class" },
+            { value: "BCM", label: "BCM — Backward Class (Muslim)" },
+            { value: "MBC", label: "MBC — Most Backward Class" },
+            { value: "DNC", label: "DNC — Denotified Communities" },
+            { value: "SC", label: "SC — Scheduled Caste" },
+            { value: "SCA", label: "SCA — Scheduled Caste (Arunthathiyar)" },
+            { value: "ST", label: "ST — Scheduled Tribe" },
+          ],
           {
             requirement: "policy",
           },
@@ -159,7 +168,7 @@ export const associateProfessorV1: FormDefinition = {
             help: "The form has space for three children; additional children are listed in the third column.",
           },
         ),
-        text("joiningTime", "Joining time required", 1, "JOINING TIME REQUIRED", {
+        text("joiningTime", "Joining time required (In Days)", 1, "JOINING TIME REQUIRED", {
           requirement: "required",
           maxLength: 100,
         }),

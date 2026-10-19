@@ -1,3 +1,4 @@
+
 @echo off
 setlocal EnableDelayedExpansion
 cd /d "%~dp0"
@@ -23,13 +24,9 @@ echo    PSG TECH STAFF RECRUITMENT PORTAL - DOCKER RUNNER
 echo ================================================================================
 echo.
 
-REM 1. Check Docker prerequisite
 where docker >nul 2>&1
 if errorlevel 1 (
     echo [ERROR] Docker command not found!
-    echo Please install Docker Desktop and ensure it is added to your PATH.
-    echo Download: https://www.docker.com/products/docker-desktop/
-    echo.
     pause
     exit /b 1
 )
@@ -37,47 +34,41 @@ if errorlevel 1 (
 docker info >nul 2>&1
 if errorlevel 1 (
     echo [ERROR] Docker Desktop engine is not running!
-    echo Please start Docker Desktop and wait until it finishes initializing.
-    echo.
     pause
     exit /b 1
 )
 
-REM 2. Ensure .env exists
 if not exist .env (
-    echo [INFO] .env file not found. Copying .env.example to .env ...
+    echo [INFO] Creating .env from .env.example...
+    if not exist .env.example (
+        echo [ERROR] .env.example not found.
+        pause
+        exit /b 1
+    )
     copy /y .env.example .env >nul
-    echo [OK] Created .env with default development settings.
-    echo.
 )
 
-REM 3. Rebuild images with latest code
-echo [1/3] Building fresh Docker images (compiling latest UI and app code)...
+echo [1/3] Building Docker images...
 docker compose -f compose.yaml -f compose.dev.yaml build app worker migrate converter
 if errorlevel 1 (
-    echo.
-    echo [ERROR] Docker build failed. Please check the error messages above.
-    echo.
+    echo [ERROR] Docker build failed.
     pause
     exit /b 1
 )
 
-REM 4. Start the stack
 echo.
-echo [2/3] Launching Docker stack (App, Worker, DB, Redis, Mailpit, Adminer)...
+echo [2/3] Starting Docker stack...
 docker compose -f compose.yaml -f compose.dev.yaml up -d --remove-orphans --force-recreate
 if errorlevel 1 (
-    echo.
     echo [ERROR] Failed to start Docker containers.
-    echo.
     pause
     exit /b 1
 )
 
-REM 5. Wait for web application health
 echo.
-echo [3/3] Waiting for database migrations and portal health check...
+echo [3/3] Waiting for portal health...
 set /a attempts=0
+
 :health_loop
 set /a attempts+=1
 curl.exe -s -f http://127.0.0.1:6969/healthz/ready >nul 2>&1
@@ -87,109 +78,145 @@ timeout /t 2 /nobreak >nul
 goto health_loop
 
 :stack_timeout
-echo [NOTE] Healthcheck took longer than expected, but containers are starting up.
+echo [NOTE] Healthcheck timed out. Containers may still be starting.
 goto show_summary
 
 :stack_healthy
-echo [OK] Recruitment Portal is ready and healthy!
+echo [OK] Recruitment Portal is healthy!
 
 :show_summary
 cls
 echo ================================================================================
-echo    PSG TECH STAFF RECRUITMENT PORTAL - ALL SERVICES ONLINE!
+echo    PSG TECH STAFF RECRUITMENT PORTAL
 echo ================================================================================
 echo.
 echo    [WEB PORTAL]      http://localhost:6969
-echo    [DATABASE VIEWER] http://localhost:6981  (Adminer Web GUI)
-echo                      - System:    PostgreSQL
-echo                      - Server:    db
-echo                      - Username:  srp_owner (or srp_app)
-echo                      - Database:  srportal
-echo                      - Password:  change-me-owner (from .env)
-echo.
-echo    [EMAIL INBOX]     http://localhost:6980  (Mailpit Web UI)
+echo    [DATABASE VIEWER] http://localhost:6981
+echo    [EMAIL INBOX]     http://localhost:6980
 echo    [POSTGRES DIRECT] localhost:65432
 echo    [REDIS DIRECT]    localhost:63879
 echo.
-echo --------------------------------------------------------------------------------
-echo    DEMO LOGIN CREDENTIALS (password: Demo@12345-change):
-echo    - Super Admin:   superadmin@example.test
-echo    - Admin:         admin@example.test
-echo    - HR Officer:    hr@example.test
-echo    - Candidate:     candidate@example.test
+echo    Database: srportal
+echo    Demo password: Demo@12345 (after seeding)
 echo ================================================================================
 echo.
 
 start "" "http://localhost:6969"
 
 :interactive_loop
+echo.
 echo Select an option:
-echo   [B] Open Portal in Browser      (http://localhost:6969)
-echo   [D] Open Database Viewer        (http://localhost:6981)
-echo   [M] Open Mailbox Inbox          (http://localhost:6980)
-echo   [A] Seed / Reset Demo Accounts  (sets password to Demo@12345 for all roles)
-echo   [S] Launch Prisma Studio GUI    (npm run db:studio on host)
+echo   [B] Open Portal in Browser
+echo   [D] Open Database Viewer
+echo   [M] Open Mailbox Inbox
+echo   [A] Seed / Reset Demo Accounts
+echo   [S] Launch Prisma Studio GUI
 echo   [L] View Container Logs
 echo   [R] Clean Rebuild (--no-cache)
 echo   [X] Stop Stack and Exit
-echo   [Q] Quit script (keeps stack running in background)
+echo   [Q] Quit (keep stack running)
 echo.
+
+set "choice="
 set /p choice="Enter choice [B/D/M/A/S/L/R/X/Q]: "
 
-if /i "%choice%"=="B" (
-    start "" "http://localhost:6969"
-    goto interactive_loop
-)
-if /i "%choice%"=="D" (
-    start "" "http://localhost:6981/?pgsql=db&username=srp_owner&db=srportal"
-    goto interactive_loop
-)
-if /i "%choice%"=="M" (
-    start "" "http://localhost:6980"
-    goto interactive_loop
-)
-if /i "%choice%"=="A" (
-    call :do_seed
-    goto interactive_loop
-)
-if /i "%choice%"=="S" (
-    call :do_studio
-    goto interactive_loop
-)
-if /i "%choice%"=="L" (
-    echo.
-    echo Following container logs (Press Ctrl+C to stop logs and return)...
-    docker compose -f compose.yaml -f compose.dev.yaml logs -f app worker db adminer
-    goto interactive_loop
-)
-if /i "%choice%"=="R" (
-    goto do_clean_rebuild
-)
-if /i "%choice%"=="X" (
-    goto do_down
-)
-if /i "%choice%"=="Q" (
-    echo Stack is running in the background. Goodbye!
-    exit /b 0
-)
+if /i "%choice%"=="B" goto do_open_portal
+if /i "%choice%"=="D" goto do_open_db
+if /i "%choice%"=="M" goto do_open_mail
+if /i "%choice%"=="A" goto do_seed
+if /i "%choice%"=="S" goto do_studio
+if /i "%choice%"=="L" goto do_logs
+if /i "%choice%"=="R" goto do_clean_rebuild
+if /i "%choice%"=="X" goto do_down
+if /i "%choice%"=="Q" goto do_quit
 
+echo Invalid choice. Please try again.
+goto interactive_loop
+
+:do_open_portal
+start "" "http://localhost:6969"
+goto interactive_loop
+
+:do_open_mail
+start "" "http://localhost:6980"
 goto interactive_loop
 
 :do_clean_rebuild
 cls
 echo ================================================================================
-echo    CLEAN REBUILD IN DOCKER (--no-cache)
+echo    CLEAN REBUILD IN DOCKER
 echo ================================================================================
-echo Stopping current containers...
+echo Stopping containers...
 docker compose -f compose.yaml -f compose.dev.yaml down
-echo Rebuilding Docker images from scratch...
+if errorlevel 1 (
+    echo [ERROR] Failed to stop the stack.
+    pause
+    goto interactive_loop
+)
+
+echo Rebuilding images without cache...
 docker compose -f compose.yaml -f compose.dev.yaml build --no-cache app worker migrate converter
-echo Starting fresh stack...
+if errorlevel 1 (
+    echo [ERROR] Rebuild failed.
+    pause
+    goto interactive_loop
+)
+
+echo Starting stack...
 docker compose -f compose.yaml -f compose.dev.yaml up -d --force-recreate
-goto stack_healthy
+if errorlevel 1 (
+    echo [ERROR] Failed to start the stack.
+    pause
+    goto interactive_loop
+)
+goto show_summary
+
+:do_seed
+echo.
+echo ================================================================================
+echo    SEEDING / SYNCHRONIZING DEMO ROLE ACCOUNTS
+echo ================================================================================
+echo Synchronizing demo accounts via host...
+echo.
+
+set "DATABASE_URL=postgresql://srp_owner:change-me-owner@localhost:65432/srportal?schema=public"
+set "SEED_DEMO_PASSWORD=Demo@12345"
+cmd /c "npx tsx scripts/seed-accounts.ts"
+set "SEED_EXIT_CODE=%errorlevel%"
+
+echo.
+if "%SEED_EXIT_CODE%"=="0" (
+    echo [OK] Seed command completed successfully.
+) else (
+    echo [ERROR] Seeding failed with exit code %SEED_EXIT_CODE%.
+)
+
+REM If called as run.bat seed, return the exit code to the terminal.
+if /i "%~1"=="seed" exit /b %SEED_EXIT_CODE%
+
+pause
+goto interactive_loop
+
+:do_studio
+echo Starting Prisma Studio on host...
+start "Prisma Studio" cmd /k "npx prisma studio --port 5555"
+goto interactive_loop
+
+:do_logs
+docker compose -f compose.yaml -f compose.dev.yaml logs -f app worker db adminer
+goto interactive_loop
+
+:do_status
+docker compose -f compose.yaml -f compose.dev.yaml ps
+exit /b %errorlevel%
+
+:do_open_db
+start "" "http://localhost:6981/?pgsql=db&username=srp_owner&db=srportal&ns=public"
+if /i "%~1"=="db" exit /b 0
+if /i "%~1"=="adminer" exit /b 0
+goto interactive_loop
 
 :do_stop
-echo Stopping containers...
 docker compose -f compose.yaml -f compose.dev.yaml stop
 exit /b %errorlevel%
 
@@ -199,35 +226,9 @@ docker compose -f compose.yaml -f compose.dev.yaml down
 exit /b %errorlevel%
 
 :do_restart
-echo Restarting containers...
 docker compose -f compose.yaml -f compose.dev.yaml restart
 exit /b %errorlevel%
 
-:do_logs
-docker compose -f compose.yaml -f compose.dev.yaml logs -f app worker db adminer
-exit /b %errorlevel%
-
-:do_status
-docker compose -f compose.yaml -f compose.dev.yaml ps
-exit /b %errorlevel%
-
-:do_open_db
-start "" "http://localhost:6981/?pgsql=db&username=srp_owner&db=srportal"
-exit /b 0
-
-:do_studio
-echo Starting Prisma Studio on host (http://localhost:5555)...
-start "Prisma Studio" cmd /c "npx prisma studio --port 5555"
-exit /b 0
-
-:do_seed
-echo.
-echo ================================================================================
-echo    SEEDING / SYNCHRONIZING DEMO ROLE ACCOUNTS
-echo ================================================================================
-set "DATABASE_URL=postgresql://srp_owner:change-me-owner@localhost:65432/srportal?schema=public"
-set "SEED_DEMO_PASSWORD=Demo@12345"
-npx tsx scripts/seed-accounts.ts
-echo.
-pause
+:do_quit
+echo Stack is running in the background. Goodbye!
 exit /b 0
