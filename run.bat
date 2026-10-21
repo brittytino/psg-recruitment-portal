@@ -188,7 +188,7 @@ echo ===========================================================================
 echo Synchronizing demo accounts via host...
 echo.
 
-set "DATABASE_URL=postgresql://srp_owner:change-me-owner@localhost:65432/srportal?schema=public"
+set "DATABASE_URL=postgresql://srp_owner:PsgTech_DbOwner_2026!@localhost:65432/srportal?schema=public"
 set "SEED_DEMO_PASSWORD=Demo@12345"
 cmd /c "npx tsx scripts/seed-accounts.ts"
 set "SEED_EXIT_CODE=%errorlevel%"
