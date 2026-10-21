@@ -9,7 +9,13 @@ import {
   STATUS_LABELS,
   type AppStatus,
 } from "~/modules/applications/workflow";
-import { hasPermission } from "~/modules/auth/permissions";
+import {
+  getPrimaryRoleBadge,
+  hasPermission,
+  isAdmin,
+  isHodReviewer,
+  isHrOfficer,
+} from "~/modules/auth/permissions";
 import {
   dashboardCounts,
   filterOptions,
@@ -35,6 +41,7 @@ export async function loader({ request, context }: Route.LoaderArgs) {
     q,
     canExport: hasPermission(user.grants, "application:export"),
     name: user.displayName,
+    grants: user.grants,
   };
 }
 
@@ -46,7 +53,11 @@ const SORTABLE: { key: string; label: string }[] = [
 ];
 
 export default function StaffIndex({ loaderData }: Route.ComponentProps) {
-  const { list, counts, options, q, canExport, name } = loaderData;
+  const { list, counts, options, q, canExport, name, grants } = loaderData;
+  const isAdm = grants ? isAdmin(grants) : false;
+  const isHr = grants ? isHrOfficer(grants) : false;
+  const isHod = grants ? isHodReviewer(grants) : false;
+  const roleBadge = grants ? getPrimaryRoleBadge(grants) : { label: "Staff", tone: "neutral" as const };
   const [params] = useSearchParams();
   const location = useLocation();
   const nav = useNavigation();
@@ -83,19 +94,41 @@ export default function StaffIndex({ loaderData }: Route.ComponentProps) {
     <div className="space-y-8">
       <div className="flex flex-wrap items-end justify-between gap-4 border-b border-line/70 pb-6">
         <div>
-          <p className="eyebrow">Recruitment workspace</p>
-          <h1 className="mt-1.5 text-3xl sm:text-4xl lg:text-5xl font-extrabold text-ink">
+          <div className="flex items-center gap-2 mb-1.5">
+            <p className="eyebrow">
+              {isAdm
+                ? "PSG Tech Institutional Administration"
+                : isHr
+                ? "HR-N4 Section Recruitment Workspace"
+                : isHod
+                ? "Department Review Queue"
+                : "Recruitment Workspace"}
+            </p>
+            <Badge tone={roleBadge.tone}>{roleBadge.label}</Badge>
+          </div>
+          <h1 className="mt-1 text-3xl sm:text-4xl lg:text-5xl font-extrabold text-ink">
             Welcome back, {name} 👋
           </h1>
           <p className="mt-2 text-base text-muted">
-            Live recruitment status, candidate screening queues, and applicant files within your scope.
+            {isHod
+              ? "Review candidates, qualifications, and provide academic evaluations for your department."
+              : isHr
+              ? "Screen applicants, assign HOD reviewers, manage job profiles, and download complete dossiers."
+              : "Institutional oversight of all faculty vacancies, applicant screening queues, and candidate dossiers."}
           </p>
         </div>
-        {canExport && (
-          <a href={`/staff/export.csv${location.search}`} className="btn-secondary">
-            ⬇️ Export Applications CSV
-          </a>
-        )}
+        <div className="flex flex-wrap items-center gap-2">
+          {hasPermission(grants ?? [], "recruitment:manage") && (
+            <Link to="/admin/vacancies/new" className="btn-primary">
+              + New Job Profile / Vacancy
+            </Link>
+          )}
+          {canExport && (
+            <a href={`/staff/export.csv${location.search}`} className="btn-secondary">
+              ⬇️ Export Applications CSV
+            </a>
+          )}
+        </div>
       </div>
       <section aria-label="Summary">
         <ul className="grid grid-cols-2 gap-4 md:grid-cols-4">
@@ -269,8 +302,9 @@ export default function StaffIndex({ loaderData }: Route.ComponentProps) {
                     </Link>
                   </th>
                 ))}
-                <th scope="col">PDF</th>
+                <th scope="col">Application Dossier</th>
                 <th scope="col">Reviews</th>
+                <th scope="col">Action</th>
               </tr>
             </thead>
             <tbody>
@@ -279,13 +313,13 @@ export default function StaffIndex({ loaderData }: Route.ComponentProps) {
                   <td>
                     <Link
                       to={`/staff/applications/${r.id}`}
-                      className="whitespace-nowrap font-semibold"
+                      className="whitespace-nowrap font-semibold hover:underline"
                       state={{ back: location.pathname + location.search }}
                     >
                       {r.referenceNo}
                     </Link>
                   </td>
-                  <td>{r.currentRevision?.candidateName}</td>
+                  <td className="font-medium text-ink">{r.currentRevision?.candidateName}</td>
                   <td>
                     {r.vacancy.code}
                     <span className="block text-xs text-muted">
@@ -296,13 +330,37 @@ export default function StaffIndex({ loaderData }: Route.ComponentProps) {
                   <td>
                     <Badge tone={statusTone(r.status)}>{STATUS_LABELS[r.status as AppStatus]}</Badge>
                   </td>
-                  <td>{formatDateTime(r.submittedAt)}</td>
+                  <td className="text-sm">{formatDateTime(r.submittedAt)}</td>
                   <td>
-                    <Badge tone={statusTone(r.processingStatus)}>
-                      {PROCESSING_LABELS[r.processingStatus]}
-                    </Badge>
+                    {r.generated?.[0] ? (
+                      <a
+                        href={`/files/bundles/${r.generated[0].id}`}
+                        title="Download full candidate dossier (PDF) with all attachments"
+                        className="inline-flex items-center gap-1.5 rounded-lg bg-emerald-50 px-2.5 py-1 text-xs font-bold text-emerald-800 hover:bg-emerald-100 border border-emerald-200 transition-colors shadow-2xs no-underline"
+                      >
+                        <span>📥</span>
+                        <span>PDF ({r.generated[0].pageCount || "—"}p)</span>
+                      </a>
+                    ) : (
+                      <Badge tone={statusTone(r.processingStatus)}>
+                        {PROCESSING_LABELS[r.processingStatus]}
+                      </Badge>
+                    )}
                   </td>
-                  <td>{r._count.reviews}</td>
+                  <td>
+                    <span className="inline-flex items-center gap-1 text-xs font-semibold px-2 py-0.5 rounded-full bg-soft">
+                      {r._count.reviews} review{r._count.reviews === 1 ? "" : "s"}
+                    </span>
+                  </td>
+                  <td>
+                    <Link
+                      to={`/staff/applications/${r.id}`}
+                      className="btn-secondary py-1 px-3 text-xs font-semibold whitespace-nowrap"
+                      state={{ back: location.pathname + location.search }}
+                    >
+                      {isHod ? "Review Candidate →" : "View Application →"}
+                    </Link>
+                  </td>
                 </tr>
               ))}
             </tbody>

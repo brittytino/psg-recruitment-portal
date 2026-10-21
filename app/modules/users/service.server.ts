@@ -12,7 +12,8 @@ import { notify } from "~/modules/notifications/outbox.server";
 
 /** Which roles the acting user may grant or revoke. */
 export function grantableRoles(user: SessionUser): RoleName[] {
-  if (hasPermission(user.grants, "user:manage")) return ROLES.filter((r) => r !== "CANDIDATE");
+  if (hasPermission(user.grants, "user:manage"))
+    return ["SUPER_ADMIN", "HR_OFFICER", "DEPARTMENT_REVIEWER"];
   if (hasPermission(user.grants, "recruitment:manage")) return ["DEPARTMENT_REVIEWER"];
   return [];
 }
@@ -155,10 +156,10 @@ export async function revokeRole(actor: SessionUser | null, roleId: string) {
   const a = requireUserAdmin(actor);
   const r = await prisma.userRole.findUnique({ where: { id: roleId } });
   if (!r) throw new NotFoundError("Role assignment");
-  if (!grantableRoles(a).includes(r.role as RoleName))
+  if (!grantableRoles(a).includes(r.role as RoleName) && r.role !== "RECRUITMENT_ADMIN")
     throw new ForbiddenError("You cannot revoke this role");
-  if (r.userId === a.id && r.role === "SUPER_ADMIN")
-    throw new ConflictError("You cannot remove your own Super Admin role");
+  if (r.userId === a.id && (r.role === "SUPER_ADMIN" || r.role === "RECRUITMENT_ADMIN"))
+    throw new ConflictError("You cannot remove your own Admin role");
   await prisma.$transaction(async (tx) => {
     await tx.userRole.delete({ where: { id: roleId } });
     await audit(

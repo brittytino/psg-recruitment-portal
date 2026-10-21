@@ -120,6 +120,12 @@ export async function listApplications(user: SessionUser | null, q: ListQuery) {
             discipline: { select: { name: true } },
           },
         },
+        generated: {
+          where: { status: "READY" },
+          select: { id: true, version: true, pageCount: true },
+          orderBy: { version: "desc" },
+          take: 1,
+        },
         _count: { select: { reviews: true } },
       },
     }),
@@ -142,11 +148,14 @@ export async function dashboardCounts(user: SessionUser | null, cycleId?: string
     where: { AND: [scope, cycle, { processingStatus: "FAILED" }] },
   });
   const count = (s: string) => byStatus.find((b) => b.status === s)?._count._all ?? 0;
-  const isHr = u.grants.some((g) => g.role === "HR_OFFICER");
+  const isHr = u.grants.some(
+    (g) => g.role === "HR_OFFICER" || g.role === "SUPER_ADMIN" || g.role === "RECRUITMENT_ADMIN",
+  );
   let drafts: number | null = null;
   if (isHr) {
+    const isFullAdmin = u.grants.some((g) => g.role === "SUPER_ADMIN" || g.role === "RECRUITMENT_ADMIN");
     const hrCycles = u.grants.filter((g) => g.role === "HR_OFFICER").map((g) => g.cycleId);
-    const all = hrCycles.includes(null);
+    const all = isFullAdmin || hrCycles.includes(null);
     drafts = await prisma.application.count({
       where: {
         AND: [

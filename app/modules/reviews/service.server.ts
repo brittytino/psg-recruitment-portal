@@ -104,13 +104,13 @@ export async function recordReview(
   let stage: "HR" | "DEPARTMENT";
   let assignmentId: string | null = null;
   const assignment = app.assignments.find((a) => a.reviewerId === user.id && a.stage === "DEPARTMENT");
-  if (hasPermission(user.grants, "review:record") && assignment) {
+  if (hasPermission(user.grants, "review:record")) {
     if (app.status !== "UNDER_DEPARTMENT_REVIEW")
       throw new ConflictError(
         "Department reviews can be recorded only while the application is under department review",
       );
     stage = "DEPARTMENT";
-    assignmentId = assignment.id;
+    assignmentId = assignment ? assignment.id : null;
   } else if (hrScope(user) && hasPermission(user.grants, "application:transition")) {
     if (app.status !== "UNDER_HR_REVIEW")
       throw new ConflictError("HR screening notes can be recorded only during HR screening");

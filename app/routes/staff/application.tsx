@@ -109,7 +109,7 @@ export async function loader({ request, params, context }: Route.LoaderArgs) {
     isHr,
     canDownload: hasPermission(user.grants, "document:download"),
     canRegenerate: isHr && hasPermission(user.grants, "document:regenerate"),
-    canReviewDept: !!myAssignment && app.status === "UNDER_DEPARTMENT_REVIEW",
+    canReviewDept: (!!myAssignment || hasPermission(user.grants, "review:record")) && app.status === "UNDER_DEPARTMENT_REVIEW",
     canReviewHr: isHr && app.status === "UNDER_HR_REVIEW",
     reviewers: isHr ? await eligibleReviewers(app.vacancy.departmentId) : [],
   };
@@ -173,12 +173,17 @@ export default function StaffApplication({ loaderData, actionData }: Route.Compo
             Submitted {formatDateTime(app.submittedAt)} · Revision {app.revision?.no}
           </p>
         </div>
-        <div className="flex flex-col items-end gap-2">
+        <div className="flex flex-col sm:flex-row sm:items-center gap-2.5">
           <Badge tone={statusTone(app.status)}>{STATUS_LABELS[app.status]}</Badge>
           <Badge tone={statusTone(app.processingStatus)}>{PROCESSING_LABELS[app.processingStatus]}</Badge>
           {latestReady && canDownload && (
-            <a href={`/files/bundles/${latestReady.id}`} className="btn-primary">
-              Download consolidated PDF ({latestReady.pages} pages)
+            <a
+              href={`/files/bundles/${latestReady.id}`}
+              className="btn-primary inline-flex items-center gap-2 px-5 py-2.5 text-sm font-bold shadow-md shadow-brand-700/20 hover:scale-[1.02] transition-transform"
+              title="Download consolidated PDF dossier containing the full candidate form and all verified attachments"
+            >
+              <span>📥</span>
+              <span>Download Complete Application ({latestReady.pages} pgs)</span>
             </a>
           )}
         </div>

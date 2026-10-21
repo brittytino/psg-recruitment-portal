@@ -36,18 +36,43 @@ export const ROLE_PERMISSIONS: Record<RoleName, readonly Permission[]> = {
     "application:export",
     "document:download",
     "document:regenerate",
+    "recruitment:manage",
   ],
   DEPARTMENT_REVIEWER: ["application:list", "application:read", "review:record", "document:download"],
-  RECRUITMENT_ADMIN: ["recruitment:manage"],
-  SUPER_ADMIN: ["user:manage", "recruitment:manage", "audit:read"],
+  RECRUITMENT_ADMIN: [
+    "user:manage",
+    "recruitment:manage",
+    "audit:read",
+    "application:list",
+    "application:read",
+    "application:transition",
+    "application:assign",
+    "application:export",
+    "document:download",
+    "document:regenerate",
+    "review:record",
+  ],
+  SUPER_ADMIN: [
+    "user:manage",
+    "recruitment:manage",
+    "audit:read",
+    "application:list",
+    "application:read",
+    "application:transition",
+    "application:assign",
+    "application:export",
+    "document:download",
+    "document:regenerate",
+    "review:record",
+  ],
 };
 
 export const ROLE_LABELS: Record<RoleName, string> = {
   CANDIDATE: "Candidate",
-  HR_OFFICER: "HR / Recruitment Officer",
-  DEPARTMENT_REVIEWER: "Department Reviewer / HOD",
-  RECRUITMENT_ADMIN: "Recruitment Administrator",
-  SUPER_ADMIN: "Super Admin",
+  HR_OFFICER: "HR Officer (HR-N4 Section)",
+  DEPARTMENT_REVIEWER: "HOD / Department Reviewer",
+  RECRUITMENT_ADMIN: "Admin (Dean / Principal)",
+  SUPER_ADMIN: "Admin (Dean / Principal)",
 };
 
 export interface RoleGrant {
@@ -57,7 +82,7 @@ export interface RoleGrant {
 }
 
 export function hasPermission(grants: readonly RoleGrant[], p: Permission): boolean {
-  return grants.some((g) => ROLE_PERMISSIONS[g.role].includes(p));
+  return grants.some((g) => ROLE_PERMISSIONS[g.role]?.includes(p));
 }
 
 export function hasRole(grants: readonly RoleGrant[], role: RoleName): boolean {
@@ -67,4 +92,27 @@ export function hasRole(grants: readonly RoleGrant[], role: RoleName): boolean {
 /** Staff = anyone with a non-candidate role. */
 export function isStaff(grants: readonly RoleGrant[]): boolean {
   return grants.some((g) => g.role !== "CANDIDATE");
+}
+
+export function isAdmin(grants: readonly RoleGrant[]): boolean {
+  return grants.some((g) => g.role === "SUPER_ADMIN" || g.role === "RECRUITMENT_ADMIN");
+}
+
+export function isHrOfficer(grants: readonly RoleGrant[]): boolean {
+  return grants.some((g) => g.role === "HR_OFFICER");
+}
+
+export function isHodReviewer(grants: readonly RoleGrant[]): boolean {
+  return grants.some((g) => g.role === "DEPARTMENT_REVIEWER");
+}
+
+export function getPrimaryRoleBadge(grants: readonly RoleGrant[]): {
+  label: string;
+  tone: "info" | "warning" | "neutral" | "success" | "danger";
+} {
+  if (isAdmin(grants)) return { label: "Admin (Dean / Principal)", tone: "info" };
+  if (isHrOfficer(grants)) return { label: "HR - N4 Section", tone: "warning" };
+  if (isHodReviewer(grants)) return { label: "HOD / Dept Reviewer", tone: "neutral" };
+  if (isStaff(grants)) return { label: "Staff", tone: "neutral" };
+  return { label: "Applicant", tone: "success" };
 }

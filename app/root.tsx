@@ -31,7 +31,14 @@ import {
 import type { Route } from "./+types/root";
 import "./app.css";
 import { nonceContext, userContext } from "./context";
-import { hasPermission, isStaff } from "./modules/auth/permissions";
+import {
+  getPrimaryRoleBadge,
+  hasPermission,
+  isAdmin,
+  isHodReviewer,
+  isHrOfficer,
+  isStaff,
+} from "./modules/auth/permissions";
 import { csrfToken, getSessionUser } from "./modules/auth/session.server";
 import { env } from "./modules/core/env.server";
 import { CsrfInput } from "./components/forms";
@@ -135,6 +142,10 @@ function Header() {
   const root = useRouteLoaderData<typeof loader>("root");
   const user = root?.user;
   const grants = user?.grants ?? [];
+  const isAdm = isAdmin(grants);
+  const isHr = isHrOfficer(grants);
+  const isHod = isHodReviewer(grants);
+  const roleBadge = getPrimaryRoleBadge(grants);
   const location = useLocation();
   const [mobileOpen, setMobileOpen] = useState(false);
 
@@ -174,17 +185,17 @@ function Header() {
           )}
           {user && hasPermission(grants, "application:list") && (
             <NavLink to="/staff" end className={nav}>
-              Dashboard
+              {isHod ? "Department Review" : isHr ? "Applications Queue" : "Applications"}
             </NavLink>
           )}
           {user && hasPermission(grants, "recruitment:manage") && (
             <NavLink to="/admin" end className={nav}>
-              Administration
+              {isHr ? "Job Profiles (Entry)" : "Job Profiles & Cycles"}
             </NavLink>
           )}
           {user && hasPermission(grants, "user:manage") && (
             <NavLink to="/admin/users" className={nav}>
-              Users
+              Users & Roles
             </NavLink>
           )}
           {user && hasPermission(grants, "audit:read") && (
@@ -202,13 +213,15 @@ function Header() {
               <div className="flex items-center gap-2.5">
                 <span
                   aria-hidden="true"
-                  className="grid h-9 w-9 place-items-center rounded-full bg-gradient-to-br from-pink-200 to-violet-200 text-xs font-bold"
+                  className="grid h-9 w-9 place-items-center rounded-full bg-gradient-to-br from-brand-100 to-indigo-100 text-brand-900 border border-brand-200 text-xs font-bold"
                 >
                   {initials || "🙂"}
                 </span>
                 <span className="flex flex-col leading-tight">
-                  <span className="text-sm font-semibold">{user.displayName}</span>
-                  <span className="text-[11px] text-muted">{isStaff(grants) ? "Staff" : "Candidate"}</span>
+                  <span className="text-sm font-semibold truncate max-w-[170px]">{user.displayName}</span>
+                  <span className="text-[11px] font-bold text-brand-700 tracking-tight">
+                    {roleBadge.label}
+                  </span>
                 </span>
               </div>
               <button type="submit" className="btn-secondary px-4 py-2">
@@ -293,7 +306,7 @@ function Header() {
                 >
                   <span className="flex items-center gap-3">
                     <LayoutDashboard className="h-4 w-4 text-brand-600" />
-                    Staff Dashboard
+                    {isHod ? "Department Review" : isHr ? "Applications Queue" : "Applications"}
                   </span>
                   <ChevronRight className="h-4 w-4 opacity-50" />
                 </NavLink>
@@ -307,7 +320,7 @@ function Header() {
                 >
                   <span className="flex items-center gap-3">
                     <Settings className="h-4 w-4 text-brand-600" />
-                    Administration
+                    {isHr ? "Job Profiles (Entry)" : "Job Profiles & Cycles"}
                   </span>
                   <ChevronRight className="h-4 w-4 opacity-50" />
                 </NavLink>

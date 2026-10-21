@@ -24,24 +24,36 @@ export function requirePermission(user: SessionUser | null, p: Permission): Sess
  *  - Recruitment admins and super admins have no application access by default.
  */
 export function staffApplicationScope(user: SessionUser): Prisma.ApplicationWhereInput | null {
+  // Institutional Admins (Dean, Principal, Super Admin) have full system access across all applications
+  if (user.grants.some((g) => g.role === "SUPER_ADMIN" || g.role === "RECRUITMENT_ADMIN")) {
+    return { status: { not: "DRAFT" } };
+  }
+
   const ors: Prisma.ApplicationWhereInput[] = [];
   for (const g of user.grants) {
-    if (g.role === "HR_OFFICER") ors.push(g.cycleId ? { vacancy: { cycleId: g.cycleId } } : {});
-    if (g.role === "DEPARTMENT_REVIEWER" && g.departmentId)
+    if (g.role === "HR_OFFICER") {
+      ors.push(g.cycleId ? { vacancy: { cycleId: g.cycleId } } : {});
+    }
+    if (g.role === "DEPARTMENT_REVIEWER" && g.departmentId) {
       ors.push({
         vacancy: { departmentId: g.departmentId },
-        assignments: { some: { reviewerId: user.id, stage: "DEPARTMENT" } },
       });
+    }
   }
   if (!ors.length) return null;
   return { AND: [{ status: { not: "DRAFT" } }, { OR: ors }] };
 }
 
 export function isHr(user: SessionUser): boolean {
-  return user.grants.some((g) => g.role === "HR_OFFICER");
+  return user.grants.some(
+    (g) => g.role === "HR_OFFICER" || g.role === "SUPER_ADMIN" || g.role === "RECRUITMENT_ADMIN",
+  );
 }
 
 export function hrScope(user: SessionUser): Prisma.ApplicationWhereInput | null {
+  if (user.grants.some((g) => g.role === "SUPER_ADMIN" || g.role === "RECRUITMENT_ADMIN")) {
+    return { status: { not: "DRAFT" } };
+  }
   const ors = user.grants
     .filter((g) => g.role === "HR_OFFICER")
     .map((g) => (g.cycleId ? { vacancy: { cycleId: g.cycleId } } : {}));

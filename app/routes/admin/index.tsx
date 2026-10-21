@@ -62,12 +62,12 @@ export default function AdminIndex({ loaderData, actionData }: Route.ComponentPr
     <div className="space-y-8">
       <div className="flex flex-wrap items-center justify-between gap-4 border-b border-line/70 pb-6">
         <div>
-          <p className="eyebrow">College Administration</p>
+          <p className="eyebrow">College Administration & HR-N4 Section</p>
           <h1 className="mt-1.5 text-3xl sm:text-4xl lg:text-5xl font-extrabold text-ink">
-            Recruitment administration
+            Job Profiles & Recruitment Administration
           </h1>
           <p className="mt-2 text-base text-muted">
-            Manage recruitment cycles, vacancies, departments, official templates, and system databases.
+            Job profile entry, recruitment cycles, academic departments, official templates, and vacancy configurations.
           </p>
         </div>
         <div className="flex flex-wrap items-center gap-2">
@@ -92,7 +92,7 @@ export default function AdminIndex({ loaderData, actionData }: Route.ComponentPr
             <span>Mailbox</span>
           </a>
           <Link to="/admin/vacancies/new" className="btn-primary">
-            Create vacancy
+            + New Job Profile / Vacancy
           </Link>
         </div>
       </div>
