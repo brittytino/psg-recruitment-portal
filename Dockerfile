@@ -16,10 +16,8 @@ FROM deps AS build
 COPY . .
 RUN npx prisma generate && npm run build
 
-FROM base AS prod-deps
-COPY package.json package-lock.json ./
-COPY prisma ./prisma
-RUN --mount=type=cache,target=/root/.npm npm ci --omit=dev --no-audit --no-fund --fetch-retries=5 && npx prisma generate
+FROM deps AS prod-deps
+RUN npm prune --omit=dev && npx prisma generate
 
 FROM base AS runtime
 ENV NODE_ENV=production PORT=3000
