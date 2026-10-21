@@ -46,9 +46,14 @@ export function VacancyCard({ v }: { v: VacancyCardData }) {
             {POSITION_EMOJI[v.position] ?? "💼"}
           </span>
           <div className="min-w-0 flex-1">
-            <p className="truncate text-xs font-bold uppercase tracking-wider text-muted">{v.department.name}</p>
+            <p className="truncate text-xs font-bold uppercase tracking-wider text-muted">
+              {v.department.name}
+            </p>
             <h3 className="mt-1 text-base sm:text-lg font-bold leading-snug">
-              <Link to={`/vacancies/${v.code}`} className="text-ink no-underline hover:text-brand-700 transition-colors">
+              <Link
+                to={`/vacancies/${v.code}`}
+                className="text-ink no-underline hover:text-brand-700 transition-colors"
+              >
                 {v.title}
               </Link>
             </h3>

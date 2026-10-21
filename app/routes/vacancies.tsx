@@ -39,7 +39,8 @@ export default function Vacancies({ loaderData }: Route.ComponentProps) {
           Find your faculty position 🔎
         </h1>
         <p className="mt-2.5 sm:mt-3 max-w-2xl text-sm sm:text-lg text-muted leading-relaxed">
-          Explore faculty openings across engineering, science, and humanities departments. Apply directly online with automatic draft saving.
+          Explore faculty openings across engineering, science, and humanities departments. Apply directly
+          online with automatic draft saving.
         </p>
 
         <Form
@@ -65,7 +66,12 @@ export default function Vacancies({ loaderData }: Route.ComponentProps) {
             <label htmlFor="department" className="sr-only">
               Department
             </label>
-            <select id="department" name="department" defaultValue={departmentId} className="field-input h-11 w-full">
+            <select
+              id="department"
+              name="department"
+              defaultValue={departmentId}
+              className="field-input h-11 w-full"
+            >
               <option value="">All departments</option>
               {departments.map((d) => (
                 <option key={d.id} value={d.id}>
@@ -87,7 +93,10 @@ export default function Vacancies({ loaderData }: Route.ComponentProps) {
               ))}
             </select>
           </div>
-          <button type="submit" className="btn-primary h-11 w-full sm:w-auto px-8 text-sm sm:text-base font-semibold">
+          <button
+            type="submit"
+            className="btn-primary h-11 w-full sm:w-auto px-8 text-sm sm:text-base font-semibold"
+          >
             Search
           </button>
         </Form>
@@ -99,7 +108,10 @@ export default function Vacancies({ loaderData }: Route.ComponentProps) {
           {vacancies.length === 1 ? "position" : "positions"} available
         </p>
         {filtered && (
-          <Link to="/vacancies" className="chip no-underline hover:bg-soft text-xs font-semibold text-brand-700">
+          <Link
+            to="/vacancies"
+            className="chip no-underline hover:bg-soft text-xs font-semibold text-brand-700"
+          >
             ✕ Clear all filters
           </Link>
         )}

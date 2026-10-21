@@ -43,7 +43,8 @@ export default function Help() {
           Frequently asked questions
         </h1>
         <p className="mt-2 text-base text-muted">
-          Find answers about official form formats, document uploads, application drafting, and submission workflows.
+          Find answers about official form formats, document uploads, application drafting, and submission
+          workflows.
         </p>
       </div>
 
@@ -63,11 +64,16 @@ export default function Help() {
       </section>
 
       <section id="contact" aria-labelledby="contact-h" className="card space-y-4 p-8">
-        <h2 id="contact-h" className="text-2xl font-bold text-ink">Institutional Contact</h2>
+        <h2 id="contact-h" className="text-2xl font-bold text-ink">
+          Institutional Contact
+        </h2>
         <Alert tone="warning" title="Recruitment Office Information">
-          Official recruitment office contact details (direct telephone lines and visiting hours) are managed by the Dean's Office.
+          Official recruitment office contact details (direct telephone lines and visiting hours) are managed
+          by the Dean's Office.
         </Alert>
-        <p className="text-sm text-muted">PSG College of Technology, Peelamedu, Coimbatore – 641 004, Tamil Nadu, India.</p>
+        <p className="text-sm text-muted">
+          PSG College of Technology, Peelamedu, Coimbatore – 641 004, Tamil Nadu, India.
+        </p>
       </section>
     </div>
   );

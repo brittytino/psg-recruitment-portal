@@ -67,21 +67,26 @@ Demo data (development only):
 docker compose run --rm -e SEED_DEMO=true -e NODE_ENV=development migrate node build-worker/seed.js
 ```
 
-Demo accounts (`@example.test`, password = `SEED_DEMO_PASSWORD` in `.env`): `candidate@`, `candidate2@`, `hr@`, `reviewer.cse@`, `reviewer.ece@`, `admin@`, `superadmin@`, `auditor@`.
+Demo accounts (Universal password = `Demo@12345`):
+
+- **Super Admin**: `dean.admn@psgtech.ac.in` (DEAN), `principal@psgtech.ac.in` (Principal), `superadmin@example.test`
+- **HR-N4 Section**: `admin.n4@psgtech.ac.in` (HR & Job Entry), `hr@example.test`
+- **Department Reviewers (HODs)**: `hod.cse@psgtech.ac.in` (CSE), `hod.mca@psgtech.ac.in` (MCA), `hod.eee@psgtech.ac.in` (EEE), `hod.ece@psgtech.ac.in` (ECE), `reviewer.cse@example.test`, `reviewer.ece@example.test`
+- **Candidates**: `candidate@example.test`, `candidate2@example.test`
 
 ## 8. Docker Compose commands & Windows one-click runner
 
-| Task                           | Command                                                       |
-| ------------------------------ | ------------------------------------------------------------- |
-| **One-click All-in-One (.bat)**| `.\run.bat` (or double-click `run.bat` in root)               |
-| Clean rebuild & run            | `.\run.bat rebuild` (or `docker compose build --no-cache && docker compose up -d`) |
-| Start / rebuild (manual)       | `docker compose up -d --build`                                |
-| Dev (host ports + DB viewer)   | `docker compose -f compose.yaml -f compose.dev.yaml up -d`    |
-| Logs                           | `docker compose logs -f app worker`                           |
-| Status                         | `docker compose ps`                                           |
-| Graceful stop                  | `docker compose stop`                                         |
-| Remove containers (keeps data) | `docker compose down`                                         |
-| **Delete all data**            | `docker compose down -v` (destructive; never on shared hosts) |
+| Task                            | Command                                                                            |
+| ------------------------------- | ---------------------------------------------------------------------------------- |
+| **One-click All-in-One (.bat)** | `.\run.bat` (or double-click `run.bat` in root)                                    |
+| Clean rebuild & run             | `.\run.bat rebuild` (or `docker compose build --no-cache && docker compose up -d`) |
+| Start / rebuild (manual)        | `docker compose up -d --build`                                                     |
+| Dev (host ports + DB viewer)    | `docker compose -f compose.yaml -f compose.dev.yaml up -d`                         |
+| Logs                            | `docker compose logs -f app worker`                                                |
+| Status                          | `docker compose ps`                                                                |
+| Graceful stop                   | `docker compose stop`                                                              |
+| Remove containers (keeps data)  | `docker compose down`                                                              |
+| **Delete all data**             | `docker compose down -v` (destructive; never on shared hosts)                      |
 
 More: [docs/deployment/docker-local.md](docs/deployment/docker-local.md).
 
@@ -113,7 +118,7 @@ See [.env.example](.env.example) (commented). Validated at startup by `app/modul
 
 ## 13. Authentication and role setup
 
-Candidates self-register (e-mail verification required to apply). Staff accounts are created by a Super Admin (invitation e-mail with password-setup link) and given roles: HR officer (optionally per cycle), Department reviewer (per department), Recruitment admin, Super admin, Auditor. Matrix: [docs/architecture/authorization-matrix.md](docs/architecture/authorization-matrix.md).
+Candidates self-register (e-mail verification required to apply). Staff accounts are created by a Super Admin (invitation e-mail with password-setup link) and given roles: HR officer (optionally per cycle), Department reviewer (per department), Recruitment admin, Super admin. Matrix: [docs/architecture/authorization-matrix.md](docs/architecture/authorization-matrix.md).
 
 ## 14. Official form inventory and fidelity rules
 

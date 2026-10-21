@@ -110,7 +110,9 @@ export default function AdminIndex({ loaderData, actionData }: Route.ComponentPr
             <span className="text-xl">🛠️</span>
             <div>
               <h2 className="text-sm font-bold text-ink">Server & Database Management</h2>
-              <p className="text-xs text-muted">Direct visual database inspector and transactional email preview</p>
+              <p className="text-xs text-muted">
+                Direct visual database inspector and transactional email preview
+              </p>
             </div>
           </div>
           <span className="badge-soft text-[11px] font-mono">Docker Services Online</span>
@@ -119,15 +121,22 @@ export default function AdminIndex({ loaderData, actionData }: Route.ComponentPr
           <div className="flex flex-col justify-between rounded-xl bg-white/90 p-3.5 shadow-xs border border-line">
             <div>
               <div className="flex items-center justify-between">
-                <span className="font-semibold text-xs text-ink flex items-center gap-1.5">🗄️ Adminer Database Viewer</span>
-                <span className="rounded bg-soft px-1.5 py-0.5 text-[10px] font-mono font-medium text-muted">Port 6981</span>
+                <span className="font-semibold text-xs text-ink flex items-center gap-1.5">
+                  🗄️ Adminer Database Viewer
+                </span>
+                <span className="rounded bg-soft px-1.5 py-0.5 text-[10px] font-mono font-medium text-muted">
+                  Port 6981
+                </span>
               </div>
               <p className="mt-1 text-xs text-muted">
                 Inspect PostgreSQL tables, run SQL queries, view users, forms, and attachments directly.
               </p>
               <div className="mt-2 rounded-lg bg-soft p-2 text-[11px] font-mono text-muted leading-relaxed">
-                System: <strong className="text-ink">PostgreSQL</strong> · Server: <strong className="text-ink">db</strong><br />
-                Database: <strong className="text-ink">srportal</strong> · User: <strong className="text-ink">srp_owner</strong>
+                System: <strong className="text-ink">PostgreSQL</strong> · Server:{" "}
+                <strong className="text-ink">db</strong>
+                <br />
+                Database: <strong className="text-ink">srportal</strong> · User:{" "}
+                <strong className="text-ink">srp_owner</strong>
               </div>
             </div>
             <a
@@ -143,14 +152,19 @@ export default function AdminIndex({ loaderData, actionData }: Route.ComponentPr
           <div className="flex flex-col justify-between rounded-xl bg-white/90 p-3.5 shadow-xs border border-line">
             <div>
               <div className="flex items-center justify-between">
-                <span className="font-semibold text-xs text-ink flex items-center gap-1.5">✉️ Mailpit Local Inbox</span>
-                <span className="rounded bg-soft px-1.5 py-0.5 text-[10px] font-mono font-medium text-muted">Port 6980</span>
+                <span className="font-semibold text-xs text-ink flex items-center gap-1.5">
+                  ✉️ Mailpit Local Inbox
+                </span>
+                <span className="rounded bg-soft px-1.5 py-0.5 text-[10px] font-mono font-medium text-muted">
+                  Port 6980
+                </span>
               </div>
               <p className="mt-1 text-xs text-muted">
                 Catch and inspect all outgoing transactional emails, verification links, and password resets.
               </p>
               <div className="mt-2 rounded-lg bg-soft p-2 text-[11px] font-mono text-muted leading-relaxed">
-                SMTP Host: <strong className="text-ink">mailpit:1025</strong><br />
+                SMTP Host: <strong className="text-ink">mailpit:1025</strong>
+                <br />
                 Web UI: <strong className="text-ink">http://localhost:6980</strong>
               </div>
             </div>

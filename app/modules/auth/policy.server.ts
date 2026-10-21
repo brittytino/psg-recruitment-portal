@@ -21,14 +21,12 @@ export function requirePermission(user: SessionUser | null, p: Permission): Sess
  *
  *  - HR_OFFICER: submitted (non-draft) applications in the cycles they are scoped to (null = all).
  *  - DEPARTMENT_REVIEWER: non-draft applications in their department AND assigned to them.
- *  - AUDITOR: all non-draft applications (read-only).
  *  - Recruitment admins and super admins have no application access by default.
  */
 export function staffApplicationScope(user: SessionUser): Prisma.ApplicationWhereInput | null {
   const ors: Prisma.ApplicationWhereInput[] = [];
   for (const g of user.grants) {
     if (g.role === "HR_OFFICER") ors.push(g.cycleId ? { vacancy: { cycleId: g.cycleId } } : {});
-    if (g.role === "AUDITOR") ors.push({});
     if (g.role === "DEPARTMENT_REVIEWER" && g.departmentId)
       ors.push({
         vacancy: { departmentId: g.departmentId },

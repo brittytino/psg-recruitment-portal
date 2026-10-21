@@ -9,7 +9,6 @@ export const ROLES = [
   "DEPARTMENT_REVIEWER",
   "RECRUITMENT_ADMIN",
   "SUPER_ADMIN",
-  "AUDITOR",
 ] as const;
 export type RoleName = (typeof ROLES)[number];
 
@@ -40,8 +39,7 @@ export const ROLE_PERMISSIONS: Record<RoleName, readonly Permission[]> = {
   ],
   DEPARTMENT_REVIEWER: ["application:list", "application:read", "review:record", "document:download"],
   RECRUITMENT_ADMIN: ["recruitment:manage"],
-  SUPER_ADMIN: ["user:manage"],
-  AUDITOR: ["application:list", "application:read", "audit:read"],
+  SUPER_ADMIN: ["user:manage", "recruitment:manage", "audit:read"],
 };
 
 export const ROLE_LABELS: Record<RoleName, string> = {
@@ -50,7 +48,6 @@ export const ROLE_LABELS: Record<RoleName, string> = {
   DEPARTMENT_REVIEWER: "Department Reviewer / HOD",
   RECRUITMENT_ADMIN: "Recruitment Administrator",
   SUPER_ADMIN: "Super Admin",
-  AUDITOR: "Auditor",
 };
 
 export interface RoleGrant {

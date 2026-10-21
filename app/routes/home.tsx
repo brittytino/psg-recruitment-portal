@@ -50,7 +50,7 @@ export default function Home({ loaderData }: Route.ComponentProps) {
           stagger: 0.08,
           ease: "power2.out",
           clearProps: "all",
-        }
+        },
       );
     }, statsContainerRef);
 
@@ -89,8 +89,8 @@ export default function Home({ loaderData }: Route.ComponentProps) {
           </h1>
 
           <p className="mx-auto mt-4 sm:mt-6 max-w-2xl text-sm sm:text-lg lg:text-xl text-muted leading-relaxed">
-            Join PSG College of Technology. Find your academic post, complete the official application
-            online with automatic draft saving, and follow your recruitment journey live.
+            Join PSG College of Technology. Find your academic post, complete the official application online
+            with automatic draft saving, and follow your recruitment journey live.
           </p>
 
           {/* Responsive Search Bar */}
@@ -203,7 +203,9 @@ export default function Home({ loaderData }: Route.ComponentProps) {
             <h2 id="open" className="mt-1 text-2xl sm:text-4xl font-extrabold text-ink">
               Open positions
             </h2>
-            <p className="mt-1 text-xs sm:text-sm text-muted">Explore current faculty openings across engineering and science disciplines.</p>
+            <p className="mt-1 text-xs sm:text-sm text-muted">
+              Explore current faculty openings across engineering and science disciplines.
+            </p>
           </div>
           <Link to="/vacancies" className="btn-secondary">
             View all vacancies →
@@ -258,7 +260,8 @@ export default function Home({ loaderData }: Route.ComponentProps) {
             Apply in four simple steps
           </h2>
           <p className="mt-2 text-xs sm:text-base text-muted">
-            The application process is entirely digital, transparent, and structured according to official college guidelines.
+            The application process is entirely digital, transparent, and structured according to official
+            college guidelines.
           </p>
         </div>
         <ol className="mt-8 sm:mt-10 grid gap-4 sm:gap-6 sm:grid-cols-2 lg:grid-cols-4">
@@ -274,7 +277,9 @@ export default function Home({ loaderData }: Route.ComponentProps) {
               >
                 {emoji}
               </span>
-              <p className="mt-4 sm:mt-5 text-xs font-bold uppercase tracking-wider text-brand-700">Step {i + 1}</p>
+              <p className="mt-4 sm:mt-5 text-xs font-bold uppercase tracking-wider text-brand-700">
+                Step {i + 1}
+              </p>
               <p className="mt-1 text-sm sm:text-base font-bold text-ink">{t}</p>
               <p className="mt-1.5 sm:mt-2 text-xs sm:text-sm text-muted leading-relaxed">{d}</p>
             </motion.li>
@@ -296,14 +301,21 @@ export default function Home({ loaderData }: Route.ComponentProps) {
             Ready to shape future engineers?
           </h2>
           <p className="mt-2.5 sm:mt-3 text-sm sm:text-lg text-muted leading-relaxed">
-            Create your candidate account and start your application today. Your draft saves automatically so you can resume at any time.
+            Create your candidate account and start your application today. Your draft saves automatically so
+            you can resume at any time.
           </p>
         </div>
         <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3 w-full sm:w-auto">
-          <Link to="/register" className="btn-primary w-full sm:w-auto px-8 py-3.5 text-center text-sm sm:text-base font-semibold shadow-md">
+          <Link
+            to="/register"
+            className="btn-primary w-full sm:w-auto px-8 py-3.5 text-center text-sm sm:text-base font-semibold shadow-md"
+          >
             Create an account
           </Link>
-          <Link to="/vacancies" className="btn-secondary w-full sm:w-auto px-6 py-3.5 text-center text-sm sm:text-base font-semibold">
+          <Link
+            to="/vacancies"
+            className="btn-secondary w-full sm:w-auto px-6 py-3.5 text-center text-sm sm:text-base font-semibold"
+          >
             Browse all vacancies
           </Link>
         </div>

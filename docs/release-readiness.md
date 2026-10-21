@@ -6,7 +6,7 @@
 - Generated PDFs: minimal applications keep the template page counts (2 / 11 in LibreOffice); visually compared with the originals; merged bundles have exact expected page counts (integration).
 - Submission creates an immutable revision (DB triggers reject UPDATE/DELETE), unique reference number, single revision under concurrent submits, stale-version rejection.
 - Upload abuse: non-matching content, PDF as photograph, damaged PDF rejected; EICAR detected by ClamAV.
-- Authorization: cross-candidate, cross-department, unassigned reviewer, HR drafts, admin/super-admin no data access, auditor read-only.
+- Authorization: cross-candidate, cross-department, unassigned reviewer, HR drafts, admin/super-admin role separation.
 - Docker: full stack starts from Compose; data persists across restarts; e2e passes against the container deployment.
 - Blue-green: deploy, switch, rollback and failed-release abort locally with 0 failed requests out of 156.
 - Backup/restore: restore into scratch DB/volume reproduced identical counts and file checksums.

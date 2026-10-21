@@ -10,7 +10,7 @@ WORKDIR /app
 FROM base AS deps
 COPY package.json package-lock.json ./
 COPY prisma ./prisma
-RUN npm ci --no-audit --no-fund
+RUN --mount=type=cache,target=/root/.npm npm ci --no-audit --no-fund --fetch-retries=5
 
 FROM deps AS build
 COPY . .
@@ -19,7 +19,7 @@ RUN npx prisma generate && npm run build
 FROM base AS prod-deps
 COPY package.json package-lock.json ./
 COPY prisma ./prisma
-RUN npm ci --omit=dev --no-audit --no-fund && npx prisma generate && npm cache clean --force
+RUN --mount=type=cache,target=/root/.npm npm ci --omit=dev --no-audit --no-fund --fetch-retries=5 && npx prisma generate
 
 FROM base AS runtime
 ENV NODE_ENV=production PORT=3000

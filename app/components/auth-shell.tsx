@@ -5,7 +5,10 @@ export function AuthShell({ children }: { children: ReactNode }) {
   return (
     <div className="mx-auto grid max-w-6xl overflow-hidden rounded-3xl bg-white shadow-[var(--shadow-soft)] border border-line/60 lg:grid-cols-2">
       <div className="p-5 sm:p-10 lg:p-14">{children}</div>
-      <div aria-hidden="true" className="hero-gradient relative hidden flex-col justify-between p-12 lg:flex border-l border-pink-100/60">
+      <div
+        aria-hidden="true"
+        className="hero-gradient relative hidden flex-col justify-between p-12 lg:flex border-l border-pink-100/60"
+      >
         <p className="chip w-fit">🌸 PSG Tech Careers</p>
         <div>
           <p className="text-3xl font-bold leading-tight">Teach. Research. Inspire.</p>

@@ -64,10 +64,10 @@ export async function loader({ context }: Route.LoaderArgs) {
     csrf: csrfToken(user?.sessionId ?? null),
     user: user
       ? {
-        displayName: user.displayName,
-        emailVerified: user.emailVerified,
-        grants: user.grants,
-      }
+          displayName: user.displayName,
+          emailVerified: user.emailVerified,
+          grants: user.grants,
+        }
       : null,
   };
 }
@@ -127,7 +127,6 @@ function Logo() {
           className="h-7 sm:h-9 md:h-11 w-auto object-contain transition-transform duration-300 group-hover:scale-105"
         />
       </div>
-
     </Link>
   );
 }
@@ -354,12 +353,17 @@ function Header() {
                     </span>
                     <div className="min-w-0 flex-1">
                       <p className="truncate text-sm font-bold text-ink">{user.displayName}</p>
-                      <p className="text-xs text-muted">{isStaff(grants) ? "Staff Member" : "Candidate Account"}</p>
+                      <p className="text-xs text-muted">
+                        {isStaff(grants) ? "Staff Member" : "Candidate Account"}
+                      </p>
                     </div>
                   </div>
                   <form method="post" action="/logout">
                     <CsrfInput />
-                    <button type="submit" className="btn-secondary w-full py-2.5 text-danger hover:text-danger font-semibold">
+                    <button
+                      type="submit"
+                      className="btn-secondary w-full py-2.5 text-danger hover:text-danger font-semibold"
+                    >
                       <LogOut className="h-4 w-4 mr-1.5 inline" /> Sign out
                     </button>
                   </form>
@@ -389,8 +393,8 @@ function Footer() {
         <div className="space-y-4">
           <Logo />
           <p className="max-w-md text-sm text-muted leading-relaxed">
-            Faculty recruitment for PSG College of Technology, Peelamedu, Coimbatore – 641 004.
-            Autonomous, affiliated to Anna University, accredited with an ISO 9001:2015 certified legacy.
+            Faculty recruitment for PSG College of Technology, Peelamedu, Coimbatore – 641 004. Autonomous,
+            affiliated to Anna University, accredited with an ISO 9001:2015 certified legacy.
           </p>
           <div className="flex items-center gap-2 text-xs text-muted pt-2">
             <span>© {new Date().getFullYear()} PSG College of Technology</span>
@@ -435,7 +439,10 @@ export default function App() {
   return (
     <div className="min-h-screen flex flex-col justify-between">
       <Header />
-      <main id="main" className="mx-auto w-full max-w-[1500px] flex-1 px-4 py-8 sm:px-6 sm:py-10 lg:px-10 lg:py-12">
+      <main
+        id="main"
+        className="mx-auto w-full max-w-[1500px] flex-1 px-4 py-8 sm:px-6 sm:py-10 lg:px-10 lg:py-12"
+      >
         <Outlet />
       </main>
       <Footer />

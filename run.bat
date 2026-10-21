@@ -87,17 +87,26 @@ echo [OK] Recruitment Portal is healthy!
 :show_summary
 cls
 echo ================================================================================
-echo    PSG TECH STAFF RECRUITMENT PORTAL
+echo    PSG TECH STAFF RECRUITMENT PORTAL — READY
 echo ================================================================================
 echo.
 echo    [WEB PORTAL]      http://localhost:6969
-echo    [DATABASE VIEWER] http://localhost:6981
-echo    [EMAIL INBOX]     http://localhost:6980
-echo    [POSTGRES DIRECT] localhost:65432
-echo    [REDIS DIRECT]    localhost:63879
+echo    [SIGN IN PAGE]    http://localhost:6969/login
+echo    [DATABASE VIEWER] http://localhost:6981  (Adminer: db / srportal / srp_owner)
+echo    [EMAIL INBOX]     http://localhost:6980  (Mailpit catch-all inbox)
 echo.
-echo    Database: srportal
-echo    Demo password: Demo@12345 (after seeding)
+echo    UNIVERSAL PASSWORD: Demo@12345
+echo.
+echo    KEY DEMO ACCOUNTS:
+echo    • Super Admin (DEAN):      dean.admn@psgtech.ac.in
+echo    • Super Admin (Principal): principal@psgtech.ac.in
+echo    • HR-N4 Section:           admin.n4@psgtech.ac.in  (Job profile entry & screening)
+echo    • HOD (CSE):               hod.cse@psgtech.ac.in   (Review CSE applicants)
+echo    • HOD (MCA):               hod.mca@psgtech.ac.in   (Review MCA applicants)
+echo    • HOD (EEE):               hod.eee@psgtech.ac.in   (Review EEE applicants)
+echo    • HOD (ECE):               hod.ece@psgtech.ac.in   (Review ECE applicants)
+echo    • Candidate (Applicant 1): candidate@example.test  (Dr. R. Sathish Kumar)
+echo    • Candidate (Applicant 2): candidate2@example.test (Dr. P. Priya)
 echo ================================================================================
 echo.
 

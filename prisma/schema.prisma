@@ -21,7 +21,6 @@ enum Role {
   DEPARTMENT_REVIEWER
   RECRUITMENT_ADMIN
   SUPER_ADMIN
-  AUDITOR
 }
 
 enum UserStatus {

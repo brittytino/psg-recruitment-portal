@@ -12,11 +12,7 @@ import type { SessionUser } from "~/modules/auth/session.server";
 import { prisma } from "~/modules/core/db.server";
 import { generateBundle } from "~/modules/documents/pipeline.server";
 import { scanBytes } from "~/modules/documents/scan.server";
-import {
-  authorizeDocumentDownload,
-  authorizeGeneratedDownload,
-  uploadDocument,
-} from "~/modules/documents/service.server";
+import { authorizeDocumentDownload, uploadDocument } from "~/modules/documents/service.server";
 import { getFile, getVerifiedFile } from "~/modules/documents/storage.server";
 import { listApplications, listQuerySchema } from "~/modules/reporting/applications.server";
 import { assignReviewer, recordReview } from "~/modules/reviews/service.server";
@@ -274,14 +270,5 @@ describe("authorization", () => {
     const sa = await makeUser("SUPER_ADMIN");
     await expect(listApplications(ra, listQuerySchema.parse({}))).rejects.toThrow();
     await expect(listApplications(sa, listQuerySchema.parse({}))).rejects.toThrow();
-  });
-
-  it("auditors can read but cannot change status", async () => {
-    const { app } = await submittedApplication(vacAP, assistantMinimal);
-    const auditor = await makeUser("AUDITOR");
-    expect((await getStaffApplication(auditor, app.id)).id).toBe(app.id);
-    await expect(transition(auditor, app.id, "UNDER_HR_REVIEW", null)).rejects.toThrow();
-    const gen = await prisma.generatedDocument.findFirstOrThrow({ where: { applicationId: app.id } });
-    await expect(authorizeGeneratedDownload(auditor, gen.id)).rejects.toThrow(/not found/i);
   });
 });

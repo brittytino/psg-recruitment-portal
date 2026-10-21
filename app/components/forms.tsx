@@ -68,6 +68,8 @@ export function TextInput({
   name,
   type = "text",
   defaultValue,
+  value,
+  onChange,
   error,
   hint,
   required,
@@ -79,6 +81,8 @@ export function TextInput({
   name: string;
   type?: string;
   defaultValue?: string | number | null;
+  value?: string | number;
+  onChange?: (e: React.ChangeEvent<HTMLInputElement>) => void;
   error?: string;
   hint?: ReactNode;
   required?: boolean;
@@ -94,6 +98,8 @@ export function TextInput({
           name={name}
           type={type}
           defaultValue={defaultValue ?? undefined}
+          value={value}
+          onChange={onChange}
           required={required}
           aria-required={required}
           aria-invalid={invalid}

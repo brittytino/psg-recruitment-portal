@@ -76,9 +76,33 @@ async function demo() {
   });
 
   const users: { email: string; name: string; roles: { role: Role; departmentId?: string }[] }[] = [
+    {
+      email: "dean.admn@psgtech.ac.in",
+      name: "Dr. G. Chandramohan (Dean Administration)",
+      roles: [{ role: "SUPER_ADMIN" }],
+    },
+    {
+      email: "principal@psgtech.ac.in",
+      name: "Dr. K. Prakasan (Principal)",
+      roles: [{ role: "SUPER_ADMIN" }],
+    },
     { email: "superadmin@example.test", name: "Demo Super Admin", roles: [{ role: "SUPER_ADMIN" }] },
+    {
+      email: "admin.n4@psgtech.ac.in",
+      name: "Admin N4 Section (HR)",
+      roles: [{ role: "HR_OFFICER" }, { role: "RECRUITMENT_ADMIN" }],
+    },
     { email: "admin@example.test", name: "Demo Recruitment Admin", roles: [{ role: "RECRUITMENT_ADMIN" }] },
-    { email: "hr@example.test", name: "Demo HR Officer", roles: [{ role: "HR_OFFICER" }] },
+    {
+      email: "hr@example.test",
+      name: "Demo HR Officer",
+      roles: [{ role: "HR_OFFICER" }, { role: "RECRUITMENT_ADMIN" }],
+    },
+    {
+      email: "hod.cse@psgtech.ac.in",
+      name: "Dr. R. Venkatesan (HOD CSE)",
+      roles: [{ role: "DEPARTMENT_REVIEWER", departmentId: cse.id }],
+    },
     {
       email: "reviewer.cse@example.test",
       name: "Demo CSE Reviewer",
@@ -89,7 +113,6 @@ async function demo() {
       name: "Demo ECE Reviewer",
       roles: [{ role: "DEPARTMENT_REVIEWER", departmentId: ece.id }],
     },
-    { email: "auditor@example.test", name: "Demo Auditor", roles: [{ role: "AUDITOR" }] },
     { email: "candidate@example.test", name: "Demo Candidate", roles: [{ role: "CANDIDATE" }] },
     { email: "candidate2@example.test", name: "Second Demo Candidate", roles: [{ role: "CANDIDATE" }] },
   ];
