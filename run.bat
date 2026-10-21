@@ -98,9 +98,9 @@ echo.
 echo    UNIVERSAL PASSWORD: Demo@12345
 echo.
 echo    KEY DEMO ACCOUNTS:
-echo    • Super Admin (DEAN):      dean.admn@psgtech.ac.in
-echo    • Super Admin (Principal): principal@psgtech.ac.in
-echo    • HR-N4 Section:           admin.n4@psgtech.ac.in  (Job profile entry & screening)
+echo    • Admin (DEAN - Dr. S. Saravanan): dean.admn@psgtech.ac.in
+echo    • Admin (Principal):               principal@psgtech.ac.in
+echo    • HR-N4 Section:                   admin.n4@psgtech.ac.in  (Job profile entry and screening)
 echo    • HOD (CSE):               hod.cse@psgtech.ac.in   (Review CSE applicants)
 echo    • HOD (MCA):               hod.mca@psgtech.ac.in   (Review MCA applicants)
 echo    • HOD (EEE):               hod.eee@psgtech.ac.in   (Review EEE applicants)

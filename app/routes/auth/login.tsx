@@ -46,7 +46,7 @@ import { useState } from "react";
 
 const DEMO_PRESETS = [
   {
-    role: "Dean Administration (Admin)",
+    role: "Dr. S. Saravanan (Dean Administration)",
     email: "dean.admn@psgtech.ac.in",
     badge: "Admin",
     badgeColor: "bg-purple-100 text-purple-800 border-purple-200",

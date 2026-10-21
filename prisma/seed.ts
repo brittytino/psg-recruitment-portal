@@ -78,7 +78,7 @@ async function demo() {
   const users: { email: string; name: string; roles: { role: Role; departmentId?: string }[] }[] = [
     {
       email: "dean.admn@psgtech.ac.in",
-      name: "Dr. G. Chandramohan (Dean Administration)",
+      name: "Dr. S. Saravanan (Dean Administration)",
       roles: [{ role: "SUPER_ADMIN" }],
     },
     {
@@ -118,7 +118,13 @@ async function demo() {
   ];
   for (const u of users) {
     const existing = await prisma.user.findUnique({ where: { email: u.email } });
-    if (existing) continue;
+    if (existing) {
+      await prisma.profile.updateMany({
+        where: { userId: existing.id },
+        data: { fullName: u.name },
+      });
+      continue;
+    }
     await prisma.user.create({
       data: {
         email: u.email,

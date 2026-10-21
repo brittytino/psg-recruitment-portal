@@ -345,7 +345,7 @@ async function main() {
     // Super Admins — Highest Authority
     {
       email: "dean.admn@psgtech.ac.in",
-      name: "Dr. G. Chandramohan (Dean Administration)",
+      name: "Dr. S. Saravanan (Dean Administration)",
       roles: [{ role: "SUPER_ADMIN" }],
       category: "SUPER ADMIN",
       description:
@@ -481,6 +481,12 @@ async function main() {
           status: "ACTIVE",
           failedLoginCount: 0,
           lockedUntil: null,
+          profile: {
+            upsert: {
+              create: { fullName: acc.name, privacyVersion: "v1", privacyAcceptedAt: new Date() },
+              update: { fullName: acc.name },
+            },
+          },
         },
       });
 
