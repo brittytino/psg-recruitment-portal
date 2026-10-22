@@ -1,10 +1,15 @@
-import { useId, useRef } from "react";
+import { useEffect, useId, useMemo, useRef, useState } from "react";
+import { useParams } from "react-router";
+import { useCsrf } from "~/components/forms";
+import { DOCUMENT_TYPE_LABELS, type DocType } from "~/modules/documents/policy";
 import type {
   Answers,
   FieldDef,
   ListField,
   ScalarField,
   SectionDef,
+  SelectField,
+  TableAttachmentConfig,
   TableField,
   TableRow,
 } from "~/modules/forms/types";
@@ -20,12 +25,18 @@ export function SectionFields({
   derived,
   issues,
   onChange,
+  applicationId,
+  csrf,
+  maxUploadMb,
 }: {
   section: SectionDef;
   answers: Answers;
   derived: Record<string, string | number | null>;
   issues: FieldIssue[];
   onChange: (key: string, value: Answers[string]) => void;
+  applicationId?: string;
+  csrf?: string;
+  maxUploadMb?: number;
 }) {
   return (
     <div className="space-y-6">
@@ -37,6 +48,9 @@ export function SectionFields({
           derived={derived[f.key]}
           issues={issues}
           onChange={(v) => onChange(f.key, v)}
+          applicationId={applicationId}
+          csrf={csrf}
+          maxUploadMb={maxUploadMb}
         />
       ))}
     </div>
@@ -51,12 +65,18 @@ function FieldRenderer({
   derived,
   issues,
   onChange,
+  applicationId,
+  csrf,
+  maxUploadMb,
 }: {
   field: FieldDef;
   value: Answers[string] | undefined;
   derived: string | number | null | undefined;
   issues: FieldIssue[];
   onChange: (v: Answers[string]) => void;
+  applicationId?: string;
+  csrf?: string;
+  maxUploadMb?: number;
 }) {
   if (field.kind === "table")
     return (
@@ -65,6 +85,9 @@ function FieldRenderer({
         rows={Array.isArray(value) ? (value as TableRow[]) : []}
         issues={issues}
         onChange={onChange}
+        applicationId={applicationId}
+        csrf={csrf}
+        maxUploadMb={maxUploadMb}
       />
     );
   if (field.kind === "list")
@@ -118,7 +141,7 @@ export function ScalarInput({
     className: "field-input",
   };
   const str = value == null ? "" : String(value);
-  const set = (s: string) => onChange(s === "" ? null : s);
+  const set = (s: string | null) => onChange(s === "" || s == null ? null : s);
   let input: React.ReactNode;
   switch (field.kind) {
     case "derived":
@@ -166,13 +189,25 @@ export function ScalarInput({
           min={field.min}
           max={field.max}
           step={field.integer ? 1 : "any"}
+          placeholder={field.placeholder}
           value={str}
           onChange={(e) => onChange(e.target.value === "" ? null : Number(e.target.value))}
         />
       );
       break;
     case "select":
-      input = (
+      input = field.allowOther ? (
+        <SelectWithOther
+          field={field}
+          id={id}
+          path={path}
+          value={value}
+          common={common}
+          describedBy={describedBy}
+          error={error}
+          onChange={set}
+        />
+      ) : (
         <select {...common} value={str} onChange={(e) => set(e.target.value)}>
           <option value="">Select…</option>
           {field.options.map((o) => (
@@ -227,6 +262,137 @@ export function ScalarInput({
   );
 }
 
+function SelectWithOther({
+  field,
+  id,
+  path,
+  value,
+  common,
+  describedBy,
+  error,
+  onChange,
+}: {
+  field: SelectField;
+  id: string;
+  path: string;
+  value: string | number | null;
+  common: Record<string, unknown>;
+  describedBy?: string;
+  error?: string;
+  onChange: (v: string | null) => void;
+}) {
+  const otherVal = field.otherOptionValue ?? "Others";
+  const otherInputId = `${id}-other`;
+  const otherErrId = error ? `${otherInputId}-err` : undefined;
+
+  const rawStr = value == null ? "" : String(value);
+
+  // Check if rawStr matches an existing predefined option (case-insensitive for resilience)
+  const matchedOption = useMemo(() => {
+    if (!rawStr) return null;
+    return field.options.find((o) => o.value.toLowerCase() === rawStr.toLowerCase());
+  }, [field.options, rawStr]);
+
+  const isCustom = rawStr !== "" && (!matchedOption || matchedOption.value === otherVal);
+
+  const [isOtherSelected, setIsOtherSelected] = useState<boolean>(() => isCustom || rawStr === otherVal);
+  const [customText, setCustomText] = useState<string>(() => {
+    if (isCustom && rawStr !== otherVal) return rawStr;
+    return "";
+  });
+
+  const lastEmittedRef = useRef<string | null>(null);
+
+  useEffect(() => {
+    if (rawStr === lastEmittedRef.current) return;
+    if (!rawStr) {
+      setIsOtherSelected(false);
+      setCustomText("");
+      return;
+    }
+    const matched = field.options.find((o) => o.value.toLowerCase() === rawStr.toLowerCase());
+    if (matched && matched.value !== otherVal) {
+      setIsOtherSelected(false);
+      setCustomText("");
+    } else {
+      setIsOtherSelected(true);
+      setCustomText(rawStr === otherVal ? "" : rawStr);
+    }
+  }, [rawStr, field.options, otherVal]);
+
+  const handleSelectChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
+    const selected = e.target.value;
+    if (selected === otherVal) {
+      setIsOtherSelected(true);
+      const nextVal = customText.trim() === "" ? otherVal : customText.trim();
+      lastEmittedRef.current = nextVal;
+      onChange(nextVal);
+    } else if (selected === "") {
+      setIsOtherSelected(false);
+      setCustomText("");
+      lastEmittedRef.current = null;
+      onChange(null);
+    } else {
+      setIsOtherSelected(false);
+      setCustomText("");
+      lastEmittedRef.current = selected;
+      onChange(selected);
+    }
+  };
+
+  const handleCustomTextChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const val = e.target.value;
+    setCustomText(val);
+    const nextVal = val.trim() === "" ? otherVal : val;
+    lastEmittedRef.current = nextVal;
+    onChange(nextVal);
+  };
+
+  const selectValue = isOtherSelected ? otherVal : (matchedOption?.value ?? "");
+
+  return (
+    <div className="space-y-2">
+      <select {...common} value={selectValue} onChange={handleSelectChange}>
+        <option value="">Select…</option>
+        {field.options.map((o) => (
+          <option key={o.value} value={o.value}>
+            {o.label}
+          </option>
+        ))}
+      </select>
+      {isOtherSelected && (
+        <div className="mt-2 space-y-1.5 rounded-xl border border-line bg-soft/60 p-3.5 animate-in fade-in duration-200">
+          <label htmlFor={otherInputId} className="block text-xs font-semibold text-ink">
+            {field.otherLabel ?? `Please specify ${field.label.toLowerCase()}`}
+            {field.requirement === "required" && (
+              <span className="text-danger" aria-hidden="true">
+                {" "}
+                *
+              </span>
+            )}
+          </label>
+          <input
+            id={otherInputId}
+            name={`${path}_other`}
+            type="text"
+            className="field-input bg-white"
+            placeholder={field.otherPlaceholder ?? `Type your ${field.label.toLowerCase()} here`}
+            maxLength={field.otherMaxLength ?? 60}
+            value={customText}
+            onChange={handleCustomTextChange}
+            autoFocus={!customText}
+            aria-describedby={[describedBy, otherErrId].filter(Boolean).join(" ") || undefined}
+            aria-invalid={!!error}
+          />
+          <p className="text-xs text-muted">
+            If your {field.label.toLowerCase()} is not in the list above, type it in this field.
+          </p>
+        </div>
+      )}
+    </div>
+  );
+}
+
 function RemoveButton({ label, onConfirm }: { label: string; onConfirm: () => void }) {
   const ref = useRef<HTMLDialogElement>(null);
   const titleId = useId();
@@ -273,18 +439,62 @@ function TableEditor({
   rows,
   issues,
   onChange,
+  applicationId,
+  csrf,
+  maxUploadMb,
 }: {
   field: TableField;
   rows: TableRow[];
   issues: FieldIssue[];
   onChange: (v: TableRow[]) => void;
+  applicationId?: string;
+  csrf?: string;
+  maxUploadMb?: number;
 }) {
   const headingId = `t-${field.key}`;
   const tableError = issueFor(issues, field.key);
   const update = (i: number, key: string, v: string | number | null) =>
     onChange(rows.map((r, j) => (j === i ? { ...r, [key]: v } : r)));
-  const add = () => onChange([...rows, Object.fromEntries(field.columns.map((c) => [c.key, null]))]);
-  const remove = (i: number) => onChange(rows.filter((_, j) => j !== i));
+  const updateAttachment = (
+    i: number,
+    doc: { id: string; name: string; type: string } | null,
+  ) =>
+    onChange(
+      rows.map((r, j) =>
+        j === i
+          ? {
+              ...r,
+              documentId: doc ? doc.id : null,
+              documentName: doc ? doc.name : null,
+              documentType: doc ? doc.type : null,
+            }
+          : r,
+      ),
+    );
+  const add = () =>
+    onChange([
+      ...rows,
+      {
+        ...Object.fromEntries(field.columns.map((c) => [c.key, null])),
+        ...(field.attachment ? { documentId: null, documentName: null, documentType: null } : {}),
+      },
+    ]);
+  const rootCsrf = useCsrf();
+  const routeParams = useParams();
+  const effectiveAppId = applicationId ?? routeParams.id;
+  const effectiveCsrf = csrf || rootCsrf;
+
+  const remove = (i: number) => {
+    const rowToRemove = rows[i];
+    if (rowToRemove?.documentId && effectiveAppId && effectiveCsrf) {
+      const fd = new FormData();
+      fd.append("_csrf", effectiveCsrf);
+      fd.append("intent", "remove");
+      fd.append("documentId", String(rowToRemove.documentId));
+      fetch(`/applications/${effectiveAppId}/attachments`, { method: "POST", body: fd }).catch(() => {});
+    }
+    onChange(rows.filter((_, j) => j !== i));
+  };
   const move = (i: number, d: -1 | 1) => {
     const next = [...rows];
     const [r] = next.splice(i, 1);
@@ -353,6 +563,20 @@ function TableEditor({
                 />
               ))}
             </div>
+            {field.attachment && (
+              <InlineAttachmentEditor
+                config={field.attachment}
+                row={row}
+                rowIndex={i}
+                fieldKey={field.key}
+                error={issueFor(issues, `${field.key}.${i}.documentId`)}
+                applicationId={effectiveAppId}
+                csrf={effectiveCsrf}
+                maxUploadMb={maxUploadMb}
+                onAttached={(doc) => updateAttachment(i, doc)}
+                onRemoved={() => updateAttachment(i, null)}
+              />
+            )}
           </li>
         ))}
       </ol>
@@ -360,6 +584,228 @@ function TableEditor({
         Add entry to “{field.label}”
       </button>
     </fieldset>
+  );
+}
+
+function InlineAttachmentEditor({
+  config,
+  row,
+  rowIndex,
+  fieldKey,
+  error,
+  applicationId,
+  csrf,
+  maxUploadMb,
+  onAttached,
+  onRemoved,
+}: {
+  config: TableAttachmentConfig;
+  row: TableRow;
+  rowIndex: number;
+  fieldKey: string;
+  error?: string;
+  applicationId?: string;
+  csrf?: string;
+  maxUploadMb?: number;
+  onAttached: (doc: { id: string; name: string; type: string }) => void;
+  onRemoved: () => void;
+}) {
+  const rootCsrf = useCsrf();
+  const routeParams = useParams();
+  const effectiveAppId = applicationId ?? routeParams.id;
+  const effectiveCsrf = csrf || rootCsrf;
+
+  const [uploading, setUploading] = useState(false);
+  const [removing, setRemoving] = useState(false);
+  const [uploadError, setUploadError] = useState<string | null>(null);
+  const [selectedDocType, setSelectedDocType] = useState<DocType>(
+    config.docType ?? config.allowedDocTypes?.[0] ?? "DEGREE_CERTIFICATE",
+  );
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
+  const hasDoc = Boolean(row.documentId);
+  const docName = row.documentName ? String(row.documentName) : "Attached document";
+  const docId = row.documentId ? String(row.documentId) : null;
+
+  const handleUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    if (!effectiveAppId || !effectiveCsrf) {
+      setUploadError("Unable to upload document: session context is missing. Please reload the page.");
+      return;
+    }
+    const maxBytes = (maxUploadMb ?? 10) * 1024 * 1024;
+    if (file.size > maxBytes) {
+      setUploadError(`File is too large. Maximum allowed size is ${maxUploadMb ?? 10} MB.`);
+      if (fileInputRef.current) fileInputRef.current.value = "";
+      return;
+    }
+    setUploading(true);
+    setUploadError(null);
+    try {
+      const fd = new FormData();
+      fd.append("_csrf", effectiveCsrf);
+      fd.append("documentType", selectedDocType);
+      fd.append("file", file);
+      const res = await fetch(`/applications/${effectiveAppId}/attachments`, {
+        method: "POST",
+        body: fd,
+      });
+      const data = await res.json();
+      if (data.ok && data.document) {
+        onAttached(data.document);
+      } else {
+        setUploadError(data.formError || "Upload failed. Please check that the file is not damaged.");
+      }
+    } catch {
+      setUploadError("Could not connect to upload file. Please try again.");
+    } finally {
+      setUploading(false);
+      if (fileInputRef.current) fileInputRef.current.value = "";
+    }
+  };
+
+  const handleRemove = async () => {
+    if (!docId || !effectiveAppId || !effectiveCsrf) {
+      onRemoved();
+      return;
+    }
+    setRemoving(true);
+    setUploadError(null);
+    try {
+      const fd = new FormData();
+      fd.append("_csrf", effectiveCsrf);
+      fd.append("intent", "remove");
+      fd.append("documentId", docId);
+      await fetch(`/applications/${effectiveAppId}/attachments`, {
+        method: "POST",
+        body: fd,
+      });
+    } catch {
+      // Soft fail network error; detach locally
+    } finally {
+      setRemoving(false);
+      onRemoved();
+    }
+  };
+
+  const inputId = `file-${fieldKey}-${rowIndex}`;
+  const errId = `err-${fieldKey}-${rowIndex}`;
+
+  if (hasDoc && docId) {
+    return (
+      <div className="mt-4 rounded-xl border border-line bg-soft/70 p-3.5 sm:flex sm:items-center sm:justify-between gap-3">
+        <div className="flex items-center gap-3 min-w-0">
+          <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-brand-100 text-brand-800 font-bold text-xs">
+            DOC
+          </div>
+          <div className="min-w-0">
+            <p className="truncate text-sm font-semibold text-ink" title={docName}>
+              {docName}
+            </p>
+            <div className="flex flex-wrap items-center gap-2 text-xs text-muted">
+              <span className="inline-flex items-center gap-1 font-medium text-success">
+                <span className="h-1.5 w-1.5 rounded-full bg-success" />
+                Attached to Entry {rowIndex + 1}
+              </span>
+              <span>·</span>
+              <a
+                href={`/files/documents/${docId}`}
+                target="_blank"
+                rel="noreferrer"
+                className="font-medium text-brand-700 underline hover:text-brand-900"
+              >
+                View document
+              </a>
+            </div>
+          </div>
+        </div>
+        <div className="mt-2.5 sm:mt-0 shrink-0">
+          <button
+            type="button"
+            className="btn-secondary py-1 text-xs text-danger hover:bg-danger/10"
+            disabled={removing}
+            onClick={handleRemove}
+          >
+            {removing ? "Removing…" : "Remove / Replace file"}
+          </button>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div
+      className={`mt-4 rounded-xl border border-dashed p-4 transition-colors ${
+        error || uploadError ? "border-danger/60 bg-danger/5" : "border-line bg-soft/40"
+      }`}
+    >
+      <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3">
+        <div>
+          <label htmlFor={inputId} className="block text-sm font-semibold text-ink">
+            {config.label ?? "Supporting document / certificate"}
+            {config.required && (
+              <span className="text-danger" aria-hidden="true">
+                {" "}
+                *
+              </span>
+            )}
+          </label>
+          <p className="mt-0.5 text-xs text-muted">
+            {config.help ?? `Upload PDF, JPEG, or PNG up to ${maxUploadMb ?? 10} MB`}
+          </p>
+        </div>
+        {config.allowedDocTypes && config.allowedDocTypes.length > 1 && (
+          <div className="w-full sm:w-auto">
+            <select
+              value={selectedDocType}
+              onChange={(e) => setSelectedDocType(e.target.value as DocType)}
+              className="field-input py-1 text-xs"
+              aria-label="Document type for this certificate"
+            >
+              {config.allowedDocTypes.map((t) => (
+                <option key={t} value={t}>
+                  {DOCUMENT_TYPE_LABELS[t]}
+                </option>
+              ))}
+            </select>
+          </div>
+        )}
+      </div>
+
+      <div className="mt-3 flex flex-wrap items-center gap-3">
+        <input
+          ref={fileInputRef}
+          id={inputId}
+          name={`${fieldKey}_file_${rowIndex}`}
+          type="file"
+          accept=".pdf,.jpg,.jpeg,.png,application/pdf,image/jpeg,image/png"
+          onChange={handleUpload}
+          disabled={uploading}
+          className="text-xs file:mr-3 file:cursor-pointer file:rounded-xl file:border-0 file:bg-brand-50 file:px-3 file:py-1.5 file:text-xs file:font-semibold file:text-brand-700 hover:file:bg-brand-100"
+          aria-invalid={!!(error || uploadError)}
+          aria-describedby={[uploadError ? `${errId}-up` : undefined, error ? errId : undefined]
+            .filter(Boolean)
+            .join(" ") || undefined}
+        />
+        {uploading && (
+          <span className="text-xs text-brand-700 font-medium animate-pulse">
+            Uploading and inspecting document…
+          </span>
+        )}
+      </div>
+
+      {uploadError && (
+        <p id={`${errId}-up`} className="mt-2 text-xs font-medium text-danger" role="alert">
+          {uploadError}
+        </p>
+      )}
+      {error && !uploadError && (
+        <p id={errId} className="mt-2 text-xs font-medium text-danger" role="alert">
+          {error}
+        </p>
+      )}
+    </div>
   );
 }
 
@@ -437,12 +883,18 @@ export function AnswerView({ field, value }: { field: FieldDef; value: Answers[s
   const empty = <span className="text-muted">Not provided</span>;
   const fmt = (f: ScalarField, v: unknown) => {
     if (v == null || v === "") return null;
-    if (f.kind === "select") return f.options.find((o) => o.value === v)?.label ?? String(v);
+    if (f.kind === "select") {
+      const match = f.options.find((o) => o.value === v);
+      if (match) return match.label;
+      if (f.allowOther) return `Other: ${String(v)}`;
+      return String(v);
+    }
     return String(v);
   };
   if (field.kind === "table") {
     const rows = Array.isArray(value) ? (value as TableRow[]) : [];
     if (!rows.length) return empty;
+    const hasAttachments = field.attachment || rows.some((r) => r.documentId);
     return (
       <div className="overflow-x-auto">
         <table className="table">
@@ -455,6 +907,7 @@ export function AnswerView({ field, value }: { field: FieldDef; value: Answers[s
                   {c.label}
                 </th>
               ))}
+              {hasAttachments && <th scope="col">Certificate / Document</th>}
             </tr>
           </thead>
           <tbody>
@@ -464,6 +917,23 @@ export function AnswerView({ field, value }: { field: FieldDef; value: Answers[s
                 {field.columns.map((c) => (
                   <td key={c.key}>{fmt(c, r[c.key]) ?? "—"}</td>
                 ))}
+                {hasAttachments && (
+                  <td>
+                    {r.documentId ? (
+                      <a
+                        href={`/files/documents/${r.documentId}`}
+                        target="_blank"
+                        rel="noreferrer"
+                        className="inline-flex items-center gap-1.5 font-medium text-brand-700 underline hover:text-brand-900"
+                      >
+                        <span aria-hidden="true">📄</span>
+                        <span>{r.documentName ? String(r.documentName) : "Attached document"}</span>
+                      </a>
+                    ) : (
+                      <span className="text-xs text-muted">Not attached</span>
+                    )}
+                  </td>
+                )}
               </tr>
             ))}
           </tbody>

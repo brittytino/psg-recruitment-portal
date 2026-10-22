@@ -7,6 +7,8 @@
  * document (`npm run forms:inventory`).
  */
 
+import type { DocType } from "~/modules/documents/policy";
+
 export type FormCode = "ASSISTANT_PROFESSOR" | "ASSOCIATE_PROFESSOR";
 
 /** Requirement status. `policy` = awaiting institutional confirmation; treated as optional. */
@@ -17,6 +19,14 @@ export interface SourceRef {
   page: number;
   /** Exact label text as it appears in the source document. */
   label: string;
+}
+
+export interface TableAttachmentConfig {
+  required?: boolean;
+  label?: string;
+  docType?: DocType;
+  allowedDocTypes?: readonly DocType[];
+  help?: string;
 }
 
 interface BaseField {
@@ -55,11 +65,18 @@ export interface NumberField extends BaseField {
   min?: number;
   max?: number;
   integer?: boolean;
+  placeholder?: string;
 }
 
 export interface SelectField extends BaseField {
   kind: "select";
   options: { value: string; label: string }[];
+  /** When true, selecting an "other" option displays a text input allowing custom text. */
+  allowOther?: boolean;
+  otherOptionValue?: string;
+  otherLabel?: string;
+  otherPlaceholder?: string;
+  otherMaxLength?: number;
 }
 
 /** Read-only field whose value is derived (e.g. age from date of birth, department from vacancy). */
@@ -78,6 +95,7 @@ export interface TableField extends BaseField {
   templateRows: number;
   minRows?: number;
   maxRows: number;
+  attachment?: TableAttachmentConfig;
 }
 
 /** A list of free-text entries (e.g. journal papers written in blank lines of the source). */

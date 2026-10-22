@@ -5,7 +5,13 @@ import { handleAction, readForm, requireUser } from "~/lib/http.server";
 import { getOwnApplication } from "~/modules/applications/service.server";
 import { EDITABLE, type AppStatus } from "~/modules/applications/workflow";
 import { env } from "~/modules/core/env.server";
-import { DOCUMENT_TYPES, DOCUMENT_TYPE_LABELS, type DocType } from "~/modules/documents/policy";
+import { ValidationError } from "~/modules/core/errors";
+import {
+  DOCUMENT_TYPE_LABELS,
+  INLINE_ENTRY_DOC_TYPES,
+  STANDALONE_DOCUMENT_TYPES,
+  type DocType,
+} from "~/modules/documents/policy";
 import { removeDocument, uploadDocument } from "~/modules/documents/service.server";
 
 export const meta: Route.MetaFunction = () => [{ title: "Documents — PSG Tech Recruitment" }];
@@ -50,8 +56,14 @@ export async function action({ request, params, context }: Route.ActionArgs) {
       await removeDocument(user, params.id, String(form.get("documentId")));
       return { message: "The document was removed." };
     }
+    const docType = form.get("documentType");
+    if (docType && (INLINE_ENTRY_DOC_TYPES as readonly string[]).includes(String(docType))) {
+      throw new ValidationError(
+        "Qualification and experience certificates must be uploaded directly with their respective entries in the application form.",
+      );
+    }
     const file = form.get("file");
-    await uploadDocument(user, params.id, form.get("documentType"), file instanceof File ? file : null);
+    await uploadDocument(user, params.id, docType, file instanceof File ? file : null);
     return { message: "The document was uploaded. It will be scanned for malware shortly." };
   });
 }
@@ -60,9 +72,12 @@ export default function Documents({ loaderData, actionData }: Route.ComponentPro
   const { id, title, required, documents, maxMb } = loaderData;
   const nav = useNavigation();
   const uploading = nav.state === "submitting" && nav.formEncType === "multipart/form-data";
+  const standaloneRequired = required.filter(
+    (r) => !(INLINE_ENTRY_DOC_TYPES as readonly string[]).includes(r.type),
+  );
   const checklist: { type: DocType; label: string; required: boolean }[] = [
     { type: "PHOTOGRAPH", label: DOCUMENT_TYPE_LABELS.PHOTOGRAPH, required: true },
-    ...required,
+    ...standaloneRequired,
   ];
   return (
     <div className="space-y-6">
@@ -77,6 +92,12 @@ export default function Documents({ loaderData, actionData }: Route.ComponentPro
       {actionData && "formError" in actionData && actionData.formError && (
         <Alert tone="danger">{actionData.formError}</Alert>
       )}
+
+      <div className="rounded-2xl border border-line bg-soft/70 p-4 text-sm text-muted">
+        <span className="font-semibold text-ink">Qualification &amp; experience certificates:</span> Supporting
+        documents for academic qualifications (degree certificates, mark sheets) and employment experience
+        testimonials are attached directly to each entry in the respective sections of your form.
+      </div>
 
       <section className="card" aria-labelledby="checklist">
         <h2 id="checklist">Checklist</h2>
@@ -119,7 +140,7 @@ export default function Documents({ loaderData, actionData }: Route.ComponentPro
               Document type
             </label>
             <select id="documentType" name="documentType" required className="field-input mt-1">
-              {DOCUMENT_TYPES.map((t) => (
+              {STANDALONE_DOCUMENT_TYPES.map((t) => (
                 <option key={t} value={t}>
                   {DOCUMENT_TYPE_LABELS[t]}
                 </option>
