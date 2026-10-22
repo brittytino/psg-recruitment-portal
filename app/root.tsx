@@ -191,9 +191,9 @@ function Header() {
     .toUpperCase();
 
   const staffNavActive =
-    "inline-flex items-center gap-2 rounded-xl px-3.5 py-1.5 text-xs font-bold text-brand-950 bg-white border border-slate-200/90 shadow-xs no-underline transition-all duration-150";
+    "inline-flex items-center gap-2 whitespace-nowrap rounded-xl px-3 py-1.5 text-xs font-bold text-brand-950 bg-white border border-slate-200/90 shadow-xs no-underline transition-all duration-150";
   const staffNavInactive =
-    "inline-flex items-center gap-2 rounded-xl px-3.5 py-1.5 text-xs font-semibold text-slate-600 hover:text-slate-900 hover:bg-white/60 transition-all duration-150 no-underline";
+    "inline-flex items-center gap-2 whitespace-nowrap rounded-xl px-3 py-1.5 text-xs font-semibold text-slate-600 hover:text-slate-900 hover:bg-white/60 transition-all duration-150 no-underline";
 
   const publicNavActive =
     "rounded-full px-4 py-1.5 text-sm font-bold text-white bg-slate-900 shadow-xs no-underline transition-colors";
@@ -256,7 +256,7 @@ function Header() {
           {staff && (
             <Link
               to="/vacancies"
-              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-semibold text-slate-500 hover:text-slate-900 hover:bg-slate-100 transition-colors border border-transparent hover:border-slate-200"
+              className="hidden 2xl:inline-flex items-center gap-1.5 whitespace-nowrap px-3 py-1.5 rounded-full text-xs font-semibold text-slate-500 hover:text-slate-900 hover:bg-slate-100 transition-colors border border-transparent hover:border-slate-200"
               title="Preview public candidate vacancies page"
             >
               <span>Public Portal</span>
