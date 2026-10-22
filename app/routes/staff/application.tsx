@@ -109,7 +109,9 @@ export async function loader({ request, params, context }: Route.LoaderArgs) {
     isHr,
     canDownload: hasPermission(user.grants, "document:download"),
     canRegenerate: isHr && hasPermission(user.grants, "document:regenerate"),
-    canReviewDept: (!!myAssignment || hasPermission(user.grants, "review:record")) && app.status === "UNDER_DEPARTMENT_REVIEW",
+    canReviewDept:
+      (!!myAssignment || hasPermission(user.grants, "review:record")) &&
+      app.status === "UNDER_DEPARTMENT_REVIEW",
     canReviewHr: isHr && app.status === "UNDER_HR_REVIEW",
     reviewers: isHr ? await eligibleReviewers(app.vacancy.departmentId) : [],
   };

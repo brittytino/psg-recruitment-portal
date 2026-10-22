@@ -1,4 +1,5 @@
 import { date, derived, list, monthYear, num, select, table, text, textarea } from "../builders";
+import { INDIAN_RELIGIONS } from "../religions";
 import type { FormDefinition, ScalarField } from "../types";
 
 const titleYear = (page: number): ScalarField[] => [
@@ -68,10 +69,19 @@ export const associateProfessorV1: FormDefinition = {
         }),
         date("dateOfBirth", "Date of birth", 1, "DATE OF BIRTH, AGE & GENDER", { requirement: "required" }),
         derived("age", "Age", 1, "DATE OF BIRTH, AGE & GENDER", "dateOfBirth"),
-        text("gender", "Gender", 1, "DATE OF BIRTH, AGE & GENDER", {
-          requirement: "required",
-          maxLength: 30,
-        }),
+        select(
+          "gender",
+          "Gender",
+          1,
+          "DATE OF BIRTH, AGE & GENDER",
+          [
+            { value: "M", label: "M" },
+            { value: "F", label: "F" },
+          ],
+          {
+            requirement: "required",
+          },
+        ),
         textarea("qualificationsSummary", "Qualifications", 1, "QUALIFICATIONS", {
           requirement: "required",
           maxLength: 300,
@@ -100,7 +110,14 @@ export const associateProfessorV1: FormDefinition = {
           maxLength: 200,
           pattern: { regex: "^[^\\s@]+@[^\\s@]+\\.[^\\s@]+$", message: "Enter a valid e-mail address" },
         }),
-        text("religion", "Religion", 1, "RELIGION", { requirement: "policy", maxLength: 60 }),
+        select("religion", "Religion", 1, "RELIGION", [...INDIAN_RELIGIONS], {
+          requirement: "policy",
+          allowOther: true,
+          otherOptionValue: "Others",
+          otherLabel: "Please specify your religion",
+          otherPlaceholder: "Enter your religion",
+          otherMaxLength: 60,
+        }),
         text("caste", "Community / caste", 1, "COMMUNITY | CASTE", { requirement: "policy", maxLength: 100 }),
         select(
           "communityCategory",
@@ -215,7 +232,17 @@ export const associateProfessorV1: FormDefinition = {
             num("months", "Mon", 2, "MON", { integer: true, max: 11 }),
             text("reasonForLeaving", "Reason for leaving", 2, "REASON FOR LEAVING", { maxLength: 300 }),
           ],
-          { templateRows: 5, maxRows: 40 },
+          {
+            templateRows: 5,
+            maxRows: 40,
+            attachment: {
+              required: true,
+              label: "Experience / Service certificate",
+              docType: "EXPERIENCE_CERTIFICATE",
+              allowedDocTypes: ["EXPERIENCE_CERTIFICATE"],
+              help: "Upload experience certificate, relieving order or service testimonial (PDF, JPEG, or PNG up to 10 MB).",
+            },
+          },
         ),
       ],
     },
@@ -251,10 +278,29 @@ export const associateProfessorV1: FormDefinition = {
             text("college", "College", 2, "COLLEGE", { requirement: "required", maxLength: 200 }),
             text("university", "University", 2, "UNIVERSITY", { requirement: "required", maxLength: 200 }),
             text("classPercent", "Class & % of marks", 2, "CLASS  &  % OF MARKS", { maxLength: 60 }),
+            num("attempts", "No. of attempts", 2, "NO. OF ATTEMPTS", {
+              requirement: "required",
+              min: 1,
+              max: 99,
+              integer: true,
+              placeholder: "e.g. 1",
+            }),
             text("thesis", "Thesis", 2, "THESIS", { maxLength: 400 }),
             text("specialisation", "Specialisation", 2, "SPECIALISATION", { maxLength: 200 }),
           ],
-          { templateRows: 4, minRows: 1, maxRows: 4, requirement: "required" },
+          {
+            templateRows: 4,
+            minRows: 1,
+            maxRows: 4,
+            requirement: "required",
+            attachment: {
+              required: true,
+              label: "Degree / Provisional certificate",
+              docType: "DEGREE_CERTIFICATE",
+              allowedDocTypes: ["DEGREE_CERTIFICATE", "PHD_CERTIFICATE", "MARK_SHEET"],
+              help: "Upload attested degree certificate, provisional certificate or mark sheet (PDF, JPEG, or PNG up to 10 MB).",
+            },
+          },
         ),
       ],
     },

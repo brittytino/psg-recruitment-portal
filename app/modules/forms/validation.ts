@@ -55,8 +55,20 @@ export function checkScalar(
       if (f.max !== undefined && n > f.max) return `${f.label} must be at most ${f.max}`;
       return null;
     }
-    case "select":
+    case "select": {
+      if (f.allowOther) {
+        if (typeof v !== "string") return `${f.label} must be text`;
+        const otherVal = f.otherOptionValue ?? "Others";
+        if (v === otherVal) {
+          return mode === "submit" ? `Please specify your ${f.label.toLowerCase()}` : null;
+        }
+        if (f.otherMaxLength && v.length > f.otherMaxLength) {
+          return `${f.label} must be at most ${f.otherMaxLength} characters`;
+        }
+        return null;
+      }
       return f.options.some((o) => o.value === v) ? null : `${f.label} has an invalid choice`;
+    }
   }
 }
 
@@ -104,8 +116,22 @@ function checkField(
       const msg = checkScalar(c, r[c.key], mode, isRequired(c));
       if (msg) push(`${f.key}.${i}.${c.key}`, `Row ${i + 1}: ${msg}`);
     }
+    const allowedKeys = new Set([
+      ...f.columns.map((c) => c.key),
+      ...(f.attachment ? ["documentId", "documentName", "documentType"] : []),
+    ]);
     for (const k of Object.keys(r))
-      if (!f.columns.some((c) => c.key === k)) push(`${f.key}.${i}.${k}`, `Row ${i + 1}: unknown column`);
+      if (!allowedKeys.has(k)) push(`${f.key}.${i}.${k}`, `Row ${i + 1}: unknown column`);
+
+    if (mode === "submit" && f.attachment?.required) {
+      const docId = r.documentId;
+      if (!docId || typeof docId !== "string" || !docId.trim()) {
+        push(
+          `${f.key}.${i}.documentId`,
+          `Row ${i + 1}: Please upload the required ${f.attachment.label ?? "supporting document"}`,
+        );
+      }
+    }
   });
 }
 

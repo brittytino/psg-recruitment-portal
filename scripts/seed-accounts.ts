@@ -3,7 +3,61 @@ import { readFileSync, existsSync } from "node:fs";
 import { PrismaClient, type Role, type Position } from "@prisma/client";
 import { hash } from "@node-rs/argon2";
 
-const prisma = new PrismaClient();
+function loadEnv() {
+  if (!existsSync(".env")) return;
+  try {
+    const content = readFileSync(".env", "utf-8");
+    for (const line of content.split(/\r?\n/)) {
+      const trimmed = line.trim();
+      if (!trimmed || trimmed.startsWith("#")) continue;
+      const eqIdx = trimmed.indexOf("=");
+      if (eqIdx !== -1) {
+        const key = trimmed.slice(0, eqIdx).trim();
+        let val = trimmed.slice(eqIdx + 1).trim();
+        if ((val.startsWith('"') && val.endsWith('"')) || (val.startsWith("'") && val.endsWith("'"))) {
+          val = val.slice(1, -1);
+        }
+        if (!process.env[key]) {
+          process.env[key] = val;
+        }
+      }
+    }
+  } catch {
+    // ignore
+  }
+}
+
+loadEnv();
+
+function resolveDatabaseUrl(): string {
+  const user = process.env.POSTGRES_USER || "srp_owner";
+  const pass = process.env.POSTGRES_PASSWORD || "PsgTech_DbOwner_2026!";
+  const db = process.env.POSTGRES_DB || "srportal";
+  const hostPort = process.env.POSTGRES_HOST_PORT || "65432";
+  const encodedPass = encodeURIComponent(pass);
+  const hostUrl = `postgresql://${encodeURIComponent(user)}:${encodedPass}@localhost:${hostPort}/${db}?schema=public`;
+
+  let url = process.env.DATABASE_URL;
+
+  // Detect corrupted or container-internal URLs:
+  // 1. Corrupted by batch delayed expansion (missing '@' or missing host/port)
+  // 2. Pointing to docker-internal hostname 'db:5432' when running on host
+  if (!url || !url.includes("@") || url.includes("@db:") || url.includes("@db/")) {
+    url = hostUrl;
+  }
+
+  process.env.DATABASE_URL = url;
+  return url;
+}
+
+const dbUrl = resolveDatabaseUrl();
+const prisma = new PrismaClient({
+  datasources: {
+    db: {
+      url: dbUrl,
+    },
+  },
+});
 const PASSWORD = process.env.SEED_DEMO_PASSWORD || "Demo@12345";
 
 function canonicalJson(v: unknown): string {
@@ -574,6 +628,7 @@ async function main() {
           institution: "Government College of Technology, Coimbatore",
           classOrMarks: "First Class with Distinction / 86%",
           monthYearOfPassing: "2010-05",
+          attempts: 1,
         },
         {
           degree: "M.E. Computer Science and Engineering",
@@ -581,6 +636,7 @@ async function main() {
           institution: "PSG College of Technology, Coimbatore",
           classOrMarks: "First Class with Distinction / 89%",
           monthYearOfPassing: "2012-06",
+          attempts: 1,
         },
         {
           degree: "Ph.D. in Computer Science and Engineering",
@@ -588,6 +644,7 @@ async function main() {
           institution: "PSG College of Technology (Autonomous)",
           classOrMarks: "Highly Commended",
           monthYearOfPassing: "2019-11",
+          attempts: 1,
         },
       ],
       experience: [
@@ -779,6 +836,7 @@ async function main() {
             institution: "PSG College of Technology",
             classOrMarks: "First Class / 84%",
             monthYearOfPassing: "2013-05",
+            attempts: 1,
           },
           {
             degree: "M.Tech. Data Science",
@@ -786,6 +844,7 @@ async function main() {
             institution: "PSG College of Technology",
             classOrMarks: "First Class with Distinction / 91%",
             monthYearOfPassing: "2015-06",
+            attempts: 1,
           },
           {
             degree: "Ph.D. in Information and Communication Engineering",
@@ -793,6 +852,7 @@ async function main() {
             institution: "Anna University Regional Campus, Coimbatore",
             classOrMarks: "Commended",
             monthYearOfPassing: "2022-04",
+            attempts: 1,
           },
         ],
         experience: [

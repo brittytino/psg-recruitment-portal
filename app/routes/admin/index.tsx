@@ -67,7 +67,8 @@ export default function AdminIndex({ loaderData, actionData }: Route.ComponentPr
             Job Profiles & Recruitment Administration
           </h1>
           <p className="mt-2 text-base text-muted">
-            Job profile entry, recruitment cycles, academic departments, official templates, and vacancy configurations.
+            Job profile entry, recruitment cycles, academic departments, official templates, and vacancy
+            configurations.
           </p>
         </div>
         <div className="flex flex-wrap items-center gap-2">

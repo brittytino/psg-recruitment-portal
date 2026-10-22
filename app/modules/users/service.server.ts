@@ -12,8 +12,7 @@ import { notify } from "~/modules/notifications/outbox.server";
 
 /** Which roles the acting user may grant or revoke. */
 export function grantableRoles(user: SessionUser): RoleName[] {
-  if (hasPermission(user.grants, "user:manage"))
-    return ["SUPER_ADMIN", "HR_OFFICER", "DEPARTMENT_REVIEWER"];
+  if (hasPermission(user.grants, "user:manage")) return ["SUPER_ADMIN", "HR_OFFICER", "DEPARTMENT_REVIEWER"];
   if (hasPermission(user.grants, "recruitment:manage")) return ["DEPARTMENT_REVIEWER"];
   return [];
 }

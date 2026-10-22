@@ -17,6 +17,25 @@ export const DOCUMENT_TYPES = [
 ] as const;
 export type DocType = (typeof DOCUMENT_TYPES)[number];
 
+export const QUALIFICATION_DOC_TYPES: readonly DocType[] = [
+  "DEGREE_CERTIFICATE",
+  "MARK_SHEET",
+  "PHD_CERTIFICATE",
+];
+
+export const EXPERIENCE_DOC_TYPES: readonly DocType[] = [
+  "EXPERIENCE_CERTIFICATE",
+];
+
+export const INLINE_ENTRY_DOC_TYPES: readonly DocType[] = [
+  ...QUALIFICATION_DOC_TYPES,
+  ...EXPERIENCE_DOC_TYPES,
+];
+
+export const STANDALONE_DOCUMENT_TYPES: readonly DocType[] = DOCUMENT_TYPES.filter(
+  (t) => !INLINE_ENTRY_DOC_TYPES.includes(t),
+);
+
 export const DOCUMENT_TYPE_LABELS: Record<DocType, string> = {
   PHOTOGRAPH: "Passport size photograph",
   DEGREE_CERTIFICATE: "Degree certificates (attested copies)",

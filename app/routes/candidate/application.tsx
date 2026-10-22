@@ -16,7 +16,9 @@ import { handleAction, readForm, requireUser } from "~/lib/http.server";
 import { FORM_LABELS } from "~/lib/labels";
 import { getOwnApplication, saveDraft } from "~/modules/applications/service.server";
 import { EDITABLE, STATUS_LABELS, type AppStatus } from "~/modules/applications/workflow";
+import { env } from "~/modules/core/env.server";
 import { ValidationError } from "~/modules/core/errors";
+import { removeDocument, uploadDocument } from "~/modules/documents/service.server";
 import { getFormDefinition } from "~/modules/forms/registry";
 import type { Answers, FormCode } from "~/modules/forms/types";
 import { ageOn, validateAnswers, type FieldIssue } from "~/modules/forms/validation";
@@ -47,6 +49,7 @@ export async function loader({ request, params, context }: Route.LoaderArgs) {
     lastSavedAt: app.lastSavedAt,
     hasPhoto: app.documents.some((d) => d.documentType === "PHOTOGRAPH"),
     clarification,
+    maxMb: env().MAX_UPLOAD_MB,
   };
 }
 
@@ -65,6 +68,39 @@ export async function action({ request, params, context }: Route.ActionArgs) {
   const user = requireUser(context, request);
   const form = await readForm(request, context);
   return handleAction(async () => {
+    const intent = form.get("intent");
+    if (intent === "upload_entry_document") {
+      const file = form.get("file");
+      const docType = form.get("documentType");
+      const doc = await uploadDocument(
+        user,
+        params.id,
+        docType,
+        file instanceof File ? file : null,
+      );
+      return data({
+        ok: true as const,
+        action: "upload" as const,
+        document: {
+          id: doc.id,
+          type: doc.documentType,
+          name: doc.originalName,
+          size: doc.sizeBytes,
+        },
+      });
+    }
+    if (intent === "remove_entry_document") {
+      const documentId = String(form.get("documentId") ?? "");
+      if (documentId) {
+        await removeDocument(user, params.id, documentId);
+      }
+      return data({
+        ok: true as const,
+        action: "remove" as const,
+        documentId,
+      });
+    }
+
     let answers: unknown;
     try {
       answers = JSON.parse(String(form.get("answers") ?? "{}"));
@@ -300,6 +336,9 @@ export default function ApplicationEditor({ loaderData }: Route.ComponentProps) 
             derived={derived}
             issues={sectionIssues}
             onChange={onChange}
+            applicationId={L.id}
+            csrf={csrf}
+            maxUploadMb={L.maxMb}
           />
 
           <div className="flex flex-wrap items-center justify-between gap-3 border-t border-line pt-4">

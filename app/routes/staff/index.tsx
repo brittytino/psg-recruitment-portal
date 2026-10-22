@@ -99,10 +99,10 @@ export default function StaffIndex({ loaderData }: Route.ComponentProps) {
               {isAdm
                 ? "PSG Tech Institutional Administration"
                 : isHr
-                ? "HR-N4 Section Recruitment Workspace"
-                : isHod
-                ? "Department Review Queue"
-                : "Recruitment Workspace"}
+                  ? "HR-N4 Section Recruitment Workspace"
+                  : isHod
+                    ? "Department Review Queue"
+                    : "Recruitment Workspace"}
             </p>
             <Badge tone={roleBadge.tone}>{roleBadge.label}</Badge>
           </div>
@@ -113,8 +113,8 @@ export default function StaffIndex({ loaderData }: Route.ComponentProps) {
             {isHod
               ? "Review candidates, qualifications, and provide academic evaluations for your department."
               : isHr
-              ? "Screen applicants, assign HOD reviewers, manage job profiles, and download complete dossiers."
-              : "Institutional oversight of all faculty vacancies, applicant screening queues, and candidate dossiers."}
+                ? "Screen applicants, assign HOD reviewers, manage job profiles, and download complete dossiers."
+                : "Institutional oversight of all faculty vacancies, applicant screening queues, and candidate dossiers."}
           </p>
         </div>
         <div className="flex flex-wrap items-center gap-2">

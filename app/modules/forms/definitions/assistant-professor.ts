@@ -1,4 +1,5 @@
 import { date, derived, monthYear, num, select, table, text, textarea } from "../builders";
+import { INDIAN_RELIGIONS } from "../religions";
 import type { FormDefinition } from "../types";
 
 /**
@@ -80,7 +81,6 @@ export const assistantProfessorV1: FormDefinition = {
           ],
           {
             requirement: "required",
-            help: "Options as printed on the official form (M/F). Awaiting policy review.",
           },
         ),
         text("placeOfBirth", "Place of birth", 1, "4.  Place of Birth", {
@@ -97,7 +97,14 @@ export const assistantProfessorV1: FormDefinition = {
           requirement: "required",
           maxLength: 60,
         }),
-        text("religion", "Religion", 1, "Nationality & Religion", { requirement: "policy", maxLength: 60 }),
+        select("religion", "Religion", 1, "Nationality & Religion", [...INDIAN_RELIGIONS], {
+          requirement: "policy",
+          allowOther: true,
+          otherOptionValue: "Others",
+          otherLabel: "Please specify your religion",
+          otherPlaceholder: "Enter your religion",
+          otherMaxLength: 60,
+        }),
         select(
           "community",
           "Community",
@@ -145,8 +152,27 @@ export const assistantProfessorV1: FormDefinition = {
             monthYear("monthYearOfPassing", "Month & Year of Passing", 1, "Month & Year of  Passing", {
               requirement: "required",
             }),
+            num("attempts", "No. of attempts", 1, "No. of attempts", {
+              requirement: "required",
+              min: 1,
+              max: 99,
+              integer: true,
+              placeholder: "e.g. 1",
+            }),
           ],
-          { templateRows: 5, minRows: 1, maxRows: 20, requirement: "required" },
+          {
+            templateRows: 5,
+            minRows: 1,
+            maxRows: 20,
+            requirement: "required",
+            attachment: {
+              required: true,
+              label: "Degree certificate / Mark sheet",
+              docType: "DEGREE_CERTIFICATE",
+              allowedDocTypes: ["DEGREE_CERTIFICATE", "MARK_SHEET", "PHD_CERTIFICATE"],
+              help: "Upload attested degree certificate, provisional certificate or mark sheet (PDF, JPEG, or PNG up to 10 MB).",
+            },
+          },
         ),
         text("specialisation", "Specialisation", 1, "Specialisation", {
           requirement: "required",
@@ -188,7 +214,17 @@ export const assistantProfessorV1: FormDefinition = {
               { requirement: "required" },
             ),
           ],
-          { templateRows: 4, maxRows: 40 },
+          {
+            templateRows: 4,
+            maxRows: 40,
+            attachment: {
+              required: true,
+              label: "Experience certificate / Testimonial",
+              docType: "EXPERIENCE_CERTIFICATE",
+              allowedDocTypes: ["EXPERIENCE_CERTIFICATE"],
+              help: "Upload experience certificate, relieving order or service testimonial (PDF, JPEG, or PNG up to 10 MB).",
+            },
+          },
         ),
       ],
     },

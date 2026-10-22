@@ -71,7 +71,14 @@ describe.each([
         (v as Record<string, unknown>[]).forEach((r) =>
           f.columns.forEach((c) => {
             const cv = r[c.key];
-            if (cv == null || cv === "" || c.kind === "date" || c.kind === "monthYear" || c.key === "level")
+            if (
+              cv == null ||
+              cv === "" ||
+              c.kind === "date" ||
+              c.kind === "monthYear" ||
+              c.key === "level" ||
+              c.key === "attempts"
+            )
               return;
             if (!has(String(cv))) missing.push(`${f.key}.${c.key}: ${String(cv)}`);
           }),

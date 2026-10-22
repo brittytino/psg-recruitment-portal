@@ -20,6 +20,7 @@ export default [
   route("account", "routes/candidate/account.tsx"),
   route("apply/:code", "routes/candidate/apply.tsx"),
   route("applications/:id", "routes/candidate/application.tsx"),
+  route("applications/:id/attachments", "routes/candidate/attachments.ts"),
   route("applications/:id/documents", "routes/candidate/documents.tsx"),
   route("applications/:id/review", "routes/candidate/review.tsx"),
   route("applications/:id/receipt", "routes/candidate/receipt.tsx"),

@@ -9,6 +9,7 @@ import { ConflictError, ForbiddenError, NotFoundError, ValidationError } from "~
 import { getFormDefinition } from "~/modules/forms/registry";
 import type { Answers, FormCode, TableRow } from "~/modules/forms/types";
 import { stripDerived, validateAnswers, withDerived, type FieldIssue } from "~/modules/forms/validation";
+import { INLINE_ENTRY_DOC_TYPES } from "~/modules/documents/policy";
 import { enqueueOutbox, notify } from "~/modules/notifications/outbox.server";
 import { EDITABLE, findTransition, STATUS_LABELS, type AppStatus } from "./workflow";
 
@@ -184,9 +185,11 @@ export async function submissionIssues(
   const active = app.documents.filter((d) => !d.removedAt);
   if (!active.some((d) => d.documentType === "PHOTOGRAPH"))
     documents.push("Passport size photograph is required (it is printed on the application form)");
-  for (const r of app.vacancy.requiredDocuments)
+  for (const r of app.vacancy.requiredDocuments) {
+    if ((INLINE_ENTRY_DOC_TYPES as readonly string[]).includes(r.documentType)) continue;
     if (r.required && !active.some((d) => d.documentType === r.documentType))
       documents.push(`${r.label} is required`);
+  }
   for (const d of active)
     if (d.scanStatus === "INFECTED")
       documents.push(`"${d.originalName}" failed the malware scan. Remove it and upload a clean copy.`);
@@ -196,6 +199,7 @@ export async function submissionIssues(
 function extractQualifications(code: FormCode, a: Answers) {
   const rows = (k: string) => (Array.isArray(a[k]) ? (a[k] as TableRow[]) : []);
   const s = (v: unknown) => (v == null || v === "" ? null : String(v));
+  const numVal = (v: unknown) => (v == null || v === "" ? 1 : Number(v) || 1);
   if (code === "ASSISTANT_PROFESSOR")
     return rows("academicQualifications").map((r, i) => ({
       sortOrder: i,
@@ -204,6 +208,7 @@ function extractQualifications(code: FormCode, a: Answers) {
       university: s(r.university),
       institution: s(r.institution),
       passedOn: s(r.monthYearOfPassing),
+      attempts: numVal(r.attempts),
     }));
   return rows("educationalQualifications").map((r, i) => ({
     sortOrder: i,
@@ -212,6 +217,7 @@ function extractQualifications(code: FormCode, a: Answers) {
     university: s(r.university),
     institution: s(r.college),
     passedOn: s(r.monthYear),
+    attempts: numVal(r.attempts),
   }));
 }
 

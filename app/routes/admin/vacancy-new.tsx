@@ -4,7 +4,7 @@ import { Alert, CsrfInput, ErrorSummary, TextInput } from "~/components/forms";
 import { handleAction, readForm, requireStaff } from "~/lib/http.server";
 import { POSITION_LABELS } from "~/lib/labels";
 import { prisma } from "~/modules/core/db.server";
-import { DOCUMENT_TYPES, DOCUMENT_TYPE_LABELS } from "~/modules/documents/policy";
+import { DOCUMENT_TYPE_LABELS, STANDALONE_DOCUMENT_TYPES } from "~/modules/documents/policy";
 import { createVacancy } from "~/modules/recruitment/service.server";
 
 export const meta: Route.MetaFunction = () => [{ title: "Create vacancy — Administration" }];
@@ -159,7 +159,7 @@ export default function VacancyNew({ loaderData, actionData }: Route.ComponentPr
             The passport photograph is always required (it is printed on the form).
           </p>
           <div className="mt-2 grid gap-1 sm:grid-cols-2">
-            {DOCUMENT_TYPES.filter((t) => t !== "PHOTOGRAPH").map((t) => (
+            {STANDALONE_DOCUMENT_TYPES.filter((t) => t !== "PHOTOGRAPH").map((t) => (
               <label key={t} className="flex items-center gap-2 text-sm">
                 <input type="checkbox" name="requiredDocuments" value={t} className="h-4 w-4" />{" "}
                 {DOCUMENT_TYPE_LABELS[t]}

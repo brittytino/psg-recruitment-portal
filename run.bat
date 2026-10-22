@@ -188,10 +188,12 @@ echo ===========================================================================
 echo Synchronizing demo accounts via host...
 echo.
 
-set "DATABASE_URL=postgresql://srp_owner:PsgTech_DbOwner_2026!@localhost:65432/srportal?schema=public"
+setlocal DisableDelayedExpansion
+set "DATABASE_URL=postgresql://srp_owner:PsgTech_DbOwner_2026%%21@localhost:65432/srportal?schema=public"
 set "SEED_DEMO_PASSWORD=Demo@12345"
 cmd /c "npx tsx scripts/seed-accounts.ts"
 set "SEED_EXIT_CODE=%errorlevel%"
+endlocal & set "SEED_EXIT_CODE=%SEED_EXIT_CODE%"
 
 echo.
 if "%SEED_EXIT_CODE%"=="0" (
@@ -208,7 +210,7 @@ goto interactive_loop
 
 :do_studio
 echo Starting Prisma Studio on host...
-start "Prisma Studio" cmd /k "npx prisma studio --port 5555"
+start "Prisma Studio" cmd /k "set \"DATABASE_URL=postgresql://srp_owner:PsgTech_DbOwner_2026%%21@localhost:65432/srportal?schema=public\" && npx prisma studio --port 5555"
 goto interactive_loop
 
 :do_logs

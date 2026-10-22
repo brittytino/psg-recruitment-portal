@@ -22,7 +22,6 @@ import {
   LogIn,
   LogOut,
   Menu,
-  Settings,
   ShieldCheck,
   UserPlus,
   Users,
@@ -32,7 +31,6 @@ import type { Route } from "./+types/root";
 import "./app.css";
 import { nonceContext, userContext } from "./context";
 import {
-  getPrimaryRoleBadge,
   hasPermission,
   isAdmin,
   isHodReviewer,
@@ -154,8 +152,7 @@ function Header() {
 
   // Clean full name removing parenthetical role repetitions
   const rawName = user?.displayName ?? "";
-  const cleanDisplayName =
-    rawName.replace(/\s*\([^)]*\)\s*/g, "").trim() || rawName || "Staff Member";
+  const cleanDisplayName = rawName.replace(/\s*\([^)]*\)\s*/g, "").trim() || rawName || "Staff Member";
 
   // Clean institutional role label for header pill
   const roleLabel = (() => {
@@ -209,9 +206,7 @@ function Header() {
                 className={({ isActive }) => (isActive ? staffNavActive : staffNavInactive)}
               >
                 <LayoutDashboard className="h-4 w-4 text-brand-600" />
-                <span>
-                  {isHod ? "Department Review" : isHr ? "Applications Queue" : "Applications"}
-                </span>
+                <span>{isHod ? "Department Review" : isHr ? "Applications Queue" : "Applications"}</span>
               </NavLink>
             )}
             {hasPermission(grants, "recruitment:manage") && (
@@ -360,11 +355,7 @@ function Header() {
                     >
                       <span className="flex items-center gap-3">
                         <LayoutDashboard className="h-4 w-4 text-brand-600" />
-                        {isHod
-                          ? "Department Review"
-                          : isHr
-                          ? "Applications Queue"
-                          : "Applications"}
+                        {isHod ? "Department Review" : isHr ? "Applications Queue" : "Applications"}
                       </span>
                       <ChevronRight className="h-4 w-4 opacity-50" />
                     </NavLink>

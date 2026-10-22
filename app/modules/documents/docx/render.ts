@@ -267,7 +267,10 @@ function bindAssistant(b: Binder) {
       (r) => s(r.degree),
       (r) => s(r.university),
       (r) => s(r.institution),
-      (r) => s(r.classOrMarks),
+      (r) =>
+        [s(r.classOrMarks), r.attempts ? `(${r.attempts} att.)` : ""]
+          .filter(Boolean)
+          .join(" "),
       (r) => fmtMonthYear(r.monthYearOfPassing),
     ],
     "Academic Qualifications",
@@ -438,7 +441,13 @@ function bindAssociate(b: Binder) {
     ["MONTH & YEAR", (r) => fmtMonthYear(r.monthYear)],
     ["COLLEGE", (r) => s(r.college)],
     ["UNIVERSITY", (r) => s(r.university)],
-    ["CLASS & % OF MARKS", (r) => s(r.classPercent)],
+    [
+      "CLASS & % OF MARKS",
+      (r) =>
+        [s(r.classPercent), r.attempts ? `(${r.attempts} att.)` : ""]
+          .filter(Boolean)
+          .join(" "),
+    ],
     ["THESIS", (r) => s(r.thesis)],
     ["SPECIALISATION", (r) => s(r.specialisation)],
   ];
