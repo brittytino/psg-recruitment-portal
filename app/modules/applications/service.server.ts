@@ -7,9 +7,20 @@ import type { SessionUser } from "~/modules/auth/session.server";
 import { prisma, type Tx } from "~/modules/core/db.server";
 import { ConflictError, ForbiddenError, NotFoundError, ValidationError } from "~/modules/core/errors";
 import { getFormDefinition } from "~/modules/forms/registry";
-import type { Answers, FormCode, TableRow } from "~/modules/forms/types";
-import { stripDerived, validateAnswers, withDerived, type FieldIssue } from "~/modules/forms/validation";
-import { INLINE_ENTRY_DOC_TYPES } from "~/modules/documents/policy";
+import type { Answers, FormCode, FormDefinition, TableRow } from "~/modules/forms/types";
+import { periodDuration, totalDuration } from "~/modules/forms/experience";
+import {
+  experiencePeriods,
+  stripDerived,
+  uploadRequired,
+  validateAnswers,
+  withDerived,
+  type DerivedContext,
+  type FieldIssue,
+} from "~/modules/forms/validation";
+import { DOCUMENT_TYPE_LABELS, INLINE_ENTRY_DOC_TYPES } from "~/modules/documents/policy";
+import { POSITION_LABELS } from "~/lib/labels";
+import { academicYearOf, ACADEMIC_YEAR, formatReference } from "./reference";
 import { enqueueOutbox, notify } from "~/modules/notifications/outbox.server";
 import { EDITABLE, findTransition, STATUS_LABELS, type AppStatus } from "./workflow";
 
@@ -65,7 +76,14 @@ export async function createDraft(user: SessionUser, vacancyId: string): Promise
   try {
     return await prisma.$transaction(async (tx) => {
       const app = await tx.application.create({
-        data: { candidateId: user.id, vacancyId, formTemplateId: vacancy.formTemplateId, draftAnswers: {} },
+        data: {
+          candidateId: user.id,
+          vacancyId,
+          formTemplateId: vacancy.formTemplateId,
+          draftAnswers: {},
+          departmentId: vacancy.departmentId,
+          appliedPosition: vacancy.position,
+        },
       });
       await recordStatus(tx, app, null, "DRAFT", user.id);
       await audit(
@@ -171,19 +189,45 @@ export async function saveDraft(
   return { version: expectedVersion + 1, savedAt, issues: [] };
 }
 
+/** Context for derived values (department, post, age, experience totals). */
+export function derivedContext(app: {
+  vacancy: { department: { name: string }; position: string };
+}): DerivedContext {
+  return {
+    department: app.vacancy.department.name,
+    position: POSITION_LABELS[app.vacancy.position] ?? app.vacancy.position,
+    asOf: today(),
+  };
+}
+
 /** Pre-submission check used by the review page and by submit(). */
 export async function submissionIssues(
   app: Awaited<ReturnType<typeof getOwnApplication>>,
 ): Promise<{ field: FieldIssue[]; documents: string[] }> {
   const def = getFormDefinition(app.formTemplate.code as FormCode, app.formTemplate.version);
-  const answers = withDerived(def, app.draftAnswers as Answers, {
-    department: app.vacancy.department.name,
-    asOf: today(),
-  });
+  const answers = withDerived(def, app.draftAnswers as Answers, derivedContext(app));
   const field = validateAnswers(def, stripDerived(def, answers), "submit");
   const documents: string[] = [];
   const active = app.documents.filter((d) => !d.removedAt);
-  if (!active.some((d) => d.documentType === "PHOTOGRAPH"))
+  if (def.uploads) {
+    for (const g of def.uploads)
+      if (
+        uploadRequired(g, answers) &&
+        !active.some((d) => (g.types as readonly string[]).includes(d.documentType))
+      )
+        documents.push(`${g.title} is required`);
+    for (const t of ["PHOTOGRAPH", "SIGNATURE"] as const) {
+      const d = active.find((x) => x.documentType === t);
+      if (d?.scanStatus === "PENDING")
+        documents.push(
+          `${DOCUMENT_TYPE_LABELS[t]} is still being checked for malware. Wait a moment and reload this page.`,
+        );
+      if (d?.scanStatus === "FAILED")
+        documents.push(
+          `${DOCUMENT_TYPE_LABELS[t]} could not be checked for malware. Remove it and upload it again.`,
+        );
+    }
+  } else if (!active.some((d) => d.documentType === "PHOTOGRAPH"))
     documents.push("Passport size photograph is required (it is printed on the application form)");
   for (const r of app.vacancy.requiredDocuments) {
     if ((INLINE_ENTRY_DOC_TYPES as readonly string[]).includes(r.documentType)) continue;
@@ -193,13 +237,64 @@ export async function submissionIssues(
   for (const d of active)
     if (d.scanStatus === "INFECTED")
       documents.push(`"${d.originalName}" failed the malware scan. Remove it and upload a clean copy.`);
-  return { field, documents };
+  return { field, documents: [...new Set(documents)] };
 }
 
-function extractQualifications(code: FormCode, a: Answers) {
-  const rows = (k: string) => (Array.isArray(a[k]) ? (a[k] as TableRow[]) : []);
-  const s = (v: unknown) => (v == null || v === "" ? null : String(v));
+const rowsIn = (a: Answers, k: string) => (Array.isArray(a[k]) ? (a[k] as TableRow[]) : []);
+const strOrNull = (v: unknown) => (v == null || v === "" ? null : String(v));
+
+function extractQualifications(def: FormDefinition, a: Answers) {
+  const code = def.code;
+  const rows = (k: string) => rowsIn(a, k);
+  const s = strOrNull;
   const numVal = (v: unknown) => (v == null || v === "" ? 1 : Number(v) || 1);
+  if (def.version >= 2) {
+    const school = (["sslc", "hsc"] as const).map((p, i) => ({
+      sortOrder: i,
+      category: "SCHOOL",
+      level: p.toUpperCase(),
+      degree: p === "sslc" ? "SSLC" : `HSC${a.hscMajor ? ` (${String(a.hscMajor)})` : ""}`,
+      university: s(a[`${p}Board`]),
+      board: s(a[`${p}Board`]),
+      institution: s(a[`${p}School`]),
+      passedOn: s(a[`${p}Year`]),
+      score: s(a[`${p}Marks`]),
+      modeOfStudy: s(a[`${p}Mode`]),
+      attempts: numVal(a[`${p}Attempts`]),
+    }));
+    const college = rows("collegeQualifications").map((r, i) => ({
+      sortOrder: i + 2,
+      category: "COLLEGE",
+      level: s(r.level),
+      degree: String(r.degree ?? ""),
+      specialisation: s(r.specialisation),
+      university: s(r.university),
+      institution: s(r.college),
+      passedOn: s(r.monthYear),
+      score:
+        r.score == null ? null : `${r.score}${String(r.scoreType ?? "").startsWith("CGPA") ? " CGPA" : "%"}`,
+      classAwarded: s(r.classAwarded),
+      modeOfStudy: s(r.mode),
+      attempts: numVal(r.attempts),
+    }));
+    const phd = ["Awarded", "Thesis submitted", "Pursuing"].includes(String(a.phdStatus))
+      ? [
+          {
+            sortOrder: college.length + 2,
+            category: "COLLEGE",
+            level: "PHD",
+            degree: `Ph.D. (${String(a.phdStatus)})`,
+            specialisation: s(a.phdSpecialisation),
+            university: s(a.phdUniversity),
+            institution: null,
+            passedOn: s(a.phdAwardDate),
+            modeOfStudy: s(a.phdMode),
+            attempts: 1,
+          },
+        ]
+      : [];
+    return [...school, ...college, ...phd];
+  }
   if (code === "ASSISTANT_PROFESSOR")
     return rows("academicQualifications").map((r, i) => ({
       sortOrder: i,
@@ -221,9 +316,27 @@ function extractQualifications(code: FormCode, a: Answers) {
   }));
 }
 
-function extractEmployment(code: FormCode, a: Answers) {
-  const rows = (k: string) => (Array.isArray(a[k]) ? (a[k] as TableRow[]) : []);
-  const s = (v: unknown) => (v == null || v === "" ? null : String(v));
+function extractEmployment(def: FormDefinition, a: Answers) {
+  const code = def.code;
+  const rows = (k: string) => rowsIn(a, k);
+  const s = strOrNull;
+  if (def.version >= 2)
+    return rows("experience").map((r, i) => {
+      const current = r.isCurrent === "Yes";
+      const d = periodDuration({ from: s(r.from) ?? undefined, to: current ? null : s(r.to) }, today());
+      return {
+        sortOrder: i,
+        designation: String(r.designation ?? ""),
+        organisation: String(r.institution ?? ""),
+        fromDate: s(r.from),
+        toDate: current ? null : s(r.to),
+        nature: s(r.nature),
+        isCurrent: current,
+        scaleOfPay: s(r.scaleOfPay),
+        grossSalary: s(r.grossSalary),
+        durationMonths: d?.totalMonths ?? null,
+      };
+    });
   if (code === "ASSISTANT_PROFESSOR")
     return rows("experience").map((r, i) => ({
       sortOrder: i,
@@ -243,13 +356,33 @@ function extractEmployment(code: FormCode, a: Answers) {
   }));
 }
 
-async function nextReference(tx: Tx): Promise<string> {
-  const year = new Date().getUTCFullYear();
+/** Filter fields stored on the revision for the HR dashboard and exports. */
+function revisionFilters(def: FormDefinition, a: Answers) {
+  const exams = rowsIn(a, "competitiveExams")
+    .map((r) => String(r.exam ?? "").trim())
+    .filter(Boolean);
+  const phdStatus = def.version >= 2 ? strOrNull(a.phdStatus) : null;
+  const num = (v: unknown) => (typeof v === "number" && Number.isFinite(v) ? Math.trunc(v) : null);
+  return {
+    phdStatus,
+    hasPhd: phdStatus === "Awarded",
+    competitiveExams: [...new Set(exams)],
+    totalExperienceMonths: def.version >= 2 ? totalDuration(experiencePeriods(a), today()).totalMonths : null,
+    journalCount: def.version >= 2 ? rowsIn(a, "journalPapers").length : null,
+    conferenceCount: def.version >= 2 ? rowsIn(a, "conferencePapers").length : null,
+    hIndex: num(a.hIndex),
+  };
+}
+
+/** Allocates the next "PSGCT<year><DEPT>_<NNNN>" number inside the submission transaction. */
+async function nextReference(tx: Tx, academicYear: string, deptCode: string): Promise<string> {
   const rows = await tx.$queryRaw<{ value: number }[]>`
-    INSERT INTO reference_counters (year, value) VALUES (${year}, 1)
-    ON CONFLICT (year) DO UPDATE SET value = reference_counters.value + 1
+    INSERT INTO department_reference_counters ("academicYear", "departmentCode", value)
+    VALUES (${academicYear}, ${deptCode}, 1)
+    ON CONFLICT ("academicYear", "departmentCode")
+    DO UPDATE SET value = department_reference_counters.value + 1
     RETURNING value`;
-  return `PSGTECH-${year}-${String(rows[0]!.value).padStart(6, "0")}`;
+  return formatReference(academicYear, deptCode, rows[0]!.value);
 }
 
 /**
@@ -276,10 +409,11 @@ export async function submit(user: SessionUser, id: string, expectedVersion: num
     throw new ValidationError("The application is incomplete", problems);
 
   const def = getFormDefinition(app.formTemplate.code as FormCode, app.formTemplate.version);
-  const answers = withDerived(def, app.draftAnswers as Answers, {
-    department: app.vacancy.department.name,
-    asOf: today(),
-  });
+  const answers = withDerived(def, app.draftAnswers as Answers, derivedContext(app));
+  const academicYear =
+    app.vacancy.cycle.academicYear && ACADEMIC_YEAR.test(app.vacancy.cycle.academicYear)
+      ? app.vacancy.cycle.academicYear
+      : academicYearOf(app.vacancy.cycle.opensAt);
   const manifest = app.documents
     .filter((d) => !d.removedAt)
     .map((d) => ({
@@ -309,11 +443,13 @@ export async function submit(user: SessionUser, id: string, expectedVersion: num
           attachmentManifest: manifest,
           candidateName: String(answers.name ?? "").toUpperCase(),
           createdById: user.id,
-          qualifications: { create: extractQualifications(def.code, answers) },
-          employment: { create: extractEmployment(def.code, answers) },
+          ...revisionFilters(def, answers),
+          qualifications: { create: extractQualifications(def, answers) },
+          employment: { create: extractEmployment(def, answers) },
         },
       });
-      const referenceNo = app.referenceNo ?? (await nextReference(tx));
+      const referenceNo =
+        app.referenceNo ?? (await nextReference(tx, academicYear, app.vacancy.department.code));
       const updated = await tx.application.update({
         where: { id },
         data: {
@@ -420,6 +556,8 @@ export async function getStaffApplication(user: SessionUser, id: string) {
       assignments: {
         include: { reviewer: { select: { id: true, email: true, profile: { select: { fullName: true } } } } },
       },
+      assignedHod: { select: { id: true, email: true, profile: { select: { fullName: true } } } },
+      positionChanges: { orderBy: { createdAt: "asc" } },
       reviews: {
         orderBy: { createdAt: "asc" },
         include: { reviewer: { select: { email: true, profile: { select: { fullName: true } } } } },
@@ -442,7 +580,11 @@ export async function transition(
   if (!scope) throw new ForbiddenError();
   const app = await prisma.application.findFirst({
     where: { AND: [{ id }, scope] },
-    include: { vacancy: true, reviews: { select: { stage: true } } },
+    include: {
+      vacancy: true,
+      reviews: { select: { stage: true } },
+      positionChanges: { select: { status: true } },
+    },
   });
   if (!app) throw new NotFoundError("Application");
   const t = findTransition(app.status as AppStatus, to, "hr");
@@ -458,6 +600,8 @@ export async function transition(
     );
   if (t.requires === "departmentReview" && !app.reviews.some((r) => r.stage === "DEPARTMENT"))
     throw new ConflictError("At least one department review must be recorded first");
+  if (t.requires === "positionDecided" && app.positionChanges.some((p) => p.status === "PENDING"))
+    throw new ConflictError("Approve or reject the position-change recommendation first");
   await prisma.$transaction(async (tx) => {
     const res = await tx.application.updateMany({ where: { id, status: app.status }, data: { status: to } });
     if (res.count !== 1) throw new ConflictError("The application status changed. Please reload.");

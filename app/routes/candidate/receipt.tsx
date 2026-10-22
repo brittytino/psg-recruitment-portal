@@ -18,7 +18,12 @@ export async function loader({ request, params, context }: Route.LoaderArgs) {
   const app = await getOwnApplication(user, params.id);
   const bundle = app.currentRevisionId
     ? await prisma.generatedDocument.findFirst({
-        where: { revisionId: app.currentRevisionId, kind: "CONSOLIDATED_BUNDLE", status: "READY" },
+        where: {
+          revisionId: app.currentRevisionId,
+          status: "READY",
+          // v1 forms have no separate application PDF; their bundle is the candidate copy.
+          kind: app.formTemplate.version === 1 ? "CONSOLIDATED_BUNDLE" : "APPLICATION_PDF",
+        },
         orderBy: { version: "desc" },
         select: { id: true, pageCount: true },
       })
@@ -93,7 +98,7 @@ export default function Receipt({ loaderData: L, actionData }: Route.ComponentPr
             <dd>
               {L.bundle ? (
                 <a href={`/files/bundles/${L.bundle.id}`}>
-                  Download your submitted application ({L.bundle.pageCount} pages)
+                  Download your submitted application (PDF, {L.bundle.pageCount} pages)
                 </a>
               ) : (
                 <span>{PROCESSING_LABELS[L.processingStatus] ?? L.processingStatus}</span>

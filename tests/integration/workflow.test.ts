@@ -15,7 +15,7 @@ import { scanBytes } from "~/modules/documents/scan.server";
 import { authorizeDocumentDownload, uploadDocument } from "~/modules/documents/service.server";
 import { getFile, getVerifiedFile } from "~/modules/documents/storage.server";
 import { listApplications, listQuerySchema } from "~/modules/reporting/applications.server";
-import { assignReviewer, recordReview } from "~/modules/reviews/service.server";
+import { assignToHod, recordHodDecision } from "~/modules/reviews/service.server";
 import { assistantMinimal, associateMinimal, testPhotoPng } from "../fixtures/applications";
 import type { RoleName } from "~/modules/auth/permissions";
 
@@ -138,11 +138,12 @@ describe("candidate submission and document pipeline", () => {
     "%s: submit → scan → consolidated PDF with all attachments",
     async (_n, vac, answers, formPages) => {
       const { app, referenceNo } = await submittedApplication(vac(), answers);
-      expect(referenceNo).toMatch(/^PSGTECH-\d{4}-\d{6}$/);
+      expect(referenceNo).toMatch(/^PSGCT\d{4}-\d{2}I[AB][A-Z0-9]+_\d{4}$/);
       const g = await runPipeline(app.id);
       expect(g.status).toBe("READY");
       // form pages + 3-page degree PDF + 1 image page
-      expect(g.pageCount).toBe(formPages + 3 + 1);
+      // form pages + contents page + 3-page degree PDF + 1 image page
+      expect(g.pageCount).toBe(formPages + 1 + 3 + 1);
       const pdf = await PDFDocument.load(await getFile(g.storageKey!));
       expect(pdf.getPageCount()).toBe(g.pageCount);
       const a = await prisma.application.findUniqueOrThrow({ where: { id: app.id } });
@@ -232,43 +233,38 @@ describe("authorization", () => {
     await expect(getStaffApplication(other, app.id)).rejects.toThrow();
   });
 
-  it("department reviewers see only assigned applications in their department", async () => {
+  it("HODs see only applications of their department that are assigned to them", async () => {
     const { app } = await submittedApplication(vacAP, assistantMinimal);
     await runPipeline(app.id);
-    const hr = await makeUser("HR_OFFICER");
-    const revA = await makeUser("DEPARTMENT_REVIEWER", deptA);
-    const revB = await makeUser("DEPARTMENT_REVIEWER", deptB);
-    await expect(getStaffApplication(revA, app.id)).rejects.toThrow(/not found/i); // not yet assigned
-    await transition(hr, app.id, "UNDER_HR_REVIEW", null);
-    await assignReviewer(hr, app.id, revA.id);
-    await expect(assignReviewer(hr, app.id, revB.id)).rejects.toThrow(/not a reviewer/);
-    expect((await getStaffApplication(revA, app.id)).id).toBe(app.id);
-    await expect(getStaffApplication(revB, app.id)).rejects.toThrow(/not found/i);
-    const listB = await listApplications(revB, listQuerySchema.parse({}));
+    const hr = await makeUser("HR");
+    const hodA = await makeUser("HOD", deptA);
+    const hodB = await makeUser("HOD", deptB);
+    await expect(getStaffApplication(hodA, app.id)).rejects.toThrow(/not found/i); // not yet assigned
+    await expect(assignToHod(hr, { hodId: hodB.id, applicationIds: [app.id] })).rejects.toThrow(
+      /does not review/,
+    );
+    await assignToHod(hr, { hodId: hodA.id, applicationIds: [app.id] });
+    expect((await getStaffApplication(hodA, app.id)).id).toBe(app.id);
+    await expect(getStaffApplication(hodB, app.id)).rejects.toThrow(/not found/i);
+    const listB = await listApplications(hodB, listQuerySchema.parse({}));
     expect(listB.rows.some((r) => r.id === app.id)).toBe(false);
+    await expect(recordHodDecision(hodB, app.id, { decision: "ACCEPT" })).rejects.toThrow(/not found/i);
 
-    // Workflow guards: department review required before shortlisting.
-    await transition(hr, app.id, "UNDER_DEPARTMENT_REVIEW", null);
-    await expect(transition(hr, app.id, "SHORTLISTED", null)).rejects.toThrow(/department review/);
-    await recordReview(revA, app.id, {
-      recommendation: "SHORTLIST",
-      score: "80",
-      comments: "Strong research record and teaching.",
-    });
+    await recordHodDecision(hodA, app.id, { decision: "ACCEPT", reason: "" });
+    await expect(transition(hr, app.id, "APPROVED", "")).rejects.toThrow(/Cannot move/);
     await transition(hr, app.id, "SHORTLISTED", null);
-    await expect(transition(hr, app.id, "APPROVED", "")).rejects.toThrow(/reason/);
     const hist = await prisma.applicationStatusHistory.count({ where: { applicationId: app.id } });
-    expect(hist).toBeGreaterThanOrEqual(5);
+    expect(hist).toBeGreaterThanOrEqual(4);
   });
 
-  it("HR cannot see drafts; recruitment admins and super admins have no application access", async () => {
+  it("HR cannot see drafts; Admin sees every submitted application", async () => {
     const cand = await makeUser("CANDIDATE");
     const draft = await createDraft(cand, vacAP);
-    const hr = await makeUser("HR_OFFICER");
+    const hr = await makeUser("HR");
     await expect(getStaffApplication(hr, draft.id)).rejects.toThrow(/not found/i);
-    const ra = await makeUser("RECRUITMENT_ADMIN");
-    const sa = await makeUser("SUPER_ADMIN");
-    await expect(listApplications(ra, listQuerySchema.parse({}))).rejects.toThrow();
-    await expect(listApplications(sa, listQuerySchema.parse({}))).rejects.toThrow();
+    const admin = await makeUser("ADMIN");
+    await expect(getStaffApplication(admin, draft.id)).rejects.toThrow(/not found/i);
+    const { app } = await submittedApplication(vacAS, associateMinimal);
+    expect((await getStaffApplication(admin, app.id)).id).toBe(app.id);
   });
 });

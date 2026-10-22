@@ -4,10 +4,14 @@ import { PDFDocument } from "pdf-lib";
 import { prisma } from "~/modules/core/db.server";
 import { env } from "~/modules/core/env.server";
 import { logger } from "~/modules/core/logger.server";
-import { getFormDefinition } from "~/modules/forms/registry";
+import { POSITION_LABELS } from "~/lib/labels";
+import { getFormDefinition, isDocxForm } from "~/modules/forms/registry";
 import type { Answers, FormCode } from "~/modules/forms/types";
+import { getSetting } from "~/modules/settings/service.server";
 import { renderApplicationDocx } from "./docx/render";
-import { BUNDLE_ORDER, DOCUMENT_TYPE_LABELS, type DocType } from "./policy";
+import { addOutline, insertIndexPages, type BundleSection } from "./pdf/bundle";
+import { renderApplicationPdf } from "./pdf/render";
+import { BUNDLE_ORDER, DOCUMENT_TYPE_LABELS, PRINTED_TYPES, type DocType } from "./policy";
 import { newKey, putFile, sha256Hex, getVerifiedFile } from "./storage.server";
 
 /** Errors that should be retried (transient), as opposed to permanent data problems. */
@@ -65,9 +69,11 @@ async function imageToPdf(data: Uint8Array, mime: string): Promise<PDFDocument> 
 export function orderManifest(entries: ManifestEntry[]): ManifestEntry[] {
   return entries
     .map((e, i) => ({ e, i }))
-    .filter(({ e }) => e.documentType !== "PHOTOGRAPH")
+    .filter(({ e }) => !PRINTED_TYPES.includes(e.documentType))
     .sort(
-      (a, b) => BUNDLE_ORDER.indexOf(a.e.documentType) - BUNDLE_ORDER.indexOf(b.e.documentType) || a.i - b.i,
+      (a, b) =>
+        (BUNDLE_ORDER.indexOf(a.e.documentType) + 1 || 99) -
+          (BUNDLE_ORDER.indexOf(b.e.documentType) + 1 || 99) || a.i - b.i,
     )
     .map(({ e }) => e);
 }
@@ -80,6 +86,7 @@ export interface BundleReport {
   sourcePageCount: number;
   deviations: string[];
   photoPlaced: boolean;
+  indexPages: number;
   attachments: {
     documentId: string;
     documentType: DocType;
@@ -91,9 +98,33 @@ export interface BundleReport {
   totalPages: number;
 }
 
+/** Application form PDF for a v2 form (used for previews and for submitted revisions). */
+export async function renderFormPdf(opts: {
+  formCode: FormCode;
+  formVersion: number;
+  answers: Answers;
+  department: string;
+  position: string;
+  referenceNo: string | null;
+  revisionNo: number | null;
+  submittedAt: Date | null;
+  photo: { bytes: Uint8Array; mime: string } | null;
+  signature: { bytes: Uint8Array; mime: string } | null;
+  attachments: { documentType: DocType; originalName: string }[];
+  preview: boolean;
+}): Promise<Uint8Array> {
+  const def = getFormDefinition(opts.formCode, opts.formVersion);
+  return renderApplicationPdf({
+    def,
+    ...opts,
+    printEndorsement: await getSetting("printEmployerEndorsement"),
+  });
+}
+
 /**
  * Generates the consolidated bundle for one GeneratedDocument row. Idempotent: a READY row is
- * left untouched; output is stored under a new random key and recorded with its checksum.
+ * left untouched; output is stored under a new random key and recorded with its checksum. For
+ * v2 forms the stand-alone application PDF (what the candidate downloads) is stored as well.
  */
 export async function generateBundle(
   generatedDocumentId: string,
@@ -118,12 +149,7 @@ export async function generateBundle(
   const rev = gen.revision;
   const code = rev.formCode as FormCode;
   const def = getFormDefinition(code, rev.formVersion);
-  const tplRow = await prisma.formTemplate.findUniqueOrThrow({
-    where: { code_version: { code, version: rev.formVersion } },
-  });
-  const template = new Uint8Array(await readFile(resolve(def.templatePath)));
-  if (sha256Hex(template) !== tplRow.sha256)
-    throw new PipelineError(`Template file ${def.templatePath} does not match its registered checksum`);
+  const docx = isDocxForm(def);
 
   const manifest = rev.attachmentManifest as unknown as ManifestEntry[];
   const docs = await prisma.applicationDocument.findMany({
@@ -147,24 +173,58 @@ export async function generateBundle(
       );
   }
 
-  const photoEntry = manifest.find((m) => m.documentType === "PHOTOGRAPH");
-  const photo = photoEntry
-    ? await getVerifiedFile(byId.get(photoEntry.documentId)!.storageKey, photoEntry.sha256)
-    : null;
-  const { docx, report } = await renderApplicationDocx({
-    formCode: code,
-    template,
-    answers: rev.answers as Answers,
-    photo,
-  });
-  const formPdfBytes = await convertDocxToPdf(docx);
+  const printed = async (t: DocType) => {
+    const e = manifest.find((m) => m.documentType === t);
+    if (!e) return null;
+    const d = byId.get(e.documentId)!;
+    return { bytes: await getVerifiedFile(d.storageKey, e.sha256), mime: d.mimeType };
+  };
+  const photo = await printed("PHOTOGRAPH");
+
+  let formPdfBytes: Uint8Array;
+  let deviations: string[] = [];
+  let photoPlaced = !!photo;
+  if (docx) {
+    const tplRow = await prisma.formTemplate.findUniqueOrThrow({
+      where: { code_version: { code, version: rev.formVersion } },
+    });
+    const template = new Uint8Array(await readFile(resolve(def.templatePath)));
+    if (sha256Hex(template) !== tplRow.sha256)
+      throw new PipelineError(`Template file ${def.templatePath} does not match its registered checksum`);
+    const r = await renderApplicationDocx({
+      formCode: code,
+      template,
+      answers: rev.answers as Answers,
+      photo: photo?.bytes ?? null,
+    });
+    deviations = r.report.deviations;
+    photoPlaced = r.report.photoPlaced;
+    formPdfBytes = await convertDocxToPdf(r.docx);
+  } else {
+    const app = gen.application;
+    const position = app.appliedPosition ?? app.vacancy.position;
+    formPdfBytes = await renderFormPdf({
+      formCode: code,
+      formVersion: rev.formVersion,
+      answers: rev.answers as Answers,
+      department: app.vacancy.department.name,
+      position: POSITION_LABELS[position] ?? position,
+      referenceNo: app.referenceNo,
+      revisionNo: rev.revisionNo,
+      submittedAt: rev.createdAt,
+      photo,
+      signature: await printed("SIGNATURE"),
+      attachments: manifest,
+      preview: false,
+    });
+  }
   let formPdf: PDFDocument;
   try {
     formPdf = await PDFDocument.load(formPdfBytes);
   } catch {
-    throw new PipelineError("The converted application PDF could not be read");
+    throw new PipelineError("The application PDF could not be read");
   }
-  if (formPdf.getPageCount() < def.sourcePageCount)
+  if (docx && formPdf.getPageCount() < def.sourcePageCount)
     throw new PipelineError(
       `Converted application has ${formPdf.getPageCount()} pages; the template has ${def.sourcePageCount}`,
     );
@@ -202,23 +262,48 @@ export async function generateBundle(
     });
   }
 
+  // Index page (after the application form) and bookmarks for every part of the bundle.
+  const appPages = formPdf.getPageCount();
+  const plan = (offset: number): BundleSection[] => {
+    let p = appPages + offset;
+    return [
+      { title: "Application form", startPage: 0, pages: appPages },
+      ...attachments.map((a) => {
+        const s = { title: `${a.label} — ${a.originalName}`, startPage: p, pages: a.pages };
+        p += a.pages;
+        return s;
+      }),
+    ];
+  };
+  const indexPages = await insertIndexPages(
+    out,
+    appPages,
+    `Application ${gen.application.referenceNo ?? ""} — revision ${rev.revisionNo}`,
+    plan(Math.max(1, Math.ceil((attachments.length + 1) / 40))),
+  );
+  const sections = plan(indexPages);
+  sections.splice(1, 0, { title: "Contents", startPage: appPages, pages: indexPages });
+  addOutline(out, sections);
+
   const finalBytes = await out.save();
-  // Validate the merged output by re-reading it and checking every page was included.
-  const expectedPages = formPdf.getPageCount() + attachments.reduce((n, a) => n + a.pages, 0);
+  const expectedPages = appPages + indexPages + attachments.reduce((n, a) => n + a.pages, 0);
   const check = await PDFDocument.load(finalBytes);
   if (check.getPageCount() !== expectedPages)
     throw new PipelineError(`Merged PDF has ${check.getPageCount()} pages; expected ${expectedPages}`);
 
   const key = newKey("generated", "pdf", gen.applicationId);
   const { sha256, size } = await putFile(key, finalBytes);
+  const formKey = newKey("generated", "pdf", gen.applicationId);
+  const formStored = await putFile(formKey, formPdfBytes);
   const bundleReport: BundleReport = {
     formCode: code,
     formVersion: rev.formVersion,
     revisionNo: rev.revisionNo,
-    applicationPages: formPdf.getPageCount(),
+    applicationPages: appPages,
     sourcePageCount: def.sourcePageCount,
-    deviations: report.deviations,
-    photoPlaced: report.photoPlaced,
+    deviations,
+    photoPlaced,
+    indexPages,
     attachments,
     totalPages: expectedPages,
   };
@@ -235,6 +320,30 @@ export async function generateBundle(
         report: bundleReport as object,
         error: null,
       },
+    });
+    // The application form alone: the copy candidates download (bundles are for the office).
+    await tx.generatedDocument.upsert({
+      where: {
+        revisionId_kind_version: {
+          revisionId: gen.revisionId,
+          kind: "APPLICATION_PDF",
+          version: gen.version,
+        },
+      },
+      create: {
+        applicationId: gen.applicationId,
+        revisionId: gen.revisionId,
+        kind: "APPLICATION_PDF",
+        version: gen.version,
+        status: "READY",
+        storageKey: formKey,
+        sha256: formStored.sha256,
+        sizeBytes: formStored.size,
+        pageCount: appPages,
+        completedAt: new Date(),
+        requestedById: gen.requestedById,
+      },
+      update: {},
     });
     await tx.application.updateMany({
       where: { id: gen.applicationId, currentRevisionId: gen.revisionId },

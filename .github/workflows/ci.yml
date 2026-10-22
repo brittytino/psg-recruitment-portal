@@ -52,15 +52,14 @@ jobs:
           SHADOW: postgresql://srp_owner:change-me-owner@localhost:65432/srportal_shadow
       - name: Integration + authorization tests
         run: npm run test:integration
-      - name: Seed demo data and run e2e
+      - name: Seed and run e2e
         run: |
-          SEED_DEMO=true npx tsx prisma/seed.ts
+          npx tsx prisma/seed.ts
           npx playwright install --with-deps chromium
           . scripts/host-env.sh && export APP_ORIGIN=http://localhost:3000 && (npx react-router dev --port 3000 &) && for i in $(seq 60); do curl -sf localhost:3000/healthz/live && break; sleep 2; done
           npm run test:e2e
         env:
           DATABASE_URL: postgresql://srp_owner:change-me-owner@localhost:65432/srportal?schema=public
-          SEED_DEMO_PASSWORD: Demo@12345-change
       - name: PDF regression render
         run: . scripts/host-env.sh && npx tsx scripts/render-samples.ts
       - uses: actions/upload-artifact@v4

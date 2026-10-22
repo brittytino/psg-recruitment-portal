@@ -1,18 +1,21 @@
+import { useState } from "react";
 import { Form, Link, useLocation, useNavigation } from "react-router";
 import type { Route } from "./+types/application";
 import { AnswerView } from "~/components/application-form";
 import { Alert, Badge, ConfirmDialog, CsrfInput, formatDateTime, statusTone } from "~/components/forms";
 import { clientIp, handleAction, readForm, requireStaff } from "~/lib/http.server";
-import { FORM_LABELS, POSITION_LABELS, RECOMMENDATION_LABELS } from "~/lib/labels";
+import { FORM_LABELS, POSITION_LABELS } from "~/lib/labels";
 import { getStaffApplication, transition } from "~/modules/applications/service.server";
 import {
   APPLICATION_STATUSES,
+  ASSIGNABLE,
   availableTransitions,
+  HOD_STAGE,
   PROCESSING_LABELS,
   STATUS_LABELS,
   type AppStatus,
 } from "~/modules/applications/workflow";
-import { hasPermission } from "~/modules/auth/permissions";
+import { hasPermission, hodDepartments } from "~/modules/auth/permissions";
 import { hrScope } from "~/modules/auth/policy.server";
 import { audit } from "~/modules/audit/audit.server";
 import { ValidationError } from "~/modules/core/errors";
@@ -20,14 +23,22 @@ import { DOCUMENT_TYPE_LABELS, type DocType } from "~/modules/documents/policy";
 import { requestRegeneration } from "~/modules/documents/service.server";
 import { getFormDefinition } from "~/modules/forms/registry";
 import type { Answers, FormCode } from "~/modules/forms/types";
-import { assignReviewer, eligibleReviewers, recordReview } from "~/modules/reviews/service.server";
+import { conditionMet } from "~/modules/forms/validation";
+import { allowedChanges } from "~/modules/reviews/position-policy";
+import {
+  assignToHod,
+  canApprovePositionChange,
+  decidePositionChange,
+  recordHodDecision,
+  unassign,
+} from "~/modules/reviews/service.server";
+import { hodsForDepartment } from "~/modules/users/service.server";
 
-export const meta: Route.MetaFunction = () => [{ title: "Application — Recruitment workspace" }];
+export const meta: Route.MetaFunction = () => [{ title: "Application — PSG Tech Recruitment" }];
 
 export async function loader({ request, params, context }: Route.LoaderArgs) {
   const user = requireStaff(context, request, "application:read");
   const app = await getStaffApplication(user, params.id);
-  // Privileged access to a candidate record is audited.
   await audit({
     actorId: user.id,
     action: "application.viewed",
@@ -35,8 +46,11 @@ export async function loader({ request, params, context }: Route.LoaderArgs) {
     entityId: app.id,
     ip: clientIp(request),
   });
-  const isHr = !!hrScope(user);
-  const myAssignment = app.assignments.find((a) => a.reviewerId === user.id && a.stage === "DEPARTMENT");
+  const isOffice = !!hrScope(user);
+  const isAssignedHod =
+    app.assignedHodId === user.id && hodDepartments(user.grants).includes(app.vacancy.departmentId);
+  const applied = app.appliedPosition ?? app.vacancy.position;
+  const current = app.generated.filter((g) => g.revisionId === app.currentRevisionId && g.status === "READY");
   return {
     app: {
       id: app.id,
@@ -44,76 +58,57 @@ export async function loader({ request, params, context }: Route.LoaderArgs) {
       status: app.status as AppStatus,
       processingStatus: app.processingStatus,
       submittedAt: app.submittedAt,
+      applied,
+      effective: app.effectivePosition,
       vacancy: {
         code: app.vacancy.code,
         title: app.vacancy.title,
-        position: app.vacancy.position,
         department: app.vacancy.department.name,
-        discipline: app.vacancy.discipline?.name ?? null,
+        departmentId: app.vacancy.departmentId,
         cycle: app.vacancy.cycle.title,
       },
       formCode: app.formTemplate.code as FormCode,
       formVersion: app.formTemplate.version,
       revision: app.currentRevision
         ? {
-            id: app.currentRevision.id,
             no: app.currentRevision.revisionNo,
-            createdAt: app.currentRevision.createdAt,
             answers: app.currentRevision.answers as Answers,
-            sha: app.currentRevision.answersSha256,
+            name: app.currentRevision.candidateName,
             manifest: app.currentRevision.attachmentManifest as {
               documentId: string;
               documentType: DocType;
               originalName: string;
-              sizeBytes: number;
             }[],
           }
         : null,
-      documents: app.documents.map((d) => ({ id: d.id, scan: d.scanStatus, mime: d.mimeType })),
-      required: app.vacancy.requiredDocuments.map((r) => ({
-        type: r.documentType as DocType,
-        label: r.label,
-      })),
-      generated: app.generated.map((g) => ({
-        id: g.id,
-        version: g.version,
-        revisionId: g.revisionId,
-        status: g.status,
-        pages: g.pageCount,
-        error: g.error,
-        createdAt: g.createdAt,
-        completedAt: g.completedAt,
-        report: g.report as { deviations?: string[] } | null,
-      })),
+      scans: Object.fromEntries(app.documents.map((d) => [d.id, d.scanStatus])),
+      applicationPdf: current.find((g) => g.kind === "APPLICATION_PDF") ?? null,
+      bundle:
+        current.filter((g) => g.kind === "CONSOLIDATED_BUNDLE").sort((a, b) => b.version - a.version)[0] ??
+        null,
+      failed:
+        app.generated.find((g) => g.revisionId === app.currentRevisionId && g.status === "FAILED")?.error ??
+        null,
+      hod: app.assignedHod ? (app.assignedHod.profile?.fullName ?? app.assignedHod.email) : null,
+      hodDecision: app.hodDecision,
+      hodReason: app.hodDecisionReason,
+      hodRemarks: app.hodRemarks,
+      hodDecidedAt: app.hodDecidedAt,
+      positionChanges: app.positionChanges,
       history: app.statusHistory.map((h) => ({
-        from: h.fromStatus,
-        to: h.toStatus,
+        to: h.toStatus as AppStatus,
         reason: h.reason,
         at: h.createdAt,
       })),
-      assignments: app.assignments.map((a) => ({
-        id: a.id,
-        name: a.reviewer.profile?.fullName ?? a.reviewer.email,
-        completedAt: a.completedAt,
-      })),
-      reviews: app.reviews.map((r) => ({
-        id: r.id,
-        stage: r.stage,
-        recommendation: r.recommendation,
-        score: r.score,
-        comments: r.comments,
-        at: r.createdAt,
-        by: r.reviewer.profile?.fullName ?? r.reviewer.email,
-      })),
     },
-    isHr,
+    isOffice,
+    isAssignedHod,
     canDownload: hasPermission(user.grants, "document:download"),
-    canRegenerate: isHr && hasPermission(user.grants, "document:regenerate"),
-    canReviewDept:
-      (!!myAssignment || hasPermission(user.grants, "review:record")) &&
-      app.status === "UNDER_DEPARTMENT_REVIEW",
-    canReviewHr: isHr && app.status === "UNDER_HR_REVIEW",
-    reviewers: isHr ? await eligibleReviewers(app.vacancy.departmentId) : [],
+    canRegenerate: isOffice && hasPermission(user.grants, "document:regenerate"),
+    canApprove: await canApprovePositionChange(user),
+    canAssign: isOffice && hasPermission(user.grants, "application:assign"),
+    hods: isOffice ? await hodsForDepartment(app.vacancy.departmentId) : [],
+    changeOptions: allowedChanges(applied),
   };
 }
 
@@ -123,6 +118,27 @@ export async function action({ request, params, context }: Route.ActionArgs) {
   const ip = clientIp(request);
   return handleAction(async () => {
     switch (form.get("intent")) {
+      case "decision":
+        await recordHodDecision(user, params.id, Object.fromEntries(form), ip);
+        return { message: "Your decision has been recorded." };
+      case "position":
+        await decidePositionChange(
+          user,
+          String(form.get("requestId")),
+          form.get("approve") === "yes",
+          String(form.get("note") ?? ""),
+          ip,
+        );
+        return {
+          message:
+            form.get("approve") === "yes" ? "Position change approved." : "Position change not approved.",
+        };
+      case "assign":
+        await assignToHod(user, { hodId: String(form.get("hodId")), applicationIds: [params.id] }, ip);
+        return { message: "Moved to the HOD." };
+      case "unassign":
+        await unassign(user, params.id, String(form.get("reason") ?? ""), ip);
+        return { message: "Taken back from the HOD." };
       case "transition": {
         const to = String(form.get("to"));
         if (!(APPLICATION_STATUSES as readonly string[]).includes(to))
@@ -130,12 +146,6 @@ export async function action({ request, params, context }: Route.ActionArgs) {
         await transition(user, params.id, to as AppStatus, String(form.get("reason") ?? ""), ip);
         return { message: `Status changed to “${STATUS_LABELS[to as AppStatus]}”.` };
       }
-      case "assign":
-        await assignReviewer(user, params.id, String(form.get("reviewerId")), ip);
-        return { message: "Reviewer assigned." };
-      case "review":
-        await recordReview(user, params.id, Object.fromEntries(form), ip);
-        return { message: "Review recorded." };
       case "regenerate":
         await requestRegeneration(user, params.id, ip);
         return { message: "PDF regeneration has been queued as a new version." };
@@ -146,47 +156,79 @@ export async function action({ request, params, context }: Route.ActionArgs) {
 }
 
 export default function StaffApplication({ loaderData, actionData }: Route.ComponentProps) {
-  const { app, isHr, canDownload, canRegenerate, canReviewDept, canReviewHr, reviewers } = loaderData;
+  const {
+    app,
+    isOffice,
+    isAssignedHod,
+    canDownload,
+    canRegenerate,
+    canApprove,
+    canAssign,
+    hods,
+    changeOptions,
+  } = loaderData;
   const location = useLocation();
   const nav = useNavigation();
-  const back = (location.state as { back?: string } | null)?.back ?? "/staff";
-  const def = getFormDefinition(app.formCode, app.formVersion);
-  const transitions = isHr ? availableTransitions(app.status, "hr") : [];
-  const docScan = new Map(app.documents.map((d) => [d.id, d.scan]));
-  const currentBundles = app.generated.filter((g) => g.revisionId === app.revision?.id);
-  const latestReady = currentBundles.find((g) => g.status === "READY");
   const busy = nav.state !== "idle";
+  const back = (location.state as { back?: string } | null)?.back ?? (isOffice ? "/staff" : "/staff/review");
+  const def = getFormDefinition(app.formCode, app.formVersion);
+  const transitions = isOffice ? availableTransitions(app.status, "hr") : [];
+  const pending = app.positionChanges.find((p) => p.status === "PENDING");
+  const fe = actionData && "fieldErrors" in actionData ? actionData.fieldErrors : undefined;
+  const [decision, setDecision] = useState<string>(app.hodDecision ?? "");
+  const answers = app.revision?.answers ?? {};
+
   return (
     <div className="space-y-6">
       <p className="text-sm">
-        <Link to={back}>← Back to the application list</Link>
+        <Link to={back}>← Back</Link>
       </p>
       <header className="card flex flex-wrap items-start justify-between gap-4">
-        <div>
-          <p className="text-sm text-muted">{FORM_LABELS[app.formCode]}</p>
-          <h1>
-            {app.referenceNo} — {String(app.revision?.answers.name ?? "").toUpperCase()}
-          </h1>
-          <p className="mt-1 text-sm text-muted">
-            {app.vacancy.code} · {POSITION_LABELS[app.vacancy.position]} · {app.vacancy.department}
-            {app.vacancy.discipline ? ` · ${app.vacancy.discipline}` : ""} · {app.vacancy.cycle}
-          </p>
-          <p className="mt-1 text-sm text-muted">
-            Submitted {formatDateTime(app.submittedAt)} · Revision {app.revision?.no}
-          </p>
+        <div className="min-w-0">
+          <p className="text-sm font-medium text-muted">{FORM_LABELS[app.formCode]}</p>
+          <h1 className="mt-1 text-2xl sm:text-3xl">{app.revision?.name}</h1>
+          <p className="mt-1 font-mono text-sm font-semibold text-brand-700">{app.referenceNo}</p>
+          <dl className="mt-3 grid gap-x-8 gap-y-1 text-sm sm:grid-cols-2">
+            <div>
+              <dt className="inline text-muted">Department: </dt>
+              <dd className="inline font-medium">{app.vacancy.department}</dd>
+            </div>
+            <div>
+              <dt className="inline text-muted">Applied for: </dt>
+              <dd className="inline font-medium">{POSITION_LABELS[app.applied]}</dd>
+            </div>
+            {app.effective && (
+              <div>
+                <dt className="inline text-muted">Approved position: </dt>
+                <dd className="inline font-semibold text-brand-700">{POSITION_LABELS[app.effective]}</dd>
+              </div>
+            )}
+            <div>
+              <dt className="inline text-muted">Submitted: </dt>
+              <dd className="inline">
+                {formatDateTime(app.submittedAt)} (revision {app.revision?.no})
+              </dd>
+            </div>
+            <div>
+              <dt className="inline text-muted">HOD: </dt>
+              <dd className="inline">{app.hod ?? "Not yet assigned"}</dd>
+            </div>
+          </dl>
         </div>
-        <div className="flex flex-col sm:flex-row sm:items-center gap-2.5">
+        <div className="flex flex-col items-start gap-2 sm:items-end">
           <Badge tone={statusTone(app.status)}>{STATUS_LABELS[app.status]}</Badge>
-          <Badge tone={statusTone(app.processingStatus)}>{PROCESSING_LABELS[app.processingStatus]}</Badge>
-          {latestReady && canDownload && (
-            <a
-              href={`/files/bundles/${latestReady.id}`}
-              className="btn-primary inline-flex items-center gap-2 px-5 py-2.5 text-sm font-bold shadow-md shadow-brand-700/20 hover:scale-[1.02] transition-transform"
-              title="Download consolidated PDF dossier containing the full candidate form and all verified attachments"
-            >
-              <span>📥</span>
-              <span>Download Complete Application ({latestReady.pages} pgs)</span>
+          {canDownload && app.applicationPdf && (
+            <a href={`/files/bundles/${app.applicationPdf.id}`} className="btn-secondary">
+              Download application ({app.applicationPdf.pageCount} pages)
             </a>
+          )}
+          {canDownload && app.bundle && (
+            <a href={`/files/bundles/${app.bundle.id}`} className="btn-primary">
+              Download application + documents ({app.bundle.pageCount} pages)
+            </a>
+          )}
+          {!app.bundle && (
+            <Badge tone={statusTone(app.processingStatus)}>{PROCESSING_LABELS[app.processingStatus]}</Badge>
           )}
         </div>
       </header>
@@ -197,279 +239,371 @@ export default function StaffApplication({ loaderData, actionData }: Route.Compo
       {actionData && "formError" in actionData && actionData.formError && (
         <Alert tone="danger">{actionData.formError}</Alert>
       )}
+      {app.failed && isOffice && (
+        <Alert tone="danger" title="PDF generation failed">
+          {app.failed}
+        </Alert>
+      )}
 
-      <div className="grid gap-6 lg:grid-cols-[1fr_22rem]">
-        <div className="space-y-6">
-          <section className="card" aria-labelledby="att">
-            <h2 id="att">Attachment checklist</h2>
-            <ul className="mt-3 space-y-2 text-sm">
-              {[
-                { type: "PHOTOGRAPH" as DocType, label: DOCUMENT_TYPE_LABELS.PHOTOGRAPH },
-                ...app.required,
-              ].map((r) => {
-                const have = app.revision?.manifest.filter((m) => m.documentType === r.type) ?? [];
-                return (
-                  <li key={r.type} className="flex justify-between gap-2">
-                    <span>{r.label}</span>
-                    {have.length ? (
-                      <Badge tone="success">Provided ({have.length})</Badge>
-                    ) : (
-                      <Badge tone="danger">Missing</Badge>
-                    )}
-                  </li>
-                );
-              })}
-            </ul>
-            <table className="table mt-4">
-              <caption className="sr-only">Submitted attachments</caption>
-              <thead>
-                <tr>
-                  <th scope="col">Document</th>
-                  <th scope="col">Type</th>
-                  <th scope="col">Scan</th>
-                </tr>
-              </thead>
-              <tbody>
-                {app.revision?.manifest.map((m) => (
-                  <tr key={m.documentId}>
-                    <td>
-                      {canDownload ? (
-                        <a href={`/files/documents/${m.documentId}`}>{m.originalName}</a>
-                      ) : (
-                        m.originalName
-                      )}
-                    </td>
-                    <td>{DOCUMENT_TYPE_LABELS[m.documentType]}</td>
-                    <td>
-                      <Badge tone={statusTone(docScan.get(m.documentId) ?? "PENDING")}>
-                        {docScan.get(m.documentId) ?? "—"}
-                      </Badge>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </section>
-
-          <section className="card" aria-labelledby="pdfs">
-            <h2 id="pdfs">Consolidated PDF versions</h2>
-            <ul className="mt-3 space-y-3 text-sm">
-              {currentBundles.map((g) => (
-                <li key={g.id} className="rounded-2xl bg-soft p-4">
-                  <div className="flex flex-wrap items-center justify-between gap-2">
-                    <span>
-                      Version {g.version} · requested {formatDateTime(g.createdAt)}
-                    </span>
-                    <Badge tone={statusTone(g.status)}>{PROCESSING_LABELS[g.status]}</Badge>
-                  </div>
-                  {g.status === "READY" && canDownload && (
-                    <p className="mt-1">
-                      <a href={`/files/bundles/${g.id}`}>Download version {g.version}</a> ({g.pages} pages)
-                    </p>
-                  )}
-                  {g.error && (
-                    <p className="mt-1 text-danger">
-                      <span className="font-semibold">Error:</span> {g.error}
-                    </p>
-                  )}
-                  {g.report?.deviations && g.report.deviations.length > 0 && (
-                    <details className="mt-1">
-                      <summary className="cursor-pointer">
-                        Layout continuation notes ({g.report.deviations.length})
-                      </summary>
-                      <ul className="mt-1 list-disc pl-5">
-                        {g.report.deviations.map((d, i) => (
-                          <li key={i}>{d}</li>
-                        ))}
-                      </ul>
-                    </details>
-                  )}
-                </li>
-              ))}
-            </ul>
-            {canRegenerate && (
-              <Form method="post" className="mt-3">
-                <CsrfInput />
-                <input type="hidden" name="intent" value="regenerate" />
-                <ConfirmDialog
-                  trigger="Regenerate PDF (new version)"
-                  triggerClassName="btn-secondary"
-                  title="Regenerate the consolidated PDF?"
-                  confirmLabel="Queue regeneration"
-                >
-                  <p>
-                    A new version is generated from the same submitted revision. Earlier versions are kept
-                    unchanged.
-                  </p>
-                </ConfirmDialog>
-              </Form>
-            )}
-          </section>
-
+      <div className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_24rem]">
+        <div className="min-w-0 space-y-6">
           {app.revision &&
-            def.sections.map((s) => (
-              <section key={s.id} className="card" aria-labelledby={`s-${s.id}`}>
-                <h2 id={`s-${s.id}`}>{s.title}</h2>
-                <dl className="mt-3 space-y-3 text-sm">
-                  {s.fields.map((f) => (
-                    <div
-                      key={f.key}
-                      className={
-                        f.kind === "table" || f.kind === "list" ? "" : "grid gap-1 sm:grid-cols-[14rem_1fr]"
-                      }
-                    >
-                      <dt className="font-medium">{f.label}</dt>
-                      <dd>
-                        <AnswerView field={f} value={app.revision!.answers[f.key]} />
-                      </dd>
-                    </div>
-                  ))}
-                </dl>
-              </section>
-            ))}
+            def.sections.map((s) => {
+              if (s.kind === "uploads")
+                return (
+                  <section key={s.id} className="card" aria-labelledby={`s-${s.id}`}>
+                    <h2 id={`s-${s.id}`} className="text-xl">
+                      Documents submitted
+                    </h2>
+                    <ul className="mt-3 divide-y divide-line text-sm">
+                      {app.revision!.manifest.map((m) => (
+                        <li
+                          key={m.documentId}
+                          className="flex flex-wrap items-center justify-between gap-2 py-2.5"
+                        >
+                          <span className="min-w-0">
+                            <span className="block font-medium">{DOCUMENT_TYPE_LABELS[m.documentType]}</span>
+                            {canDownload ? (
+                              <a href={`/files/documents/${m.documentId}`} className="break-all">
+                                {m.originalName}
+                              </a>
+                            ) : (
+                              <span className="break-all">{m.originalName}</span>
+                            )}
+                          </span>
+                          <Badge tone={statusTone(app.scans[m.documentId] ?? "PENDING")}>
+                            {app.scans[m.documentId] === "CLEAN"
+                              ? "Checked"
+                              : (app.scans[m.documentId] ?? "—")}
+                          </Badge>
+                        </li>
+                      ))}
+                    </ul>
+                  </section>
+                );
+              const fields = s.fields.filter((f) => conditionMet(f.when, answers));
+              if (!fields.length) return null;
+              return (
+                <section key={s.id} className="card" aria-labelledby={`s-${s.id}`}>
+                  <h2 id={`s-${s.id}`} className="text-xl">
+                    {s.title}
+                  </h2>
+                  <dl className="mt-4 grid gap-x-6 gap-y-4 text-[15px] md:grid-cols-2">
+                    {fields.map((f) => (
+                      <div
+                        key={f.key}
+                        className={
+                          f.kind === "table" || f.kind === "list" || f.kind === "textarea"
+                            ? "md:col-span-2"
+                            : ""
+                        }
+                      >
+                        <dt className="text-sm font-semibold text-muted">{f.label}</dt>
+                        <dd className="mt-0.5">
+                          <AnswerView field={f} value={answers[f.key]} />
+                        </dd>
+                      </div>
+                    ))}
+                  </dl>
+                </section>
+              );
+            })}
         </div>
 
         <aside className="space-y-6">
-          {transitions.length > 0 && (
-            <section className="card" aria-labelledby="decide">
-              <h2 id="decide">Status decision</h2>
-              <div className="mt-3 space-y-4">
-                {transitions.map((t) => (
-                  <Form key={t.to} method="post" className="space-y-2 rounded-2xl bg-soft p-4">
-                    <CsrfInput />
-                    <input type="hidden" name="intent" value="transition" />
-                    <input type="hidden" name="to" value={t.to} />
-                    <label htmlFor={`reason-${t.to}`} className="block text-sm font-medium">
-                      {t.label}: reason {t.reasonRequired ? "(required)" : "(optional)"}
+          {isAssignedHod && HOD_STAGE.includes(app.status) && (
+            <section className="card space-y-4 border-brand-600/30" aria-labelledby="decide">
+              <div>
+                <h2 id="decide" className="text-xl">
+                  Your decision
+                </h2>
+                <p className="mt-1 text-sm text-muted">
+                  The candidate applied for <strong>{POSITION_LABELS[app.applied]}</strong>. You can change
+                  your decision until you approve the department summary sheet.
+                </p>
+              </div>
+              <Form method="post" className="space-y-4">
+                <CsrfInput />
+                <input type="hidden" name="intent" value="decision" />
+                <fieldset className="space-y-2">
+                  <legend className="text-sm font-semibold">Decision</legend>
+                  {[
+                    ["ACCEPT", "Accept as applied", `Consider for ${POSITION_LABELS[app.applied]}`],
+                    ...(changeOptions.length
+                      ? [["RECOMMEND_CHANGE", "Recommend a different position", "Needs Admin approval"]]
+                      : []),
+                    ["REJECT", "Reject", "Reason required"],
+                  ].map(([v, l, h]) => (
+                    <label
+                      key={v}
+                      className="flex cursor-pointer items-start gap-3 rounded-xl border border-line p-3 has-[:checked]:border-ink has-[:checked]:bg-soft"
+                    >
+                      <input
+                        type="radio"
+                        name="decision"
+                        value={v}
+                        checked={decision === v}
+                        onChange={() => setDecision(v!)}
+                        className="mt-1 h-4 w-4"
+                        required
+                      />
+                      <span>
+                        <span className="block font-semibold">{l}</span>
+                        <span className="text-sm text-muted">{h}</span>
+                      </span>
+                    </label>
+                  ))}
+                </fieldset>
+                {decision === "RECOMMEND_CHANGE" && (
+                  <div>
+                    <label htmlFor="toPosition" className="block text-sm font-semibold">
+                      Recommend for
+                    </label>
+                    <select id="toPosition" name="toPosition" required className="field-input mt-1">
+                      {changeOptions.map((p) => (
+                        <option key={p} value={p}>
+                          {POSITION_LABELS[p]}
+                        </option>
+                      ))}
+                    </select>
+                    {fe?.toPosition && <p className="mt-1 text-sm text-danger">{fe.toPosition[0]}</p>}
+                  </div>
+                )}
+                {decision && decision !== "ACCEPT" && (
+                  <div>
+                    <label htmlFor="reason" className="block text-sm font-semibold">
+                      Reason <span className="text-danger">*</span>
                     </label>
                     <textarea
-                      id={`reason-${t.to}`}
+                      id="reason"
                       name="reason"
-                      rows={2}
-                      maxLength={2000}
-                      required={t.reasonRequired}
-                      className="field-input"
+                      rows={3}
+                      required
+                      minLength={10}
+                      maxLength={3000}
+                      defaultValue={app.hodReason ?? ""}
+                      className="field-input mt-1"
+                      aria-invalid={!!fe?.reason}
                     />
-                    <ConfirmDialog
-                      trigger={t.label}
-                      triggerClassName={t.to === "REJECTED" ? "btn-danger w-full" : "btn-secondary w-full"}
-                      tone={t.to === "REJECTED" ? "danger" : "primary"}
-                      title={`${t.label}?`}
-                      confirmLabel="Confirm"
-                      disabled={busy}
-                    >
-                      <p>
-                        The status will change from “{STATUS_LABELS[app.status]}” to “{STATUS_LABELS[t.to]}”.
-                        This is recorded in the status history and audit log
-                        {["NEEDS_CLARIFICATION", "SHORTLISTED", "REJECTED", "APPROVED"].includes(t.to)
-                          ? " and the candidate is notified"
-                          : ""}
-                        .
-                      </p>
-                    </ConfirmDialog>
-                  </Form>
-                ))}
-              </div>
+                    {fe?.reason && <p className="mt-1 text-sm text-danger">{fe.reason[0]}</p>}
+                  </div>
+                )}
+                <div>
+                  <label htmlFor="remarks" className="block text-sm font-semibold">
+                    Remarks <span className="font-normal text-muted">(optional)</span>
+                  </label>
+                  <textarea
+                    id="remarks"
+                    name="remarks"
+                    rows={2}
+                    maxLength={3000}
+                    defaultValue={app.hodRemarks ?? ""}
+                    className="field-input mt-1"
+                  />
+                </div>
+                <button type="submit" className="btn-primary w-full" disabled={!decision || busy}>
+                  {app.hodDecision ? "Update decision" : "Record decision"}
+                </button>
+              </Form>
             </section>
           )}
 
-          {isHr && (
-            <section className="card" aria-labelledby="assign">
-              <h2 id="assign">Department reviewers</h2>
-              <ul className="mt-2 space-y-1 text-sm">
-                {app.assignments.length === 0 && <li className="text-muted">No reviewers assigned.</li>}
-                {app.assignments.map((a) => (
-                  <li key={a.id}>
-                    {a.name} —{" "}
-                    {a.completedAt ? `reviewed ${formatDateTime(a.completedAt)}` : "review pending"}
-                  </li>
-                ))}
-              </ul>
-              {(app.status === "UNDER_HR_REVIEW" || app.status === "UNDER_DEPARTMENT_REVIEW") && (
-                <Form method="post" className="mt-3 space-y-2">
+          {(app.hodDecision || app.positionChanges.length > 0) && (
+            <section className="card space-y-3" aria-labelledby="hod-out">
+              <h2 id="hod-out" className="text-xl">
+                HOD review
+              </h2>
+              {app.hodDecision && (
+                <p className="text-sm">
+                  <span className="font-semibold">
+                    {app.hodDecision === "ACCEPT"
+                      ? "Accepted as applied"
+                      : app.hodDecision === "REJECT"
+                        ? "Rejected"
+                        : "Position change recommended"}
+                  </span>{" "}
+                  · {formatDateTime(app.hodDecidedAt)}
+                  {app.hodReason && (
+                    <span className="mt-1 block whitespace-pre-line text-muted">{app.hodReason}</span>
+                  )}
+                  {app.hodRemarks && (
+                    <span className="mt-1 block whitespace-pre-line text-muted">
+                      Remarks: {app.hodRemarks}
+                    </span>
+                  )}
+                </p>
+              )}
+              {pending && (
+                <div className="space-y-3 rounded-2xl bg-warning-50 p-4 text-sm ring-1 ring-amber-200">
+                  <p>
+                    <strong>Recommendation awaiting approval:</strong> {POSITION_LABELS[pending.fromPosition]}{" "}
+                    → <strong>{POSITION_LABELS[pending.toPosition]}</strong>
+                  </p>
+                  <p className="whitespace-pre-line text-muted">{pending.reason}</p>
+                  {canApprove ? (
+                    <Form method="post" className="space-y-2">
+                      <CsrfInput />
+                      <input type="hidden" name="intent" value="position" />
+                      <input type="hidden" name="requestId" value={pending.id} />
+                      <label htmlFor="note" className="block font-semibold">
+                        Note <span className="font-normal text-muted">(required if not approving)</span>
+                      </label>
+                      <textarea id="note" name="note" rows={2} maxLength={2000} className="field-input" />
+                      <div className="flex gap-2">
+                        <button
+                          type="submit"
+                          name="approve"
+                          value="yes"
+                          className="btn-primary flex-1"
+                          disabled={busy}
+                        >
+                          Approve change
+                        </button>
+                        <button
+                          type="submit"
+                          name="approve"
+                          value="no"
+                          className="btn-secondary flex-1"
+                          disabled={busy}
+                        >
+                          Do not approve
+                        </button>
+                      </div>
+                      <p className="text-xs text-muted">
+                        The candidate’s submitted application is not changed.
+                      </p>
+                    </Form>
+                  ) : (
+                    <p className="text-xs text-muted">Waiting for the Admin (Dean / Principal) to approve.</p>
+                  )}
+                </div>
+              )}
+              {app.positionChanges.filter((p) => p.status !== "PENDING").length > 0 && (
+                <ul className="space-y-1 text-sm text-muted">
+                  {app.positionChanges
+                    .filter((p) => p.status !== "PENDING")
+                    .map((p) => (
+                      <li key={p.id}>
+                        {POSITION_LABELS[p.fromPosition]} → {POSITION_LABELS[p.toPosition]}:{" "}
+                        <span className="font-medium text-ink">
+                          {p.status === "APPROVED" ? "approved" : "not approved"}
+                        </span>{" "}
+                        {formatDateTime(p.decidedAt)}
+                        {p.decisionNote ? ` — ${p.decisionNote}` : ""}
+                      </li>
+                    ))}
+                </ul>
+              )}
+            </section>
+          )}
+
+          {canAssign && (ASSIGNABLE.includes(app.status) || app.status === "ASSIGNED_TO_HOD") && (
+            <section className="card space-y-3" aria-labelledby="assign">
+              <h2 id="assign" className="text-xl">
+                HOD assignment
+              </h2>
+              {ASSIGNABLE.includes(app.status) && (
+                <Form method="post" className="space-y-2">
                   <CsrfInput />
                   <input type="hidden" name="intent" value="assign" />
-                  <label htmlFor="reviewerId" className="block text-sm font-medium">
-                    Assign a reviewer
+                  <label htmlFor="hodId" className="block text-sm font-semibold">
+                    {app.hod ? "Move to another HOD" : `Move to a HOD of ${app.vacancy.department}`}
                   </label>
-                  <select id="reviewerId" name="reviewerId" required className="field-input">
-                    <option value="">Select…</option>
-                    {reviewers.map((r) => (
-                      <option key={r.id} value={r.id}>
-                        {r.profile?.fullName ?? r.email}
+                  <select id="hodId" name="hodId" required className="field-input">
+                    <option value="">Choose…</option>
+                    {hods.map((h) => (
+                      <option key={h.id} value={h.id}>
+                        {h.profile?.fullName ?? h.email}
                       </option>
                     ))}
                   </select>
+                  {!hods.length && (
+                    <p className="text-sm text-warning">No HOD is set up for this department.</p>
+                  )}
+                  <button type="submit" className="btn-secondary w-full" disabled={busy || !hods.length}>
+                    Move to HOD
+                  </button>
+                </Form>
+              )}
+              {app.status === "ASSIGNED_TO_HOD" && (
+                <Form method="post" className="space-y-2 border-t border-line pt-3">
+                  <CsrfInput />
+                  <input type="hidden" name="intent" value="unassign" />
+                  <label htmlFor="ureason" className="block text-sm font-semibold">
+                    Take back from the HOD — reason
+                  </label>
+                  <input id="ureason" name="reason" required minLength={5} className="field-input" />
                   <button type="submit" className="btn-secondary w-full" disabled={busy}>
-                    Assign
+                    Take back
                   </button>
                 </Form>
               )}
             </section>
           )}
 
-          <section className="card" aria-labelledby="reviews">
-            <h2 id="reviews">Reviews</h2>
-            <ul className="mt-2 space-y-3 text-sm">
-              {app.reviews.length === 0 && <li className="text-muted">No reviews recorded.</li>}
-              {app.reviews.map((r) => (
-                <li key={r.id} className="rounded-2xl bg-soft p-3">
-                  <p className="font-medium">
-                    {RECOMMENDATION_LABELS[r.recommendation]}
-                    {r.score != null ? ` · score ${r.score}` : ""}
-                  </p>
-                  <p className="text-xs text-muted">
-                    {r.stage === "HR" ? "HR screening" : "Department review"} · {r.by} ·{" "}
-                    {formatDateTime(r.at)}
-                  </p>
-                  <p className="mt-1 whitespace-pre-line">{r.comments}</p>
-                </li>
+          {transitions.length > 0 && (
+            <section className="card space-y-3" aria-labelledby="status">
+              <h2 id="status" className="text-xl">
+                Status
+              </h2>
+              {transitions.map((t) => (
+                <Form key={t.to} method="post" className="space-y-2 rounded-2xl bg-soft p-3">
+                  <CsrfInput />
+                  <input type="hidden" name="intent" value="transition" />
+                  <input type="hidden" name="to" value={t.to} />
+                  <label htmlFor={`r-${t.to}`} className="block text-sm font-semibold">
+                    {t.label} — reason {t.reasonRequired ? "(required)" : "(optional)"}
+                  </label>
+                  <textarea
+                    id={`r-${t.to}`}
+                    name="reason"
+                    rows={2}
+                    maxLength={2000}
+                    required={t.reasonRequired}
+                    className="field-input"
+                  />
+                  <ConfirmDialog
+                    trigger={t.label}
+                    triggerClassName={t.to === "REJECTED" ? "btn-danger w-full" : "btn-secondary w-full"}
+                    tone={t.to === "REJECTED" ? "danger" : "primary"}
+                    title={`${t.label}?`}
+                    confirmLabel="Confirm"
+                    disabled={busy}
+                  >
+                    <p>
+                      The status changes from “{STATUS_LABELS[app.status]}” to “{STATUS_LABELS[t.to]}”. This
+                      is recorded in the history and audit log.
+                    </p>
+                  </ConfirmDialog>
+                </Form>
               ))}
-            </ul>
-            {(canReviewDept || canReviewHr) && (
-              <Form method="post" className="mt-4 space-y-2">
-                <CsrfInput />
-                <input type="hidden" name="intent" value="review" />
-                <label htmlFor="recommendation" className="block text-sm font-medium">
-                  Recommendation
-                </label>
-                <select id="recommendation" name="recommendation" required className="field-input">
-                  {Object.entries(RECOMMENDATION_LABELS).map(([k, v]) => (
-                    <option key={k} value={k}>
-                      {v}
-                    </option>
-                  ))}
-                </select>
-                <label htmlFor="score" className="block text-sm font-medium">
-                  Score (0–100, optional)
-                </label>
-                <input id="score" name="score" type="number" min={0} max={100} className="field-input" />
-                <label htmlFor="comments" className="block text-sm font-medium">
-                  Assessment and comments
-                </label>
-                <textarea
-                  id="comments"
-                  name="comments"
-                  rows={4}
-                  required
-                  minLength={10}
-                  maxLength={5000}
-                  className="field-input"
-                />
-                <button type="submit" className="btn-primary w-full" disabled={busy}>
-                  Record {canReviewDept ? "department review" : "screening note"}
-                </button>
-              </Form>
-            )}
-          </section>
+            </section>
+          )}
+
+          {canRegenerate && (
+            <Form method="post">
+              <CsrfInput />
+              <input type="hidden" name="intent" value="regenerate" />
+              <ConfirmDialog
+                trigger="Regenerate PDF (new version)"
+                triggerClassName="btn-secondary w-full"
+                title="Regenerate the PDF?"
+                confirmLabel="Queue regeneration"
+              >
+                <p>A new version is generated from the same submitted revision. Earlier versions are kept.</p>
+              </ConfirmDialog>
+            </Form>
+          )}
 
           <section className="card" aria-labelledby="history">
-            <h2 id="history">Status history</h2>
-            <ol className="mt-2 space-y-2 text-sm">
+            <h2 id="history" className="text-xl">
+              History
+            </h2>
+            <ol className="mt-3 space-y-3 border-l-2 border-line pl-4 text-sm">
               {app.history.map((h, i) => (
                 <li key={i}>
-                  <span className="font-medium">{STATUS_LABELS[h.to as AppStatus]}</span> ·{" "}
-                  {formatDateTime(h.at)}
+                  <span className="font-semibold">{STATUS_LABELS[h.to]}</span>
+                  <span className="block text-muted">{formatDateTime(h.at)}</span>
                   {h.reason && <span className="block whitespace-pre-line text-muted">{h.reason}</span>}
                 </li>
               ))}

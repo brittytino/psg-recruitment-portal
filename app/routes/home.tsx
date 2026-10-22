@@ -15,12 +15,10 @@ export const meta: Route.MetaFunction = () => [
 export async function loader() {
   const vacancies = await listPublishedVacancies();
   const departments = new Set(vacancies.map((v) => v.departmentId)).size;
-  const posts = vacancies.reduce((n, v) => n + (v.numberOfPosts ?? 0), 0);
   return {
     vacancies: vacancies.slice(0, 6),
     total: vacancies.length,
     departments,
-    posts,
     nextClosing: vacancies[0] ?? null,
   };
 }
@@ -33,7 +31,7 @@ const STEPS: [string, string, string][] = [
 ];
 
 export default function Home({ loaderData }: Route.ComponentProps) {
-  const { vacancies, total, departments, posts, nextClosing } = loaderData;
+  const { vacancies, total, departments, nextClosing } = loaderData;
   const statsContainerRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -140,7 +138,7 @@ export default function Home({ loaderData }: Route.ComponentProps) {
           {/* Responsive 4-Column Stats Ribbon with GSAP Stagger */}
           <div
             ref={statsContainerRef}
-            className="mt-10 sm:mt-12 grid grid-cols-2 gap-3 sm:gap-5 lg:grid-cols-4 w-full max-w-5xl mx-auto text-left"
+            className="mt-10 sm:mt-12 grid grid-cols-2 gap-3 sm:gap-5 lg:grid-cols-3 w-full max-w-5xl mx-auto text-left"
           >
             <div className="stat-ribbon-tile flex items-center gap-2.5 sm:gap-3.5 rounded-2xl bg-white/95 p-3.5 sm:p-5 shadow-[var(--shadow-soft)] backdrop-blur-sm border border-white/70 transition-all hover:-translate-y-0.5 hover:shadow-md">
               <span className="grid h-10 w-10 sm:h-12 sm:w-12 shrink-0 place-items-center rounded-xl bg-tile-pink text-xl sm:text-2xl shadow-xs">
@@ -151,18 +149,6 @@ export default function Home({ loaderData }: Route.ComponentProps) {
                   Open Vacancies
                 </span>
                 <span className="block text-xl sm:text-3xl font-extrabold text-ink">{total}</span>
-              </div>
-            </div>
-
-            <div className="stat-ribbon-tile flex items-center gap-2.5 sm:gap-3.5 rounded-2xl bg-white/95 p-3.5 sm:p-5 shadow-[var(--shadow-soft)] backdrop-blur-sm border border-white/70 transition-all hover:-translate-y-0.5 hover:shadow-md">
-              <span className="grid h-10 w-10 sm:h-12 sm:w-12 shrink-0 place-items-center rounded-xl bg-tile-blue text-xl sm:text-2xl shadow-xs">
-                🎓
-              </span>
-              <div className="min-w-0">
-                <span className="block text-[10px] sm:text-xs font-semibold text-muted uppercase tracking-wider truncate">
-                  Faculty Posts
-                </span>
-                <span className="block text-xl sm:text-3xl font-extrabold text-ink">{posts || "—"}</span>
               </div>
             </div>
 

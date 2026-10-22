@@ -13,7 +13,12 @@ import type {
   TableField,
   TableRow,
 } from "~/modules/forms/types";
-import type { FieldIssue } from "~/modules/forms/validation";
+import { conditionMet, rowDuration, type FieldIssue } from "~/modules/forms/validation";
+
+const todayIso = () => new Date().toISOString().slice(0, 10);
+/** Scalars sit in a two-column grid; tables, lists, long text and wide fields span both columns. */
+const fullWidth = (f: FieldDef) =>
+  f.kind === "table" || f.kind === "list" || f.kind === "textarea" || !!f.wide;
 
 /**
  * Renders one section of an official form definition as accessible inputs. The component is
@@ -38,20 +43,22 @@ export function SectionFields({
   csrf?: string;
   maxUploadMb?: number;
 }) {
+  const visible = section.fields.filter((f) => conditionMet(f.when, answers));
   return (
-    <div className="space-y-6">
-      {section.fields.map((f) => (
-        <FieldRenderer
-          key={f.key}
-          field={f}
-          value={answers[f.key]}
-          derived={derived[f.key]}
-          issues={issues}
-          onChange={(v) => onChange(f.key, v)}
-          applicationId={applicationId}
-          csrf={csrf}
-          maxUploadMb={maxUploadMb}
-        />
+    <div className="grid gap-x-6 gap-y-5 md:grid-cols-2">
+      {visible.map((f) => (
+        <div key={f.key} className={fullWidth(f) ? "md:col-span-2" : undefined}>
+          <FieldRenderer
+            field={f}
+            value={answers[f.key]}
+            derived={derived[f.key]}
+            issues={issues}
+            onChange={(v) => onChange(f.key, v)}
+            applicationId={applicationId}
+            csrf={csrf}
+            maxUploadMb={maxUploadMb}
+          />
+        </div>
       ))}
     </div>
   );
@@ -151,7 +158,7 @@ export function ScalarInput({
           className="rounded-xl border border-dashed border-brand-600/30 bg-brand-50 px-4 py-2.5 text-sm"
           aria-describedby={describedBy}
         >
-          {str || "Calculated automatically"}
+          {str || "Calculated automatically from your answers"}
         </p>
       );
       break;
@@ -233,7 +240,7 @@ export function ScalarInput({
   }
   return (
     <div className={compact ? "space-y-1" : "space-y-1"}>
-      <label htmlFor={id} className="block text-sm font-medium">
+      <label htmlFor={id} className="block text-[15px] font-semibold text-ink">
         {field.label}
         {required ? (
           <span className="text-danger" aria-hidden="true">
@@ -247,7 +254,7 @@ export function ScalarInput({
         )}
       </label>
       {field.help && (
-        <p id={hintId} className="text-xs text-muted">
+        <p id={hintId} className="text-sm text-muted">
           {field.help}
         </p>
       )}
@@ -455,10 +462,7 @@ function TableEditor({
   const tableError = issueFor(issues, field.key);
   const update = (i: number, key: string, v: string | number | null) =>
     onChange(rows.map((r, j) => (j === i ? { ...r, [key]: v } : r)));
-  const updateAttachment = (
-    i: number,
-    doc: { id: string; name: string; type: string } | null,
-  ) =>
+  const updateAttachment = (i: number, doc: { id: string; name: string; type: string } | null) =>
     onChange(
       rows.map((r, j) =>
         j === i
@@ -471,11 +475,13 @@ function TableEditor({
           : r,
       ),
     );
+  const item = field.itemLabel ?? "Entry";
+  const canRemove = rows.length > (field.minRows ?? 0);
   const add = () =>
     onChange([
       ...rows,
       {
-        ...Object.fromEntries(field.columns.map((c) => [c.key, null])),
+        ...Object.fromEntries(field.columns.filter((c) => c.kind !== "derived").map((c) => [c.key, null])),
         ...(field.attachment ? { documentId: null, documentName: null, documentType: null } : {}),
       },
     ]);
@@ -512,11 +518,24 @@ function TableEditor({
           </span>
         )}
       </legend>
-      <p className="text-xs text-muted">
-        The printed form has {field.templateRows} rows; additional entries are added to the same table. Up to{" "}
-        {field.maxRows} entries.
-      </p>
-      {field.help && <p className="text-xs text-muted">{field.help}</p>}
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <p className="text-sm text-muted">
+          {field.minRows && field.minRows > 0
+            ? `Add at least ${field.minRows}${field.maxRows <= 10 ? ` and at most ${field.maxRows}` : ""} ${item.toLowerCase()}${field.minRows === 1 ? "" : "s"}.`
+            : field.templateRows > 0
+              ? `The printed form has ${field.templateRows} rows; additional entries are added to the same table.`
+              : "Add an entry for each item. Leave empty if not applicable."}
+        </p>
+        {field.countLabel && (
+          <span
+            className="rounded-full bg-white px-3 py-1 text-sm font-semibold shadow-xs"
+            aria-live="polite"
+          >
+            {field.countLabel}: {rows.length}
+          </span>
+        )}
+      </div>
+      {field.help && <p className="text-sm text-muted">{field.help}</p>}
       {tableError && (
         <p className="text-sm text-danger" role="alert">
           {tableError}
@@ -527,7 +546,9 @@ function TableEditor({
         {rows.map((row, i) => (
           <li key={i} className="rounded-2xl bg-white p-4 shadow-[var(--shadow-soft)]">
             <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
-              <p className="text-sm font-semibold">Entry {i + 1}</p>
+              <p className="text-base font-semibold">
+                {item} {i + 1}
+              </p>
               <div className="flex gap-2">
                 <button
                   type="button"
@@ -547,21 +568,29 @@ function TableEditor({
                 >
                   Down
                 </button>
-                <RemoveButton label={`entry ${i + 1}`} onConfirm={() => remove(i)} />
+                {canRemove && (
+                  <RemoveButton label={`${item.toLowerCase()} ${i + 1}`} onConfirm={() => remove(i)} />
+                )}
               </div>
             </div>
-            <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-              {field.columns.map((c) => (
-                <ScalarInput
-                  key={c.key}
-                  compact
-                  field={c}
-                  path={`${field.key}.${i}.${c.key}`}
-                  value={(row[c.key] as string | number | null | undefined) ?? null}
-                  error={issueFor(issues, `${field.key}.${i}.${c.key}`)}
-                  onChange={(v) => update(i, c.key, v)}
-                />
-              ))}
+            <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+              {field.columns
+                .filter((c) => conditionMet(c.when, row))
+                .map((c) => (
+                  <ScalarInput
+                    key={c.key}
+                    compact
+                    field={c}
+                    path={`${field.key}.${i}.${c.key}`}
+                    value={
+                      c.kind === "derived"
+                        ? rowDuration(row, todayIso()) || null
+                        : ((row[c.key] as string | number | null | undefined) ?? null)
+                    }
+                    error={issueFor(issues, `${field.key}.${i}.${c.key}`)}
+                    onChange={(v) => update(i, c.key, v)}
+                  />
+                ))}
             </div>
             {field.attachment && (
               <InlineAttachmentEditor
@@ -580,9 +609,14 @@ function TableEditor({
           </li>
         ))}
       </ol>
-      <button type="button" className="btn-secondary" onClick={add} disabled={rows.length >= field.maxRows}>
-        Add entry to “{field.label}”
-      </button>
+      {rows.length < field.maxRows ? (
+        <button type="button" className="btn-secondary" onClick={add}>
+          + Add {rows.length ? "another " : ""}
+          {item.toLowerCase()}
+        </button>
+      ) : (
+        <p className="text-sm text-muted">The maximum of {field.maxRows} entries has been reached.</p>
+      )}
     </fieldset>
   );
 }
@@ -784,9 +818,10 @@ function InlineAttachmentEditor({
           disabled={uploading}
           className="text-xs file:mr-3 file:cursor-pointer file:rounded-xl file:border-0 file:bg-brand-50 file:px-3 file:py-1.5 file:text-xs file:font-semibold file:text-brand-700 hover:file:bg-brand-100"
           aria-invalid={!!(error || uploadError)}
-          aria-describedby={[uploadError ? `${errId}-up` : undefined, error ? errId : undefined]
-            .filter(Boolean)
-            .join(" ") || undefined}
+          aria-describedby={
+            [uploadError ? `${errId}-up` : undefined, error ? errId : undefined].filter(Boolean).join(" ") ||
+            undefined
+          }
         />
         {uploading && (
           <span className="text-xs text-brand-700 font-medium animate-pulse">
@@ -826,10 +861,12 @@ function ListEditor({
       <legend id={headingId} className="px-1 text-base font-semibold">
         {field.label}
       </legend>
-      <p className="text-xs text-muted">
-        Space for about {field.templateCapacity} entries is printed; longer lists continue on additional lines
-        without truncation.
-      </p>
+      {field.templateCapacity > 0 && (
+        <p className="text-sm text-muted">
+          Space for about {field.templateCapacity} entries is printed; longer lists continue on additional
+          lines without truncation.
+        </p>
+      )}
       {field.help && <p className="text-xs text-muted">{field.help}</p>}
       {items.length === 0 && <p className="text-sm text-muted">No entries yet.</p>}
       <ol className="space-y-3">
@@ -915,7 +952,13 @@ export function AnswerView({ field, value }: { field: FieldDef; value: Answers[s
               <tr key={i}>
                 <td>{i + 1}</td>
                 {field.columns.map((c) => (
-                  <td key={c.key}>{fmt(c, r[c.key]) ?? "—"}</td>
+                  <td key={c.key}>
+                    {c.kind === "derived"
+                      ? rowDuration(r, todayIso()) || "—"
+                      : conditionMet(c.when, r)
+                        ? (fmt(c, r[c.key]) ?? "—")
+                        : "—"}
+                  </td>
                 ))}
                 {hasAttachments && (
                   <td>

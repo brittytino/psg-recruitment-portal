@@ -15,7 +15,7 @@ ClamAV downloads signatures on first start (several minutes); the worker retries
 ```sh
 docker compose -f compose.yaml -f compose.dev.yaml up -d db redis converter clamav mailpit
 . scripts/host-env.sh
-npx prisma migrate deploy && SEED_DEMO=true npm run db:seed     # uses MIGRATION_DATABASE_URL? see below
+npx prisma migrate deploy && npm run db:seed                    # owner URL, see below
 npm run dev                                                     # http://localhost:3000
 npm run worker                                                  # in a second terminal
 ```

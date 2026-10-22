@@ -32,7 +32,7 @@ export default function Vacancy({ loaderData }: Route.ComponentProps) {
   const days = daysLeft(v.closesAt);
   const tiles: [string, string, string, string][] = [
     ["bg-tile-green", "Position", POSITION_LABELS[v.position] ?? v.position, "🎓"],
-    ["bg-tile-blue", "Number of posts", v.numberOfPosts ? String(v.numberOfPosts) : "Not specified", "👥"],
+    ["bg-tile-blue", "Department", v.department.name, "🏛️"],
     ["bg-tile-orange", "Closes", formatDate(v.closesAt), "⏳"],
     ["bg-tile-purple", "Time left", open ? `${days} day${days === 1 ? "" : "s"}` : "Closed", "🗓️"],
   ];

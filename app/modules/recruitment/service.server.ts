@@ -6,6 +6,7 @@ import type { SessionUser } from "~/modules/auth/session.server";
 import { prisma } from "~/modules/core/db.server";
 import { ConflictError, NotFoundError, ValidationError } from "~/modules/core/errors";
 import { DOCUMENT_TYPES, DOCUMENT_TYPE_LABELS } from "~/modules/documents/policy";
+import { academicYearOf } from "~/modules/applications/reference";
 
 const fieldErrors = (e: z.ZodError) => z.flattenError(e).fieldErrors;
 /** Accepts ISO strings; a value without a zone (from datetime-local inputs) is India Standard Time. */
@@ -93,8 +94,8 @@ const departmentSchema = z.object({
     .string()
     .trim()
     .toUpperCase()
-    .regex(/^[A-Z0-9-]{2,12}$/, "2-12 letters, digits or hyphens"),
-  name: z.string().trim().min(3).max(150),
+    .regex(/^[A-Z0-9]{2,8}$/, "2–8 capital letters or digits, e.g. CSE"),
+  name: z.string().trim().min(3, "Enter the department name").max(150),
   description: z
     .string()
     .trim()
@@ -103,8 +104,9 @@ const departmentSchema = z.object({
     .transform((v) => v || null),
 });
 
+/** Departments and HODs are set up by the Admin (Dean / Principal). */
 export async function createDepartment(user: SessionUser | null, input: unknown) {
-  const u = requirePermission(user, "recruitment:manage");
+  const u = requirePermission(user, "user:manage");
   const p = departmentSchema.safeParse(input);
   if (!p.success) throw new ValidationError("Please correct the highlighted fields", fieldErrors(p.error));
   try {
@@ -128,7 +130,7 @@ export async function createDepartment(user: SessionUser | null, input: unknown)
 }
 
 export async function addDiscipline(user: SessionUser | null, departmentId: string, nameRaw: unknown) {
-  const u = requirePermission(user, "recruitment:manage");
+  const u = requirePermission(user, "user:manage");
   const name = z.string().trim().min(2).max(150).safeParse(nameRaw);
   if (!name.success) throw new ValidationError("Enter a discipline name");
   try {
@@ -165,6 +167,16 @@ const cycleSchema = z
       .max(5000)
       .optional()
       .transform((v) => v || null),
+    academicYear: z
+      .string()
+      .trim()
+      .regex(/^d{4}-d{2}$/, "Use the form 2026-27")
+      .refine(
+        (y) => (Number(y.slice(0, 4)) + 1) % 100 === Number(y.slice(5)),
+        "The two years must be consecutive",
+      )
+      .optional()
+      .or(z.literal("").transform(() => undefined)),
     opensAt: dateTime,
     closesAt: dateTime,
   })
@@ -179,7 +191,13 @@ export async function createCycle(user: SessionUser | null, input: unknown) {
   if (!p.success) throw new ValidationError("Please correct the highlighted fields", fieldErrors(p.error));
   try {
     return await prisma.$transaction(async (tx) => {
-      const c = await tx.recruitmentCycle.create({ data: { ...p.data, createdById: u.id } });
+      const c = await tx.recruitmentCycle.create({
+        data: {
+          ...p.data,
+          academicYear: p.data.academicYear ?? academicYearOf(p.data.opensAt),
+          createdById: u.id,
+        },
+      });
       await audit(
         {
           actorId: u.id,
@@ -307,7 +325,7 @@ export async function createVacancy(user: SessionUser | null, input: unknown) {
           eligibility: { create: criteria.map((description, sortOrder) => ({ description, sortOrder })) },
           requiredDocuments: {
             create: [...new Set(v.requiredDocuments)]
-              .filter((t) => t !== "PHOTOGRAPH")
+              .filter((t) => t !== "PHOTOGRAPH" && t !== "SIGNATURE")
               .map((t, sortOrder) => ({
                 documentType: t,
                 label: DOCUMENT_TYPE_LABELS[t],
@@ -369,7 +387,14 @@ export async function adminOverview(user: SessionUser | null) {
   const [departments, cycles, vacancies, templates] = await Promise.all([
     prisma.department.findMany({
       orderBy: { name: "asc" },
-      include: { disciplines: { orderBy: { name: "asc" } }, _count: { select: { vacancies: true } } },
+      include: {
+        disciplines: { orderBy: { name: "asc" } },
+        _count: { select: { vacancies: true } },
+        roles: {
+          where: { role: "HOD", user: { status: "ACTIVE" } },
+          select: { user: { select: { email: true, profile: { select: { fullName: true } } } } },
+        },
+      },
     }),
     prisma.recruitmentCycle.findMany({
       orderBy: { opensAt: "desc" },

@@ -13,6 +13,10 @@ export const APPLICATION_STATUSES = [
   "REJECTED",
   "APPROVED",
   "WITHDRAWN",
+  "ASSIGNED_TO_HOD",
+  "HOD_ACCEPTED",
+  "HOD_RECOMMENDED_CHANGE",
+  "HOD_REJECTED",
 ] as const;
 export type AppStatus = (typeof APPLICATION_STATUSES)[number];
 
@@ -25,7 +29,7 @@ export interface Transition {
   label: string;
   reasonRequired: boolean;
   /** Extra precondition, evaluated by the service. */
-  requires?: "documentsReady" | "departmentReview";
+  requires?: "documentsReady" | "departmentReview" | "positionDecided";
 }
 
 export const TRANSITIONS: readonly Transition[] = [
@@ -55,6 +59,15 @@ export const TRANSITIONS: readonly Transition[] = [
     reasonRequired: true,
   },
   { from: "SHORTLISTED", to: "WITHDRAWN", actor: "candidate", label: "Withdraw", reasonRequired: true },
+  { from: "ASSIGNED_TO_HOD", to: "WITHDRAWN", actor: "candidate", label: "Withdraw", reasonRequired: true },
+  { from: "HOD_ACCEPTED", to: "WITHDRAWN", actor: "candidate", label: "Withdraw", reasonRequired: true },
+  {
+    from: "HOD_RECOMMENDED_CHANGE",
+    to: "WITHDRAWN",
+    actor: "candidate",
+    label: "Withdraw",
+    reasonRequired: true,
+  },
 
   {
     from: "SUBMITTED",
@@ -116,6 +129,51 @@ export const TRANSITIONS: readonly Transition[] = [
     reasonRequired: true,
   },
   { from: "SHORTLISTED", to: "REJECTED", actor: "hr", label: "Record rejection", reasonRequired: true },
+  // After the HOD's decision (department-wise review). Assignment to a HOD and the HOD's decision
+  // itself are recorded by the review service, not by these transitions.
+  {
+    from: "SUBMITTED",
+    to: "NEEDS_CLARIFICATION",
+    actor: "hr",
+    label: "Return to candidate for clarification",
+    reasonRequired: true,
+  },
+  {
+    from: "HOD_ACCEPTED",
+    to: "SHORTLISTED",
+    actor: "hr",
+    label: "Shortlist",
+    reasonRequired: false,
+  },
+  {
+    from: "HOD_RECOMMENDED_CHANGE",
+    to: "SHORTLISTED",
+    actor: "hr",
+    label: "Shortlist",
+    reasonRequired: false,
+    requires: "positionDecided",
+  },
+  {
+    from: "HOD_ACCEPTED",
+    to: "REJECTED",
+    actor: "hr",
+    label: "Record rejection",
+    reasonRequired: true,
+  },
+  {
+    from: "HOD_RECOMMENDED_CHANGE",
+    to: "REJECTED",
+    actor: "hr",
+    label: "Record rejection",
+    reasonRequired: true,
+  },
+  {
+    from: "HOD_REJECTED",
+    to: "REJECTED",
+    actor: "hr",
+    label: "Confirm rejection",
+    reasonRequired: false,
+  },
 ];
 
 export const TERMINAL: readonly AppStatus[] = ["REJECTED", "APPROVED", "WITHDRAWN"];
@@ -141,7 +199,22 @@ export const STATUS_LABELS: Record<AppStatus, string> = {
   REJECTED: "Not selected",
   APPROVED: "Selected",
   WITHDRAWN: "Withdrawn",
+  ASSIGNED_TO_HOD: "With HOD for review",
+  HOD_ACCEPTED: "Accepted by HOD",
+  HOD_RECOMMENDED_CHANGE: "HOD recommended position change",
+  HOD_REJECTED: "Rejected by HOD",
 };
+
+/** Statuses in which an application is waiting for, or has, a HOD decision. */
+export const HOD_STAGE: readonly AppStatus[] = [
+  "ASSIGNED_TO_HOD",
+  "HOD_ACCEPTED",
+  "HOD_RECOMMENDED_CHANGE",
+  "HOD_REJECTED",
+];
+
+/** Submitted applications that may be moved to a HOD (bulk assignment). */
+export const ASSIGNABLE: readonly AppStatus[] = ["SUBMITTED", "UNDER_HR_REVIEW", "ASSIGNED_TO_HOD"];
 
 export const PROCESSING_LABELS: Record<string, string> = {
   NOT_STARTED: "Not started",

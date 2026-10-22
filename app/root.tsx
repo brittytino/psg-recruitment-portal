@@ -16,16 +16,20 @@ import { AnimatePresence, motion } from "framer-motion";
 import {
   Briefcase,
   ChevronRight,
+  ClipboardCheck,
+  FileSpreadsheet,
   FileText,
   HelpCircle,
   LayoutDashboard,
   LogIn,
   LogOut,
   Menu,
+  Settings,
   ShieldCheck,
   UserPlus,
   Users,
   X,
+  type LucideIcon,
 } from "lucide-react";
 import type { Route } from "./+types/root";
 import "./app.css";
@@ -36,7 +40,31 @@ import {
   isHodReviewer,
   isHrOfficer,
   isStaff,
+  primaryRoleLabel,
+  type RoleGrant,
 } from "./modules/auth/permissions";
+
+/** Staff navigation, by role. Every page re-checks permissions on the server. */
+function staffNav(grants: RoleGrant[]): { to: string; label: string; icon: LucideIcon; end?: boolean }[] {
+  const items: { to: string; label: string; icon: LucideIcon; end?: boolean }[] = [];
+  const office = isAdmin(grants) || isHrOfficer(grants);
+  if (office) items.push({ to: "/staff", label: "Applications", icon: LayoutDashboard, end: true });
+  if (isHodReviewer(grants)) items.push({ to: "/staff/review", label: "My reviews", icon: ClipboardCheck });
+  items.push({
+    to: "/staff/summary",
+    label: office ? "Summary & export" : "Summary sheet",
+    icon: FileSpreadsheet,
+  });
+  if (hasPermission(grants, "recruitment:manage"))
+    items.push({ to: "/admin", label: "Job profiles", icon: Briefcase, end: true });
+  if (hasPermission(grants, "user:manage"))
+    items.push({ to: "/admin/users", label: "Users & roles", icon: Users });
+  if (hasPermission(grants, "settings:manage"))
+    items.push({ to: "/admin/settings", label: "Settings", icon: Settings });
+  if (hasPermission(grants, "audit:read"))
+    items.push({ to: "/staff/audit", label: "Audit", icon: ShieldCheck });
+  return items;
+}
 import { csrfToken, getSessionUser } from "./modules/auth/session.server";
 import { env } from "./modules/core/env.server";
 import { CsrfInput } from "./components/forms";
@@ -140,9 +168,7 @@ function Header() {
   const user = root?.user;
   const grants = user?.grants ?? [];
   const staff = isStaff(grants);
-  const isAdm = isAdmin(grants);
-  const isHr = isHrOfficer(grants);
-  const isHod = isHodReviewer(grants);
+  const nav = staffNav(grants);
   const location = useLocation();
   const [mobileOpen, setMobileOpen] = useState(false);
 
@@ -154,18 +180,7 @@ function Header() {
   const rawName = user?.displayName ?? "";
   const cleanDisplayName = rawName.replace(/\s*\([^)]*\)\s*/g, "").trim() || rawName || "Staff Member";
 
-  // Clean institutional role label for header pill
-  const roleLabel = (() => {
-    if (user?.email === "dean.admn@psgtech.ac.in") return "Dean · Admin";
-    if (user?.email === "principal@psgtech.ac.in") return "Principal · Admin";
-    if (user?.email === "admin.n4@psgtech.ac.in") return "HR-N4 Section";
-    if (user?.email === "hod.cse@psgtech.ac.in") return "HOD (CSE)";
-    if (isAdm) return "Institutional Admin";
-    if (isHr) return "HR-N4 Section";
-    if (isHod) return "HOD Reviewer";
-    if (staff) return "Staff";
-    return "Applicant";
-  })();
+  const roleLabel = primaryRoleLabel(grants);
 
   const initials = (cleanDisplayName || "")
     .split(/\s+/)
@@ -199,44 +214,17 @@ function Header() {
             aria-label="Staff Workspace Navigation"
             className="hidden lg:flex items-center gap-1 p-1 rounded-2xl bg-slate-100/80 border border-slate-200/80 shadow-2xs"
           >
-            {hasPermission(grants, "application:list") && (
+            {nav.map((n) => (
               <NavLink
-                to="/staff"
-                end
+                key={n.to}
+                to={n.to}
+                end={n.end}
                 className={({ isActive }) => (isActive ? staffNavActive : staffNavInactive)}
               >
-                <LayoutDashboard className="h-4 w-4 text-brand-600" />
-                <span>{isHod ? "Department Review" : isHr ? "Applications Queue" : "Applications"}</span>
+                <n.icon className="h-4 w-4 text-brand-600" aria-hidden="true" />
+                <span>{n.label}</span>
               </NavLink>
-            )}
-            {hasPermission(grants, "recruitment:manage") && (
-              <NavLink
-                to="/admin"
-                end
-                className={({ isActive }) => (isActive ? staffNavActive : staffNavInactive)}
-              >
-                <Briefcase className="h-4 w-4 text-brand-600" />
-                <span>{isHr ? "Job Profiles" : "Job Profiles & Cycles"}</span>
-              </NavLink>
-            )}
-            {hasPermission(grants, "user:manage") && (
-              <NavLink
-                to="/admin/users"
-                className={({ isActive }) => (isActive ? staffNavActive : staffNavInactive)}
-              >
-                <Users className="h-4 w-4 text-brand-600" />
-                <span>Users & Roles</span>
-              </NavLink>
-            )}
-            {hasPermission(grants, "audit:read") && (
-              <NavLink
-                to="/staff/audit"
-                className={({ isActive }) => (isActive ? staffNavActive : staffNavInactive)}
-              >
-                <ShieldCheck className="h-4 w-4 text-brand-600" />
-                <span>Audit Trail</span>
-              </NavLink>
-            )}
+            ))}
           </nav>
         ) : (
           <nav aria-label="Main Navigation" className="hidden lg:flex items-center gap-2">
@@ -347,59 +335,20 @@ function Header() {
             <nav aria-label="Mobile Navigation" className="flex flex-col space-y-1">
               {staff ? (
                 <>
-                  {hasPermission(grants, "application:list") && (
+                  {nav.map((n) => (
                     <NavLink
-                      to="/staff"
-                      end
+                      key={n.to}
+                      to={n.to}
+                      end={n.end}
                       className="flex items-center justify-between rounded-xl p-3 text-sm font-semibold text-ink hover:bg-soft aria-[current=page]:bg-ink aria-[current=page]:text-white transition-colors"
                     >
                       <span className="flex items-center gap-3">
-                        <LayoutDashboard className="h-4 w-4 text-brand-600" />
-                        {isHod ? "Department Review" : isHr ? "Applications Queue" : "Applications"}
+                        <n.icon className="h-4 w-4 text-brand-600" aria-hidden="true" />
+                        {n.label}
                       </span>
                       <ChevronRight className="h-4 w-4 opacity-50" />
                     </NavLink>
-                  )}
-
-                  {hasPermission(grants, "recruitment:manage") && (
-                    <NavLink
-                      to="/admin"
-                      end
-                      className="flex items-center justify-between rounded-xl p-3 text-sm font-semibold text-ink hover:bg-soft aria-[current=page]:bg-ink aria-[current=page]:text-white transition-colors"
-                    >
-                      <span className="flex items-center gap-3">
-                        <Briefcase className="h-4 w-4 text-brand-600" />
-                        {isHr ? "Job Profiles" : "Job Profiles & Cycles"}
-                      </span>
-                      <ChevronRight className="h-4 w-4 opacity-50" />
-                    </NavLink>
-                  )}
-
-                  {hasPermission(grants, "user:manage") && (
-                    <NavLink
-                      to="/admin/users"
-                      className="flex items-center justify-between rounded-xl p-3 text-sm font-semibold text-ink hover:bg-soft aria-[current=page]:bg-ink aria-[current=page]:text-white transition-colors"
-                    >
-                      <span className="flex items-center gap-3">
-                        <Users className="h-4 w-4 text-brand-600" />
-                        Users & Roles
-                      </span>
-                      <ChevronRight className="h-4 w-4 opacity-50" />
-                    </NavLink>
-                  )}
-
-                  {hasPermission(grants, "audit:read") && (
-                    <NavLink
-                      to="/staff/audit"
-                      className="flex items-center justify-between rounded-xl p-3 text-sm font-semibold text-ink hover:bg-soft aria-[current=page]:bg-ink aria-[current=page]:text-white transition-colors"
-                    >
-                      <span className="flex items-center gap-3">
-                        <ShieldCheck className="h-4 w-4 text-brand-600" />
-                        Audit Trail
-                      </span>
-                      <ChevronRight className="h-4 w-4 opacity-50" />
-                    </NavLink>
-                  )}
+                  ))}
 
                   <NavLink
                     to="/vacancies"

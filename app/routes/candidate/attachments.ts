@@ -20,12 +20,7 @@ export async function action({ request, params, context }: Route.ActionArgs) {
 
     const file = form.get("file");
     const docType = form.get("documentType");
-    const doc = await uploadDocument(
-      user,
-      params.id,
-      docType,
-      file instanceof File ? file : null,
-    );
+    const doc = await uploadDocument(user, params.id, docType, file instanceof File ? file : null);
 
     return Response.json({
       ok: true,

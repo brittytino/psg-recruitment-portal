@@ -1,6 +1,22 @@
 import { z } from "zod";
+import {
+  formatYearsMonths,
+  overlappingPeriods,
+  periodDuration,
+  totalDuration,
+  type Period,
+} from "./experience";
 import { allFields, isScalar } from "./registry";
-import type { Answers, FieldDef, FormDefinition, ScalarField, SectionDef } from "./types";
+import type {
+  Answers,
+  Condition,
+  FieldDef,
+  FormDefinition,
+  ScalarField,
+  SectionDef,
+  TableRow,
+  UploadGroup,
+} from "./types";
 
 export type ValidationMode = "draft" | "submit";
 
@@ -22,6 +38,13 @@ function validDate(s: string): boolean {
   if (!ISO_DATE.test(s)) return false;
   const d = new Date(`${s}T00:00:00Z`);
   return !Number.isNaN(d.getTime()) && d.toISOString().slice(0, 10) === s;
+}
+
+/** True when a field's condition holds against the given values (top-level answers or a row). */
+export function conditionMet(when: Condition | undefined, values: Record<string, unknown>): boolean {
+  if (!when) return true;
+  const v = values[when.key];
+  return typeof v === "string" && when.in.includes(v);
 }
 
 /** Validates one scalar value. Returns an error message or null. */
@@ -79,9 +102,12 @@ function checkField(
   value: unknown,
   mode: ValidationMode,
   section: SectionDef,
+  answers: Record<string, unknown>,
   issues: FieldIssue[],
 ) {
   const push = (path: string, message: string) => issues.push({ path, sectionId: section.id, message });
+  // Hidden by a condition: the value is ignored (kept in the draft, not validated).
+  if (!conditionMet(f.when, answers)) return;
   if (isScalar(f)) {
     const msg = checkScalar(f, value, mode, isRequired(f));
     if (msg) push(f.key, msg);
@@ -104,78 +130,138 @@ function checkField(
   // table
   const rows = value === undefined || value === null ? [] : value;
   if (!Array.isArray(rows)) return push(f.key, `${f.label} must be a table`);
-  if (rows.length > f.maxRows) push(f.key, `${f.label}: at most ${f.maxRows} rows`);
+  if (rows.length > f.maxRows) push(f.key, `${f.label}: at most ${f.maxRows} entries`);
   const minRows = f.minRows ?? (isRequired(f) ? 1 : 0);
   if (mode === "submit" && rows.length < minRows)
     push(f.key, `${f.label}: add at least ${minRows} entr${minRows === 1 ? "y" : "ies"}`);
+  const item = f.itemLabel ?? "Row";
   rows.forEach((row, i) => {
     if (typeof row !== "object" || row === null || Array.isArray(row))
-      return push(`${f.key}.${i}`, `Row ${i + 1} is invalid`);
+      return push(`${f.key}.${i}`, `${item} ${i + 1} is invalid`);
     const r = row as Record<string, unknown>;
     for (const c of f.columns) {
+      if (!conditionMet(c.when, r)) continue;
       const msg = checkScalar(c, r[c.key], mode, isRequired(c));
-      if (msg) push(`${f.key}.${i}.${c.key}`, `Row ${i + 1}: ${msg}`);
+      if (msg) push(`${f.key}.${i}.${c.key}`, `${item} ${i + 1}: ${msg}`);
     }
     const allowedKeys = new Set([
       ...f.columns.map((c) => c.key),
       ...(f.attachment ? ["documentId", "documentName", "documentType"] : []),
     ]);
     for (const k of Object.keys(r))
-      if (!allowedKeys.has(k)) push(`${f.key}.${i}.${k}`, `Row ${i + 1}: unknown column`);
+      if (!allowedKeys.has(k)) push(`${f.key}.${i}.${k}`, `${item} ${i + 1}: unknown column`);
 
     if (mode === "submit" && f.attachment?.required) {
       const docId = r.documentId;
       if (!docId || typeof docId !== "string" || !docId.trim()) {
         push(
           `${f.key}.${i}.documentId`,
-          `Row ${i + 1}: Please upload the required ${f.attachment.label ?? "supporting document"}`,
+          `${item} ${i + 1}: Please upload the required ${f.attachment.label ?? "supporting document"}`,
         );
       }
     }
   });
 }
 
-/** Cross-field rules that the source form implies. */
+const rowsOf = (a: Record<string, unknown>, k: string): TableRow[] =>
+  Array.isArray(a[k]) ? (a[k] as TableRow[]).filter((r) => r && typeof r === "object") : [];
+
+/** Cross-field rules that the source forms imply. */
 function checkCrossField(def: FormDefinition, a: Answers, mode: ValidationMode, issues: FieldIssue[]) {
   const today = new Date().toISOString().slice(0, 10);
   const dob = a.dateOfBirth;
   if (typeof dob === "string" && validDate(dob) && dob >= today)
     issues.push({ path: "dateOfBirth", sectionId: "personal", message: "Date of birth must be in the past" });
   for (const key of ["experience", "jobsHeld"]) {
-    const rows = a[key];
-    if (!Array.isArray(rows)) continue;
-    rows.forEach((row, i) => {
-      if (typeof row !== "object" || row === null) return;
-      const r = row as Record<string, unknown>;
-      if (typeof r.from === "string" && typeof r.to === "string" && r.from && r.to && r.to < r.from)
+    const rows = rowsOf(a, key);
+    const sectionId = key === "jobsHeld" ? "jobs" : "experience";
+    rows.forEach((r, i) => {
+      const current = r.isCurrent === "Yes";
+      if (
+        typeof r.from === "string" &&
+        typeof r.to === "string" &&
+        r.from &&
+        r.to &&
+        !current &&
+        r.to < r.from
+      )
         issues.push({
           path: `${key}.${i}.to`,
-          sectionId: key === "experience" ? "experience" : "jobs",
-          message: `Row ${i + 1}: "To" date is before "From" date`,
+          sectionId,
+          message: `Position ${i + 1}: "To" date is before "From" date`,
         });
+      if (def.version >= 2) {
+        if (typeof r.from === "string" && r.from > today)
+          issues.push({
+            path: `${key}.${i}.from`,
+            sectionId,
+            message: `Position ${i + 1}: "From" date is in the future`,
+          });
+        if (!current && typeof r.to === "string" && r.to > today)
+          issues.push({
+            path: `${key}.${i}.to`,
+            sectionId,
+            message: `Position ${i + 1}: "To" date is in the future`,
+          });
+        if (typeof dob === "string" && validDate(dob) && typeof r.from === "string" && validDate(r.from)) {
+          const adult = `${Number(dob.slice(0, 4)) + 18}${dob.slice(4)}`;
+          if (r.from < adult)
+            issues.push({
+              path: `${key}.${i}.from`,
+              sectionId,
+              message: `Position ${i + 1}: the start date is before your 18th birthday`,
+            });
+        }
+      }
     });
   }
-  if (
-    def.code === "ASSOCIATE_PROFESSOR" &&
-    mode === "submit" &&
-    a.maritalStatus === "Y" &&
-    isEmpty(a.spouseNameOccupation)
-  )
-    issues.push({
-      path: "spouseNameOccupation",
-      sectionId: "family",
-      message: "Name and occupation of spouse is required when married",
-    });
-  if (def.code === "ASSOCIATE_PROFESSOR") {
-    const levels = Array.isArray(a.educationalQualifications)
-      ? (a.educationalQualifications as Record<string, unknown>[]).map((r) => r?.level)
-      : [];
+  if (def.code === "ASSOCIATE_PROFESSOR" && def.version === 1) {
+    if (mode === "submit" && a.maritalStatus === "Y" && isEmpty(a.spouseNameOccupation))
+      issues.push({
+        path: "spouseNameOccupation",
+        sectionId: "family",
+        message: "Name and occupation of spouse is required when married",
+      });
+    const levels = rowsOf(a, "educationalQualifications").map((r) => r.level);
     const dup = levels.find((l, i) => l && levels.indexOf(l) !== i);
     if (dup)
       issues.push({
         path: "educationalQualifications",
         sectionId: "education",
         message: `Only one entry per level is printed on the form (duplicate: ${String(dup)})`,
+      });
+  }
+  if (def.version >= 2 && mode === "submit") {
+    const levels = rowsOf(a, "collegeQualifications").map((r) => r.level);
+    for (const [lvl, label] of [
+      ["UG", "an under-graduate (UG)"],
+      ["PG", "a post-graduate (PG)"],
+    ] as const)
+      if (!levels.includes(lvl))
+        issues.push({
+          path: "collegeQualifications",
+          sectionId: "college",
+          message: `Add ${label} degree`,
+        });
+    rowsOf(a, "collegeQualifications").forEach((r, i) => {
+      if (
+        typeof r.scoreType === "string" &&
+        r.scoreType.startsWith("CGPA") &&
+        typeof r.score === "number" &&
+        r.score > 10
+      )
+        issues.push({
+          path: `collegeQualifications.${i}.score`,
+          sectionId: "college",
+          message: `Qualification ${i + 1}: CGPA must be 10 or less`,
+        });
+    });
+    const current = rowsOf(a, "experience").some((r) => r.isCurrent === "Yes");
+    if (current && a.currentlyEmployed === "No")
+      issues.push({
+        path: "currentlyEmployed",
+        sectionId: "experience",
+        message: 'You marked a position as current — answer "Yes" to "Are you currently employed?"',
       });
   }
 }
@@ -193,7 +279,7 @@ export function validateAnswers(def: FormDefinition, answers: unknown, mode: Val
   const known = new Set(allFields(def).map((f) => f.key));
   for (const k of Object.keys(a))
     if (!known.has(k)) issues.push({ path: k, sectionId: "", message: `Unknown field "${k}"` });
-  for (const s of def.sections) for (const f of s.fields) checkField(f, a[f.key], mode, s, issues);
+  for (const s of def.sections) for (const f of s.fields) checkField(f, a[f.key], mode, s, a, issues);
   checkCrossField(def, a as Answers, mode, issues);
   return issues;
 }
@@ -208,6 +294,89 @@ export function ageOn(dob: string, on: string): number | null {
   return age;
 }
 
+/** Experience periods from a v2 answers object. */
+export function experiencePeriods(a: Answers, nature?: string): Partial<Period>[] {
+  return rowsOf(a, "experience")
+    .filter((r) => !nature || r.nature === nature)
+    .map((r) => ({
+      from: typeof r.from === "string" ? r.from : undefined,
+      to: r.isCurrent === "Yes" ? null : typeof r.to === "string" ? r.to : null,
+    }));
+}
+
+/** First day of the month the earliest PG degree was completed, if known. */
+export function pgCompletion(a: Answers): string | undefined {
+  const pg = rowsOf(a, "collegeQualifications")
+    .filter((r) => r.level === "PG" && typeof r.monthYear === "string" && MONTH_YEAR.test(r.monthYear))
+    .map((r) => `${r.monthYear}-01`)
+    .sort();
+  return pg[0];
+}
+
+export interface DerivedContext {
+  department: string;
+  position?: string;
+  asOf: string;
+}
+
+/** Value of a derived field (server and UI use the same rules). */
+export function derivedValue(derivedFrom: string, a: Answers, ctx: DerivedContext): string | number | null {
+  switch (derivedFrom) {
+    case "vacancy.department":
+      return ctx.department;
+    case "vacancy.position":
+      return ctx.position ?? null;
+    case "dateOfBirth":
+      return typeof a.dateOfBirth === "string" ? ageOn(a.dateOfBirth, ctx.asOf) : null;
+    case "today":
+      return ctx.asOf;
+    case "experience.total":
+      return formatYearsMonths(totalDuration(experiencePeriods(a), ctx.asOf));
+    case "experience.teaching":
+      return formatYearsMonths(totalDuration(experiencePeriods(a, "Teaching"), ctx.asOf));
+    case "experience.industry":
+      return formatYearsMonths(totalDuration(experiencePeriods(a, "Industry"), ctx.asOf));
+    case "experience.afterPg": {
+      const pg = pgCompletion(a);
+      return pg ? formatYearsMonths(totalDuration(experiencePeriods(a), ctx.asOf, pg)) : null;
+    }
+    case "count.collegeOthers":
+      return rowsOf(a, "collegeQualifications").filter((r) => r.level === "DIPLOMA" || r.level === "OTHER")
+        .length;
+    default:
+      return null;
+  }
+}
+
+/** Duration of one experience row, e.g. "3 years 7 months". */
+export function rowDuration(r: TableRow, asOf: string): string {
+  return formatYearsMonths(
+    periodDuration(
+      {
+        from: typeof r.from === "string" ? r.from : undefined,
+        to: r.isCurrent === "Yes" ? null : typeof r.to === "string" ? r.to : null,
+      },
+      asOf,
+    ),
+  );
+}
+
+/** Rows of the experience table that overlap another row (warning only). */
+export function experienceOverlaps(a: Answers, asOf: string): number[] {
+  return overlappingPeriods(experiencePeriods(a), asOf);
+}
+
+/** All derived top-level values for a form. */
+export function computeDerived(
+  def: FormDefinition,
+  a: Answers,
+  ctx: DerivedContext,
+): Record<string, string | number | null> {
+  const out: Record<string, string | number | null> = {};
+  for (const f of allFields(def)) if (f.kind === "derived") out[f.key] = derivedValue(f.derivedFrom, a, ctx);
+  return out;
+}
+
 /** Strips derived fields from candidate input — those are computed by the server. */
 export function stripDerived(def: FormDefinition, answers: Answers): Answers {
   const out: Answers = {};
@@ -216,20 +385,17 @@ export function stripDerived(def: FormDefinition, answers: Answers): Answers {
   return out;
 }
 
-/** Applies server-computed derived values (department, age) at a reference date. */
-export function withDerived(
-  def: FormDefinition,
-  answers: Answers,
-  ctx: { department: string; asOf: string },
-): Answers {
-  const out: Answers = { ...answers };
-  for (const f of allFields(def)) {
-    if (f.kind !== "derived") continue;
-    if (f.derivedFrom === "vacancy.department") out[f.key] = ctx.department;
-    if (f.derivedFrom === "dateOfBirth")
-      out[f.key] = typeof answers.dateOfBirth === "string" ? ageOn(answers.dateOfBirth, ctx.asOf) : null;
-  }
-  return out;
+/** Applies server-computed derived values (department, age, experience totals) at a reference date. */
+export function withDerived(def: FormDefinition, answers: Answers, ctx: DerivedContext): Answers {
+  return { ...answers, ...computeDerived(def, answers, ctx) };
+}
+
+/** True when an upload group is mandatory for these answers. */
+export function uploadRequired(g: UploadGroup, a: Answers): boolean {
+  if (g.required === true) return true;
+  if (g.required === false) return false;
+  if (g.required === "hasExperience") return rowsOf(a, "experience").length > 0;
+  return conditionMet(g.required, a);
 }
 
 /** Section completion summary for progress indicators. */

@@ -61,18 +61,15 @@ docker compose up -d --build     # first ClamAV start downloads signatures (minu
 # http://localhost:6969
 ```
 
-Demo data (development only):
+The seed creates only the institutional accounts — no demo data:
 
-```sh
-docker compose run --rm -e SEED_DEMO=true -e NODE_ENV=development migrate node build-worker/seed.js
-```
+| Account                   | Role              |
+| ------------------------- | ----------------- |
+| `dean.admn@psgtech.ac.in` | Admin (Dean)      |
+| `principal@psgtech.ac.in` | Admin (Principal) |
+| `admin.n4@psgtech.ac.in`  | HR – N4 Section   |
 
-Demo accounts (Universal password = `Demo@12345`):
-
-- **Super Admin**: `dean.admn@psgtech.ac.in` (DEAN), `principal@psgtech.ac.in` (Principal), `superadmin@example.test`
-- **HR-N4 Section**: `admin.n4@psgtech.ac.in` (HR & Job Entry), `hr@example.test`
-- **Department Reviewers (HODs)**: `hod.cse@psgtech.ac.in` (CSE), `hod.mca@psgtech.ac.in` (MCA), `hod.eee@psgtech.ac.in` (EEE), `hod.ece@psgtech.ac.in` (ECE), `reviewer.cse@example.test`, `reviewer.ece@example.test`
-- **Candidates**: `candidate@example.test`, `candidate2@example.test`
+Each new account gets a set-password e-mail (72 h; locally in Mailpit at http://localhost:6980, and printed once by the seed). Departments and HODs are added by an Admin in the portal. Every staff sign-in is confirmed with a 6-digit code e-mailed to the account. See [docs/runbooks/recruitment-operations.md](docs/runbooks/recruitment-operations.md).
 
 ## 8. Docker Compose commands & Windows one-click runner
 
@@ -110,15 +107,15 @@ See [.env.example](.env.example) (commented). Validated at startup by `app/modul
 
 ## 11. Database migration and seed
 
-`docker compose run --rm migrate` (migrations + template registration, owner role) · host: `DATABASE_URL=<owner url> npx prisma migrate deploy` · seed: `npm run db:seed` (templates), `SEED_DEMO=true …` (demo), `BOOTSTRAP_ADMIN_EMAIL=…` (first Super Admin, prints one-time link).
+`docker compose run --rm migrate` (migrations + template registration, owner role) · host: `DATABASE_URL=<owner url> npx prisma migrate deploy` · seed: `npm run db:seed` (form templates and the Dean, Principal and HR – N4 accounts; idempotent).
 
 ## 12. Test and lint commands
 
-`npm run lint` · `npm run typecheck` · `npm run format:check` · `npm test` (unit) · `npm run test:integration` (needs dev services) · `npm run test:e2e` (needs running app + demo seed) · `npm run forms:inventory`. See [docs/testing/testing.md](docs/testing/testing.md).
+`npm run lint` · `npm run typecheck` · `npm run format:check` · `npm test` (unit) · `npm run test:integration` (needs dev services) · `npm run test:e2e` (needs the running app and Mailpit) · `npm run forms:inventory`. See [docs/testing/testing.md](docs/testing/testing.md).
 
 ## 13. Authentication and role setup
 
-Candidates self-register (e-mail verification required to apply). Staff accounts are created by a Super Admin (invitation e-mail with password-setup link) and given roles: HR officer (optionally per cycle), Department reviewer (per department), Recruitment admin, Super admin. Matrix: [docs/architecture/authorization-matrix.md](docs/architecture/authorization-matrix.md).
+Candidates self-register and verify their e-mail with a 6-digit code (or link) before applying. Staff accounts are created by an Admin (invitation e-mail with password-setup link) with one of three roles: **Admin** (Dean, Principal — full control), **HR – N4 Section** (job profiles, all applications, downloads, summaries, exports) and **HOD** (reviews assigned applications of their own department). Admin and HR always confirm sign-in with an e-mailed code; HODs too unless switched off in Settings. Matrix: [docs/architecture/authorization-matrix.md](docs/architecture/authorization-matrix.md).
 
 ## 14. Official form inventory and fidelity rules
 
@@ -126,7 +123,7 @@ Inventory (generated, 44 + 121 entries with page, label, type, validation, stora
 
 ## 15. PDF generation workflow
 
-Submit → outbox → scan jobs → generate job: verify template checksum → populate DOCX + photo → LibreOffice → validate → append attachments in defined order → verify page count → store with checksum (write-once) → READY. Failures are visible to HR with actionable messages; regeneration creates a new version. [docs/architecture/document-pipeline.md](docs/architecture/document-pipeline.md), [runbook](docs/runbooks/pdf-failures.md).
+2026-27 (v2) applications: the candidate sees a watermarked PDF preview before submitting. Submit → reference `PSGCT2026-27<DEPT>_<NNNN>` → outbox → scan jobs → generate job: draw the application PDF (photograph and signature printed) → append attachments in a defined order with a contents page and bookmarks → verify page count → store application PDF (for the candidate) and consolidated bundle (for Admin/HR/assigned HOD) with checksums (write-once) → READY. v1 applications still fill the official Word template via LibreOffice. See [ADR 0009](docs/adr/0009-department-review-v2-forms.md). Failures are visible to HR with actionable messages; regeneration creates a new version. [docs/architecture/document-pipeline.md](docs/architecture/document-pipeline.md), [runbook](docs/runbooks/pdf-failures.md).
 
 ## 16. Security architecture
 

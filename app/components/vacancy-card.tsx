@@ -63,11 +63,6 @@ export function VacancyCard({ v }: { v: VacancyCardData }) {
         <ul className="flex flex-wrap gap-1.5 sm:gap-2" aria-label="Details">
           <li className="chip font-medium text-ink bg-soft/70 border-line">{POSITION_LABELS[v.position]}</li>
           {v.discipline && <li className="chip text-muted">{v.discipline.name}</li>}
-          {v.numberOfPosts ? (
-            <li className="chip text-muted">
-              {v.numberOfPosts} post{v.numberOfPosts > 1 ? "s" : ""}
-            </li>
-          ) : null}
         </ul>
       </div>
 

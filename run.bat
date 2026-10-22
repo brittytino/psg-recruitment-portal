@@ -183,15 +183,14 @@ goto show_summary
 :do_seed
 echo.
 echo ================================================================================
-echo    SEEDING / SYNCHRONIZING DEMO ROLE ACCOUNTS
+echo    REGISTERING FORM TEMPLATES AND STAFF ACCOUNTS
 echo ================================================================================
-echo Synchronizing demo accounts via host...
+echo Seeding form templates and the Dean, Principal and HR - N4 accounts...
 echo.
 
 setlocal DisableDelayedExpansion
 set "DATABASE_URL=postgresql://srp_owner:PsgTech_DbOwner_2026%%21@localhost:65432/srportal?schema=public"
-set "SEED_DEMO_PASSWORD=Demo@12345"
-cmd /c "npx tsx scripts/seed-accounts.ts"
+cmd /c "npx tsx prisma/seed.ts"
 set "SEED_EXIT_CODE=%errorlevel%"
 endlocal & set "SEED_EXIT_CODE=%SEED_EXIT_CODE%"
 

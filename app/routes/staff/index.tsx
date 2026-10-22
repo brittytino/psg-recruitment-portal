@@ -1,66 +1,97 @@
-import { Form, Link, useLocation, useNavigation, useSearchParams } from "react-router";
+import { useState } from "react";
+import { Form, Link, redirect, useLocation, useNavigation, useSearchParams } from "react-router";
 import type { Route } from "./+types/index";
-import { Badge, formatDateTime, statusTone } from "~/components/forms";
-import { requireStaff } from "~/lib/http.server";
+import { Alert, Badge, ConfirmDialog, CsrfInput, formatDate, statusTone } from "~/components/forms";
+import { EmptyState, FilterSelect, PageHeader, StatTile } from "~/components/staff";
+import { clientIp, handleAction, readForm, requireStaff } from "~/lib/http.server";
 import { POSITION_LABELS } from "~/lib/labels";
 import {
-  APPLICATION_STATUSES,
+  ASSIGNABLE,
   PROCESSING_LABELS,
   STATUS_LABELS,
   type AppStatus,
 } from "~/modules/applications/workflow";
-import {
-  getPrimaryRoleBadge,
-  hasPermission,
-  isAdmin,
-  isHodReviewer,
-  isHrOfficer,
-} from "~/modules/auth/permissions";
+import { prisma } from "~/modules/core/db.server";
+import { hasPermission, isAdmin, isHodReviewer, isHrOfficer } from "~/modules/auth/permissions";
+import { formatYearsMonths, splitMonths } from "~/modules/forms/experience";
 import {
   dashboardCounts,
+  departmentCounts,
+  filteredIds,
   filterOptions,
   listApplications,
   parseListQuery,
 } from "~/modules/reporting/applications.server";
 import { PAGE_SIZES } from "~/modules/reporting/constants";
+import { assignToHod } from "~/modules/reviews/service.server";
+import { hodsForDepartment } from "~/modules/users/service.server";
 
-export const meta: Route.MetaFunction = () => [{ title: "Applications — Recruitment workspace" }];
+export const meta: Route.MetaFunction = () => [{ title: "Applications — PSG Tech Recruitment" }];
 
 export async function loader({ request, context }: Route.LoaderArgs) {
   const user = requireStaff(context, request, "application:list");
+  // HODs work from their own review queue.
+  if (isHodReviewer(user.grants) && !isAdmin(user.grants) && !isHrOfficer(user.grants))
+    throw redirect("/staff/review");
   const q = parseListQuery(new URL(request.url));
-  const [list, counts, options] = await Promise.all([
+  const [list, counts, departments, options] = await Promise.all([
     listApplications(user, q),
     dashboardCounts(user, q.cycleId),
+    departmentCounts(user, { cycleId: q.cycleId, position: q.position }),
     filterOptions(),
   ]);
+  const canAssign = hasPermission(user.grants, "application:assign");
   return {
     list,
     counts,
+    departments,
     options,
     q,
     canExport: hasPermission(user.grants, "application:export"),
-    name: user.displayName,
-    grants: user.grants,
+    canAssign,
+    hods: canAssign && q.departmentId ? await hodsForDepartment(q.departmentId) : [],
+    isAdmin: isAdmin(user.grants),
   };
 }
 
-const SORTABLE: { key: string; label: string }[] = [
-  { key: "referenceNo", label: "Reference" },
-  { key: "candidate", label: "Candidate" },
-  { key: "status", label: "Status" },
-  { key: "submittedAt", label: "Submitted" },
-];
+export async function action({ request, context }: Route.ActionArgs) {
+  const user = requireStaff(context, request, "application:assign");
+  const form = await readForm(request, context);
+  return handleAction(async () => {
+    let ids = form.getAll("applicationId").map(String);
+    if (form.get("scope") === "filtered") {
+      const q = parseListQuery(new URL(request.url));
+      ids = await filteredIds(user, { ...q, status: undefined, hod: undefined });
+      const assignable = await prisma.application.findMany({
+        where: { id: { in: ids }, status: { in: [...ASSIGNABLE] } },
+        select: { id: true },
+      });
+      ids = assignable.map((a) => a.id);
+    }
+    const n = await assignToHod(
+      user,
+      { hodId: String(form.get("hodId") ?? ""), applicationIds: ids },
+      clientIp(request),
+    );
+    return {
+      message: `${n} application${n === 1 ? "" : "s"} moved to the HOD. The HOD has been notified by e-mail.`,
+    };
+  });
+}
 
-export default function StaffIndex({ loaderData }: Route.ComponentProps) {
-  const { list, counts, options, q, canExport, name, grants } = loaderData;
-  const isAdm = grants ? isAdmin(grants) : false;
-  const isHr = grants ? isHrOfficer(grants) : false;
-  const isHod = grants ? isHodReviewer(grants) : false;
-  const roleBadge = grants ? getPrimaryRoleBadge(grants) : { label: "Staff", tone: "neutral" as const };
+const SORTABLE: Record<string, string> = {
+  referenceNo: "Reference No.",
+  candidate: "Candidate",
+  status: "Status",
+  submittedAt: "Submitted",
+};
+
+export default function StaffIndex({ loaderData, actionData }: Route.ComponentProps) {
+  const { list, counts, departments, options, q, canExport, canAssign, hods, isAdmin: admin } = loaderData;
   const [params] = useSearchParams();
   const location = useLocation();
   const nav = useNavigation();
+  const [selected, setSelected] = useState<Set<string>>(new Set());
   const withParams = (patch: Record<string, string | number | null>) => {
     const p = new URLSearchParams(params);
     for (const [k, v] of Object.entries(patch)) v === null || v === "" ? p.delete(k) : p.set(k, String(v));
@@ -69,325 +100,518 @@ export default function StaffIndex({ loaderData }: Route.ComponentProps) {
   const sortLink = (key: string) => {
     const current = q.sort.replace(/^-/, "");
     const desc = q.sort.startsWith("-");
-    const next = current === key ? (desc ? key : `-${key}`) : key === "submittedAt" ? "-submittedAt" : key;
-    return withParams({ sort: next, page: 1 });
+    return withParams({
+      sort: current === key ? (desc ? key : `-${key}`) : key === "submittedAt" ? "-submittedAt" : key,
+      page: 1,
+    });
   };
   const ariaSort = (key: string): "ascending" | "descending" | "none" =>
     q.sort.replace(/^-/, "") === key ? (q.sort.startsWith("-") ? "descending" : "ascending") : "none";
-  const tiles: [string, number | null, string, string, string][] = [
-    ["Total applications", counts.total, "", "bg-tile-purple", "📊"],
-    ["Drafts in progress", counts.drafts, "", "bg-soft", "📝"],
-    ["Pending screening", counts.pendingScreening, "UNDER_HR_REVIEW", "bg-tile-blue", "🔍"],
-    ["Awaiting department", counts.awaitingDepartment, "UNDER_DEPARTMENT_REVIEW", "bg-tile-orange", "🏛️"],
-    ["Clarification requested", counts.clarification, "NEEDS_CLARIFICATION", "bg-tile-pink", "💬"],
-    ["Shortlisted", counts.shortlisted, "SHORTLISTED", "bg-tile-green", "⭐"],
-    ["Not selected", counts.rejected, "REJECTED", "bg-soft", "📁"],
-    [
-      "PDF failures",
-      counts.processingFailures,
-      "FAILED",
-      counts.processingFailures ? "bg-danger-50" : "bg-soft",
-      "🧯",
-    ],
-  ];
+
+  const deptName = options.departments.find((d) => d.id === q.departmentId)?.name;
+  const chips: [string, string][] = [];
+  if (q.q) chips.push(["q", `Search: ${q.q}`]);
+  if (deptName) chips.push(["departmentId", deptName]);
+  if (q.position) chips.push(["position", POSITION_LABELS[q.position]!]);
+  if (q.status) chips.push(["status", STATUS_LABELS[q.status]]);
+  if (q.phd) chips.push(["phd", `Ph.D.: ${q.phd}`]);
+  if (q.exam) chips.push(["exam", `Exam: ${q.exam}`]);
+  if (q.minExp !== undefined) chips.push(["minExp", `Experience ≥ ${q.minExp} years`]);
+  if (q.hod) chips.push(["hod", q.hod === "assigned" ? "With a HOD" : "Not yet with a HOD"]);
+  if (q.from) chips.push(["from", `From ${q.from}`]);
+  if (q.to) chips.push(["to", `To ${q.to}`]);
+  if (q.cycleId) chips.push(["cycleId", options.cycles.find((c) => c.id === q.cycleId)?.title ?? "Cycle"]);
+
+  const assignableRows = list.rows.filter((r) => ASSIGNABLE.includes(r.status as AppStatus));
+  const toggle = (id: string) =>
+    setSelected((s) => {
+      const n = new Set(s);
+      n.has(id) ? n.delete(id) : n.add(id);
+      return n;
+    });
+  const allOnPage = assignableRows.length > 0 && assignableRows.every((r) => selected.has(r.id));
+
   return (
-    <div className="space-y-8">
-      <div className="flex flex-wrap items-end justify-between gap-4 border-b border-line/70 pb-6">
-        <div>
-          <div className="flex items-center gap-2 mb-1.5">
-            <p className="eyebrow">
-              {isAdm
-                ? "PSG Tech Institutional Administration"
-                : isHr
-                  ? "HR-N4 Section Recruitment Workspace"
-                  : isHod
-                    ? "Department Review Queue"
-                    : "Recruitment Workspace"}
-            </p>
-            <Badge tone={roleBadge.tone}>{roleBadge.label}</Badge>
-          </div>
-          <h1 className="mt-1 text-3xl sm:text-4xl lg:text-5xl font-extrabold text-ink">
-            Welcome back, {name} 👋
-          </h1>
-          <p className="mt-2 text-base text-muted">
-            {isHod
-              ? "Review candidates, qualifications, and provide academic evaluations for your department."
-              : isHr
-                ? "Screen applicants, assign HOD reviewers, manage job profiles, and download complete dossiers."
-                : "Institutional oversight of all faculty vacancies, applicant screening queues, and candidate dossiers."}
-          </p>
-        </div>
-        <div className="flex flex-wrap items-center gap-2">
-          {hasPermission(grants ?? [], "recruitment:manage") && (
-            <Link to="/admin/vacancies/new" className="btn-primary">
-              + New Job Profile / Vacancy
+    <div className="space-y-6">
+      <PageHeader
+        eyebrow={admin ? "Admin" : "HR – N4 Section"}
+        title="Applications"
+        description="All submitted applications, department-wise. Filter, open a candidate, or move applications of a department to its HOD."
+        actions={
+          <>
+            <Link to="/staff/summary" className="btn-secondary">
+              Summary &amp; export
             </Link>
-          )}
-          {canExport && (
-            <a href={`/staff/export.csv${location.search}`} className="btn-secondary">
-              ⬇️ Export Applications CSV
-            </a>
-          )}
-        </div>
-      </div>
-      <section aria-label="Summary">
-        <ul className="grid grid-cols-2 gap-4 md:grid-cols-4">
-          {tiles
-            .filter(([, v]) => v !== null)
-            .map(([label, value, filter, bg, emoji]) => {
-              const to =
-                filter === "FAILED"
-                  ? withParams({ processing: "FAILED", page: 1 })
-                  : filter
-                    ? withParams({ status: filter, page: 1 })
-                    : null;
-              const body = (
-                <>
-                  <span className="flex items-center justify-between text-sm font-medium">
-                    {label}
-                    <span
-                      aria-hidden="true"
-                      className="grid h-8 w-8 place-items-center rounded-xl bg-white/70 text-base"
-                    >
-                      {emoji}
-                    </span>
-                  </span>
-                  <span className="mt-2 block text-3xl font-bold">{value}</span>
-                </>
-              );
-              return (
-                <li key={label}>
-                  {to ? (
-                    <Link
-                      to={to}
-                      className={`stat-tile block no-underline text-ink transition-transform hover:-translate-y-0.5 ${bg}`}
-                    >
-                      {body}
-                    </Link>
-                  ) : (
-                    <div className={`stat-tile ${bg}`}>{body}</div>
-                  )}
-                </li>
-              );
-            })}
-        </ul>
+            <Link to="/admin/vacancies/new" className="btn-primary">
+              + New job profile
+            </Link>
+          </>
+        }
+      />
+
+      {actionData && "message" in actionData && actionData.message && (
+        <Alert tone="success">{actionData.message}</Alert>
+      )}
+      {actionData && "formError" in actionData && actionData.formError && (
+        <Alert tone="danger">{actionData.formError}</Alert>
+      )}
+
+      <section aria-label="Totals" className="grid grid-cols-2 gap-3 md:grid-cols-3 xl:grid-cols-6">
+        <StatTile label="Submitted" value={counts.total} to="?" />
+        <StatTile
+          label="Not yet with a HOD"
+          value={counts.submitted}
+          to={withParams({ hod: "unassigned", status: null, page: 1 })}
+          tone="bg-tile-blue/40"
+        />
+        <StatTile
+          label="With HOD"
+          value={counts.withHod}
+          to={withParams({ status: "ASSIGNED_TO_HOD", page: 1 })}
+          tone="bg-tile-orange/40"
+        />
+        <StatTile
+          label="Accepted by HOD"
+          value={counts.hodAccepted}
+          to={withParams({ status: "HOD_ACCEPTED", page: 1 })}
+          tone="bg-tile-green/50"
+        />
+        <StatTile
+          label="Position change"
+          value={counts.hodChanged}
+          to={withParams({ status: "HOD_RECOMMENDED_CHANGE", page: 1 })}
+          tone="bg-tile-purple/50"
+        />
+        <StatTile
+          label="Rejected by HOD"
+          value={counts.hodRejected}
+          to={withParams({ status: "HOD_REJECTED", page: 1 })}
+          tone="bg-tile-pink/50"
+        />
       </section>
 
-      <Form method="get" className="card grid gap-4 md:grid-cols-4" aria-label="Filter applications">
-        <div className="md:col-span-2">
-          <label htmlFor="q" className="block text-sm font-medium">
-            Search
-          </label>
-          <input
-            id="q"
-            name="q"
-            type="search"
-            defaultValue={q.q ?? ""}
-            placeholder="Reference, candidate name or e-mail"
-            className="field-input mt-1"
+      {departments.length > 0 && (
+        <section className="card p-4 sm:p-5" aria-labelledby="by-dept">
+          <h2 id="by-dept" className="text-lg">
+            Department-wise
+          </h2>
+          <div className="mt-3 overflow-x-auto">
+            <table className="table">
+              <caption className="sr-only">Applications by department</caption>
+              <thead>
+                <tr>
+                  <th scope="col">Department</th>
+                  <th scope="col" className="text-right">
+                    Total
+                  </th>
+                  <th scope="col" className="text-right">
+                    Not with HOD
+                  </th>
+                  <th scope="col" className="text-right">
+                    With HOD
+                  </th>
+                  <th scope="col" className="text-right">
+                    Accepted
+                  </th>
+                  <th scope="col" className="text-right">
+                    Change
+                  </th>
+                  <th scope="col" className="text-right">
+                    Rejected
+                  </th>
+                  <th scope="col">
+                    <span className="sr-only">Actions</span>
+                  </th>
+                </tr>
+              </thead>
+              <tbody>
+                {departments.map((d) => (
+                  <tr
+                    key={d.id}
+                    aria-current={d.id === q.departmentId ? "true" : undefined}
+                    className="aria-[current=true]:bg-brand-50/50"
+                  >
+                    <td className="font-medium">
+                      {d.name} <span className="text-muted">({d.code})</span>
+                    </td>
+                    <td className="text-right tabular-nums">{d.total}</td>
+                    <td className="text-right tabular-nums">{d.unassigned}</td>
+                    <td className="text-right tabular-nums">{d.withHod}</td>
+                    <td className="text-right tabular-nums">{d.accepted}</td>
+                    <td className="text-right tabular-nums">{d.changed}</td>
+                    <td className="text-right tabular-nums">{d.rejected}</td>
+                    <td className="text-right">
+                      <Link
+                        to={withParams({ departmentId: d.id, page: 1 })}
+                        className="whitespace-nowrap text-sm font-semibold"
+                      >
+                        Show
+                      </Link>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </section>
+      )}
+
+      <Form method="get" className="card space-y-4 p-4 sm:p-5" aria-label="Filter applications">
+        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+          <div className="sm:col-span-2">
+            <label htmlFor="f-q" className="block text-sm font-semibold">
+              Search
+            </label>
+            <input
+              id="f-q"
+              name="q"
+              type="search"
+              defaultValue={q.q ?? ""}
+              placeholder="Reference no., candidate name or e-mail"
+              className="field-input mt-1"
+            />
+          </div>
+          <FilterSelect
+            name="departmentId"
+            label="Department"
+            value={q.departmentId}
+            options={options.departments.map((d) => [d.id, d.name])}
           />
-        </div>
-        <Select
-          name="cycleId"
-          label="Recruitment cycle"
-          value={q.cycleId}
-          options={options.cycles.map((c) => [c.id, c.title])}
-        />
-        <Select
-          name="vacancyId"
-          label="Vacancy"
-          value={q.vacancyId}
-          options={options.vacancies.map((v) => [v.id, `${v.code} — ${v.title}`])}
-        />
-        <Select
-          name="position"
-          label="Position"
-          value={q.position}
-          options={Object.entries(POSITION_LABELS)}
-        />
-        <Select
-          name="departmentId"
-          label="Department"
-          value={q.departmentId}
-          options={options.departments.map((d) => [d.id, d.name])}
-        />
-        <Select
-          name="disciplineId"
-          label="Discipline"
-          value={q.disciplineId}
-          options={options.departments.flatMap((d) =>
-            d.disciplines.map((x) => [x.id, `${d.name} — ${x.name}`] as [string, string]),
-          )}
-        />
-        <Select
-          name="status"
-          label="Status"
-          value={q.status}
-          options={APPLICATION_STATUSES.filter((s) => s !== "DRAFT").map((s) => [s, STATUS_LABELS[s]])}
-        />
-        <Select
-          name="processing"
-          label="PDF status"
-          value={q.processing}
-          options={Object.entries(PROCESSING_LABELS)}
-        />
-        <div>
-          <label htmlFor="from" className="block text-sm font-medium">
-            Submitted from
-          </label>
-          <input id="from" name="from" type="date" defaultValue={q.from ?? ""} className="field-input mt-1" />
-        </div>
-        <div>
-          <label htmlFor="to" className="block text-sm font-medium">
-            Submitted to
-          </label>
-          <input id="to" name="to" type="date" defaultValue={q.to ?? ""} className="field-input mt-1" />
+          <FilterSelect
+            name="position"
+            label="Applied for"
+            value={q.position}
+            options={Object.entries(POSITION_LABELS)}
+          />
+          <FilterSelect
+            name="status"
+            label="Status"
+            value={q.status}
+            options={(Object.keys(STATUS_LABELS) as AppStatus[])
+              .filter((s) => s !== "DRAFT")
+              .map((s) => [s, STATUS_LABELS[s]])}
+          />
+          <FilterSelect
+            name="phd"
+            label="Ph.D."
+            value={q.phd}
+            allLabel="Any or none"
+            options={[
+              ["awarded", "Awarded"],
+              ["submitted", "Thesis submitted"],
+              ["pursuing", "Pursuing"],
+              ["any", "Awarded, submitted or pursuing"],
+              ["none", "No Ph.D."],
+            ]}
+          />
+          <FilterSelect
+            name="exam"
+            label="GATE / competitive exam"
+            value={q.exam}
+            allLabel="Any or none"
+            options={[
+              ["any", "Any exam"],
+              ...options.exams.map((e) => [e, e] as [string, string]),
+              ["none", "No exam"],
+            ]}
+          />
+          <FilterSelect
+            name="minExp"
+            label="Minimum experience"
+            value={q.minExp}
+            allLabel="Any"
+            options={[1, 2, 3, 5, 8, 10, 15].map((n) => [String(n), `${n}+ years`])}
+          />
+          <FilterSelect
+            name="hod"
+            label="HOD assignment"
+            value={q.hod}
+            options={[
+              ["unassigned", "Not yet with a HOD"],
+              ["assigned", "With a HOD"],
+            ]}
+          />
+          <FilterSelect
+            name="cycleId"
+            label="Recruitment cycle"
+            value={q.cycleId}
+            options={options.cycles.map((c) => [c.id, c.title])}
+          />
+          <div>
+            <label htmlFor="f-from" className="block text-sm font-semibold">
+              Submitted from
+            </label>
+            <input
+              id="f-from"
+              name="from"
+              type="date"
+              defaultValue={q.from ?? ""}
+              className="field-input mt-1"
+            />
+          </div>
+          <div>
+            <label htmlFor="f-to" className="block text-sm font-semibold">
+              Submitted to
+            </label>
+            <input id="f-to" name="to" type="date" defaultValue={q.to ?? ""} className="field-input mt-1" />
+          </div>
         </div>
         <input type="hidden" name="sort" value={q.sort} />
         <input type="hidden" name="size" value={q.size} />
-        <div className="flex items-end gap-2 md:col-span-2">
+        <div className="flex flex-wrap items-center gap-2">
           <button type="submit" className="btn-primary">
             Apply filters
           </button>
-          <Link to="/staff" className="btn-secondary">
-            Clear
-          </Link>
+          {chips.length > 0 && (
+            <Link to="/staff" className="btn-secondary">
+              Clear all
+            </Link>
+          )}
         </div>
+        {chips.length > 0 && (
+          <ul className="flex flex-wrap gap-2" aria-label="Active filters">
+            {chips.map(([k, label]) => (
+              <li key={k}>
+                <Link
+                  to={withParams({ [k]: null, page: 1 })}
+                  className="chip no-underline"
+                  aria-label={`Remove filter ${label}`}
+                >
+                  {label} <span aria-hidden="true">✕</span>
+                </Link>
+              </li>
+            ))}
+          </ul>
+        )}
       </Form>
 
-      <section aria-labelledby="results" className="card overflow-x-auto p-2">
-        <div className="flex flex-wrap items-center justify-between gap-2 p-4">
-          <h2 id="results" className="text-base">
+      <section aria-labelledby="results" className="card p-0">
+        <div className="flex flex-wrap items-center justify-between gap-3 border-b border-line p-4 sm:px-5">
+          <h2 id="results" className="text-lg">
             <span role="status">
               {list.total} application{list.total === 1 ? "" : "s"}
               {nav.state === "loading" ? " — updating…" : ""}
             </span>
           </h2>
-          <Form method="get" className="flex items-center gap-2 text-sm">
+          {canExport && (
+            <a href={`/staff/summary${location.search}#export`} className="btn-secondary py-2 text-sm">
+              Export these to Excel (CSV)
+            </a>
+          )}
+        </div>
+
+        {canAssign && (
+          <div className="border-b border-line bg-soft/60 p-4 sm:px-5">
+            {q.departmentId ? (
+              <Form method="post" className="flex flex-wrap items-end gap-3">
+                <CsrfInput />
+                {[...selected].map((id) => (
+                  <input key={id} type="hidden" name="applicationId" value={id} />
+                ))}
+                <div>
+                  <label htmlFor="hodId" className="block text-sm font-semibold">
+                    Move to HOD of {deptName}
+                  </label>
+                  <select
+                    id="hodId"
+                    name="hodId"
+                    required
+                    className="field-input mt-1 min-w-64"
+                    defaultValue={hods.length === 1 ? hods[0]!.id : ""}
+                  >
+                    {hods.length !== 1 && <option value="">Choose a HOD…</option>}
+                    {hods.map((h) => (
+                      <option key={h.id} value={h.id}>
+                        {h.profile?.fullName ?? h.email}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+                <input type="hidden" name="scope" value={selected.size ? "selected" : "filtered"} />
+                <ConfirmDialog
+                  trigger={
+                    selected.size
+                      ? `Move ${selected.size} selected`
+                      : "Move all not-yet-assigned in this department"
+                  }
+                  title="Move applications to the HOD?"
+                  confirmLabel="Move applications"
+                  disabled={!hods.length || nav.state !== "idle"}
+                >
+                  <p>
+                    {selected.size
+                      ? `${selected.size} selected application${selected.size === 1 ? "" : "s"}`
+                      : "Every application of this department that matches the filters and is not yet with a HOD"}{" "}
+                    will be moved to the HOD for review. The HOD is notified by e-mail. This is recorded in
+                    the audit log.
+                  </p>
+                </ConfirmDialog>
+                {!hods.length && (
+                  <p className="text-sm text-warning">
+                    No HOD is set up for this department yet.{" "}
+                    {admin ? <Link to="/admin/users">Add a HOD</Link> : "Ask the Admin to add one."}
+                  </p>
+                )}
+              </Form>
+            ) : (
+              <p className="text-sm text-muted">
+                To move applications to a HOD, first choose a <strong>department</strong> in the filters or
+                the department-wise table above.
+              </p>
+            )}
+          </div>
+        )}
+
+        {list.rows.length === 0 ? (
+          <div className="p-5">
+            <EmptyState title="No applications match these filters">
+              Change or <Link to="/staff">clear the filters</Link>.
+            </EmptyState>
+          </div>
+        ) : (
+          <div className="overflow-x-auto">
+            <table className="table">
+              <caption className="sr-only">Applications, sortable by column</caption>
+              <thead>
+                <tr>
+                  {canAssign && q.departmentId && (
+                    <th scope="col" className="w-10">
+                      <input
+                        type="checkbox"
+                        className="h-4 w-4"
+                        aria-label="Select all assignable applications on this page"
+                        checked={allOnPage}
+                        onChange={() =>
+                          setSelected(allOnPage ? new Set() : new Set(assignableRows.map((r) => r.id)))
+                        }
+                      />
+                    </th>
+                  )}
+                  {(["referenceNo", "candidate"] as const).map((k) => (
+                    <th key={k} scope="col" aria-sort={ariaSort(k)}>
+                      <Link to={sortLink(k)} className="text-muted no-underline">
+                        {SORTABLE[k]} <SortIcon dir={ariaSort(k)} />
+                      </Link>
+                    </th>
+                  ))}
+                  <th scope="col">Department</th>
+                  <th scope="col">Applied for</th>
+                  <th scope="col">Ph.D.</th>
+                  <th scope="col">Exam</th>
+                  <th scope="col">Experience</th>
+                  <th scope="col" aria-sort={ariaSort("submittedAt")}>
+                    <Link to={sortLink("submittedAt")} className="text-muted no-underline">
+                      Submitted <SortIcon dir={ariaSort("submittedAt")} />
+                    </Link>
+                  </th>
+                  <th scope="col" aria-sort={ariaSort("status")}>
+                    <Link to={sortLink("status")} className="text-muted no-underline">
+                      Status <SortIcon dir={ariaSort("status")} />
+                    </Link>
+                  </th>
+                  <th scope="col">HOD</th>
+                </tr>
+              </thead>
+              <tbody>
+                {list.rows.map((r) => {
+                  const applied = r.appliedPosition ?? r.vacancy.position;
+                  const rev = r.currentRevision;
+                  return (
+                    <tr key={r.id}>
+                      {canAssign && q.departmentId && (
+                        <td>
+                          {ASSIGNABLE.includes(r.status as AppStatus) && (
+                            <input
+                              type="checkbox"
+                              className="h-4 w-4"
+                              checked={selected.has(r.id)}
+                              onChange={() => toggle(r.id)}
+                              aria-label={`Select ${r.referenceNo}`}
+                            />
+                          )}
+                        </td>
+                      )}
+                      <td>
+                        <Link
+                          to={`/staff/applications/${r.id}`}
+                          state={{ back: location.pathname + location.search }}
+                          className="whitespace-nowrap font-semibold"
+                        >
+                          {r.referenceNo}
+                        </Link>
+                      </td>
+                      <td className="font-medium">{rev?.candidateName}</td>
+                      <td>{r.vacancy.department.code}</td>
+                      <td className="whitespace-nowrap">
+                        {POSITION_LABELS[applied]}
+                        {r.effectivePosition && (
+                          <span className="block text-xs text-brand-700">
+                            → {POSITION_LABELS[r.effectivePosition]}
+                          </span>
+                        )}
+                      </td>
+                      <td>{rev?.phdStatus ?? "—"}</td>
+                      <td>{rev?.competitiveExams.length ? rev.competitiveExams.join(", ") : "—"}</td>
+                      <td className="whitespace-nowrap">
+                        {rev?.totalExperienceMonths != null
+                          ? formatYearsMonths(splitMonths(rev.totalExperienceMonths))
+                          : "—"}
+                      </td>
+                      <td className="whitespace-nowrap">{formatDate(r.submittedAt)}</td>
+                      <td>
+                        <Badge tone={statusTone(r.status)}>{STATUS_LABELS[r.status as AppStatus]}</Badge>
+                        {r.processingStatus !== "READY" && (
+                          <span className="mt-1 block text-xs text-muted">
+                            {PROCESSING_LABELS[r.processingStatus]}
+                          </span>
+                        )}
+                      </td>
+                      <td className="text-sm">
+                        {r.assignedHod ? (r.assignedHod.profile?.fullName ?? r.assignedHod.email) : "—"}
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+        )}
+        <nav
+          aria-label="Pagination"
+          className="flex flex-wrap items-center justify-between gap-3 border-t border-line p-4 text-sm sm:px-5"
+        >
+          <Form method="get" className="flex items-center gap-2">
             {[...params]
               .filter(([k]) => k !== "size" && k !== "page")
               .map(([k, v]) => (
                 <input key={k} type="hidden" name={k} value={v} />
               ))}
             <label htmlFor="size">Rows per page</label>
-            <select id="size" name="size" defaultValue={q.size} className="field-input w-20 py-1">
+            <select
+              id="size"
+              name="size"
+              defaultValue={q.size}
+              className="field-input w-20 py-1"
+              onChange={(e) => e.currentTarget.form?.requestSubmit()}
+            >
               {PAGE_SIZES.map((s) => (
                 <option key={s}>{s}</option>
               ))}
             </select>
-            <button type="submit" className="btn-secondary py-1">
-              Set
-            </button>
           </Form>
-        </div>
-        {list.rows.length === 0 ? (
-          <p className="p-4 text-muted">No applications match these filters.</p>
-        ) : (
-          <table className="table">
-            <caption className="sr-only">Applications, sortable by column</caption>
-            <thead>
-              <tr>
-                {SORTABLE.slice(0, 2).map((c) => (
-                  <th key={c.key} scope="col" aria-sort={ariaSort(c.key)}>
-                    <Link to={sortLink(c.key)} className="no-underline text-ink">
-                      {c.label} <SortIcon dir={ariaSort(c.key)} />
-                    </Link>
-                  </th>
-                ))}
-                <th scope="col">Vacancy</th>
-                {SORTABLE.slice(2).map((c) => (
-                  <th key={c.key} scope="col" aria-sort={ariaSort(c.key)}>
-                    <Link to={sortLink(c.key)} className="no-underline text-ink">
-                      {c.label} <SortIcon dir={ariaSort(c.key)} />
-                    </Link>
-                  </th>
-                ))}
-                <th scope="col">Application Dossier</th>
-                <th scope="col">Reviews</th>
-                <th scope="col">Action</th>
-              </tr>
-            </thead>
-            <tbody>
-              {list.rows.map((r) => (
-                <tr key={r.id}>
-                  <td>
-                    <Link
-                      to={`/staff/applications/${r.id}`}
-                      className="whitespace-nowrap font-semibold hover:underline"
-                      state={{ back: location.pathname + location.search }}
-                    >
-                      {r.referenceNo}
-                    </Link>
-                  </td>
-                  <td className="font-medium text-ink">{r.currentRevision?.candidateName}</td>
-                  <td>
-                    {r.vacancy.code}
-                    <span className="block text-xs text-muted">
-                      {POSITION_LABELS[r.vacancy.position]} · {r.vacancy.department.code}
-                      {r.vacancy.discipline ? ` · ${r.vacancy.discipline.name}` : ""}
-                    </span>
-                  </td>
-                  <td>
-                    <Badge tone={statusTone(r.status)}>{STATUS_LABELS[r.status as AppStatus]}</Badge>
-                  </td>
-                  <td className="text-sm">{formatDateTime(r.submittedAt)}</td>
-                  <td>
-                    {r.generated?.[0] ? (
-                      <a
-                        href={`/files/bundles/${r.generated[0].id}`}
-                        title="Download full candidate dossier (PDF) with all attachments"
-                        className="inline-flex items-center gap-1.5 rounded-lg bg-emerald-50 px-2.5 py-1 text-xs font-bold text-emerald-800 hover:bg-emerald-100 border border-emerald-200 transition-colors shadow-2xs no-underline"
-                      >
-                        <span>📥</span>
-                        <span>PDF ({r.generated[0].pageCount || "—"}p)</span>
-                      </a>
-                    ) : (
-                      <Badge tone={statusTone(r.processingStatus)}>
-                        {PROCESSING_LABELS[r.processingStatus]}
-                      </Badge>
-                    )}
-                  </td>
-                  <td>
-                    <span className="inline-flex items-center gap-1 text-xs font-semibold px-2 py-0.5 rounded-full bg-soft">
-                      {r._count.reviews} review{r._count.reviews === 1 ? "" : "s"}
-                    </span>
-                  </td>
-                  <td>
-                    <Link
-                      to={`/staff/applications/${r.id}`}
-                      className="btn-secondary py-1 px-3 text-xs font-semibold whitespace-nowrap"
-                      state={{ back: location.pathname + location.search }}
-                    >
-                      {isHod ? "Review Candidate →" : "View Application →"}
-                    </Link>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        )}
-        <nav aria-label="Pagination" className="flex items-center justify-between gap-2 p-4 text-sm">
-          <span>
-            Page {q.page} of {list.pages}
-          </span>
-          <span className="flex gap-2">
-            {q.page > 1 ? (
+          <span className="flex items-center gap-2">
+            <span>
+              Page {q.page} of {list.pages}
+            </span>
+            {q.page > 1 && (
               <Link to={withParams({ page: q.page - 1 })} className="btn-secondary py-1">
                 Previous
               </Link>
-            ) : (
-              <span className="btn-secondary py-1 opacity-50" aria-disabled="true">
-                Previous
-              </span>
             )}
-            {q.page < list.pages ? (
+            {q.page < list.pages && (
               <Link to={withParams({ page: q.page + 1 })} className="btn-secondary py-1">
                 Next
               </Link>
-            ) : (
-              <span className="btn-secondary py-1 opacity-50" aria-disabled="true">
-                Next
-              </span>
             )}
           </span>
         </nav>
@@ -398,32 +622,4 @@ export default function StaffIndex({ loaderData }: Route.ComponentProps) {
 
 function SortIcon({ dir }: { dir: "ascending" | "descending" | "none" }) {
   return <span aria-hidden="true">{dir === "ascending" ? "▲" : dir === "descending" ? "▼" : "↕"}</span>;
-}
-
-function Select({
-  name,
-  label,
-  value,
-  options,
-}: {
-  name: string;
-  label: string;
-  value?: string;
-  options: [string, string][];
-}) {
-  return (
-    <div>
-      <label htmlFor={name} className="block text-sm font-medium">
-        {label}
-      </label>
-      <select id={name} name={name} defaultValue={value ?? ""} className="field-input mt-1">
-        <option value="">All</option>
-        {options.map(([v, l]) => (
-          <option key={v} value={v}>
-            {l}
-          </option>
-        ))}
-      </select>
-    </div>
-  );
 }

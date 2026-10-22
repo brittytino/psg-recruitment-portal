@@ -6,6 +6,7 @@ import { clientIp, handleAction, readForm } from "~/lib/http.server";
 import { PRIVACY_NOTICE_VERSION } from "~/lib/privacy";
 import { userContext } from "~/context";
 import { registerCandidate } from "~/modules/auth/account.server";
+import { pendingCookie } from "~/modules/auth/otp.server";
 
 export const meta: Route.MetaFunction = () => [{ title: "Register — PSG Tech Recruitment" }];
 
@@ -17,8 +18,8 @@ export function loader({ context, request }: Route.LoaderArgs) {
 export async function action({ request, context }: Route.ActionArgs) {
   const form = await readForm(request, context);
   return handleAction(async () => {
-    await registerCandidate(Object.fromEntries(form), clientIp(request));
-    throw redirect("/register?done=1");
+    const challengeId = await registerCandidate(Object.fromEntries(form), clientIp(request));
+    throw redirect("/verify-email", { headers: { "Set-Cookie": pendingCookie(challengeId, "/account") } });
   });
 }
 

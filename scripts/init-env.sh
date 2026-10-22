@@ -13,7 +13,6 @@ sed -e "s|^POSTGRES_PASSWORD=.*|POSTGRES_PASSWORD=$OWNER|" \
     -e "s|^MIGRATION_DATABASE_URL=.*|MIGRATION_DATABASE_URL=postgresql://srp_owner:$OWNER@db:5432/srportal?schema=public|" \
     -e "s|^SESSION_SECRET=.*|SESSION_SECRET=$(rand 48)|" \
     -e "s|^CONVERTER_TOKEN=.*|CONVERTER_TOKEN=$(rand 24)|" \
-    -e "s|^SEED_DEMO_PASSWORD=.*|SEED_DEMO_PASSWORD=Demo-$(rand 9)|" \
     .env.example > .env
 chmod 600 .env
 echo "Created .env with generated secrets."

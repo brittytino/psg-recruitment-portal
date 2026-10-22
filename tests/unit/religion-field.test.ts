@@ -61,9 +61,7 @@ describe("Religion dropdown and custom input specification", () => {
 
     it("rejects custom input exceeding maxLength", () => {
       const tooLong = "A".repeat(61);
-      expect(checkScalar(religion, tooLong, "submit", false)).toBe(
-        "Religion must be at most 60 characters",
-      );
+      expect(checkScalar(religion, tooLong, "submit", false)).toBe("Religion must be at most 60 characters");
     });
 
     it("allows empty value when field is optional", () => {

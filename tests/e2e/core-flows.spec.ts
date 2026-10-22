@@ -1,20 +1,24 @@
-import { expect, test, type Page } from "@playwright/test";
+import { expect, test } from "@playwright/test";
 
-const PASSWORD = process.env.SEED_DEMO_PASSWORD ?? "Demo@12345-change";
+/** Local Mailpit (compose.dev.yaml) — used to read the e-mailed one-time code. */
+const MAILPIT = process.env.MAILPIT_URL ?? "http://localhost:6980";
 
-async function signIn(page: Page, email: string) {
-  await page.goto("/login");
-  await page.getByLabel("E-mail address").fill(email);
-  await page.getByLabel("Password").fill(PASSWORD);
-  await page.getByRole("button", { name: "Sign in" }).click();
-  await page.waitForURL((u) => !u.pathname.startsWith("/login"));
+async function latestCode(to: string): Promise<string> {
+  for (let i = 0; i < 20; i++) {
+    const res = await fetch(`${MAILPIT}/api/v1/search?query=${encodeURIComponent(`to:${to}`)}`);
+    const list = (await res.json()) as { messages?: { ID: string; Subject: string }[] };
+    const m = list.messages?.find((x) => /recruitment code/.test(x.Subject));
+    if (m) return /^(\d{6})/.exec(m.Subject)![1]!;
+    await new Promise((r) => setTimeout(r, 500));
+  }
+  throw new Error(`No code e-mail for ${to}`);
 }
 
-test("public pages render with vacancies and accessible landmarks", async ({ page }) => {
+test("public pages render with accessible landmarks", async ({ page }) => {
   await page.goto("/");
-  await expect(page.getByRole("heading", { level: 1 })).toContainText("Shape the future");
-  await page.getByRole("link", { name: /View all vacancies/ }).click();
-  await expect(page.getByRole("link", { name: /\(demo\)/ }).first()).toBeVisible();
+  await expect(page.getByRole("heading", { level: 1 })).toBeVisible();
+  await expect(page.getByRole("main")).toBeVisible();
+  await page.goto("/vacancies");
   await expect(page.getByRole("main")).toBeVisible();
 });
 
@@ -31,35 +35,25 @@ test("wrong password shows a generic error", async ({ page }) => {
   await expect(page.getByText("The e-mail address or password is incorrect.")).toBeVisible();
 });
 
-test("candidate starts an application, edits a section and saves the draft", async ({ page }) => {
-  await signIn(page, "candidate@example.test");
+test("candidate registers, verifies the e-mail with a code and signs in", async ({ page }) => {
+  const email = `e2e-${Date.now()}@example.test`;
+  await page.goto("/register");
+  await page.getByLabel("Full name").fill("E2E Candidate");
+  await page.getByLabel("E-mail address").fill(email);
+  await page.getByRole("textbox", { name: "Password", exact: true }).fill("a long e2e pass phrase");
+  await page.getByLabel("Confirm password").fill("a long e2e pass phrase");
+  await page.getByLabel(/privacy notice/).check();
+  await page.getByRole("button", { name: "Create account" }).click();
+  await expect(page).toHaveURL(/\/verify-email/);
+  await page.getByLabel("6-digit code").fill(await latestCode(email));
+  await page.getByRole("button", { name: "Verify e-mail address" }).click();
+  await expect(page.getByText("E-mail address verified")).toBeVisible();
+  await page.getByLabel("E-mail address").fill(email);
+  await page.getByLabel("Password").fill("a long e2e pass phrase");
+  await page.getByRole("button", { name: "Sign in" }).click();
   await expect(page).toHaveURL(/\/account/);
-  await page.goto("/vacancies/DEMO-CSE-AP");
-  const start = page.getByRole("button", { name: /Apply now/ });
-  if (await start.isVisible()) await start.click();
-  else await page.getByRole("link", { name: /Continue application/ }).click();
-  await expect(page.getByRole("navigation", { name: "Application sections" })).toBeVisible();
-  await page.getByRole("link", { name: /Personal details/ }).click();
-  await page.getByLabel(/^Name \(in block letters\)/).fill("e2e candidate");
-  await expect(page.getByLabel(/^Name \(in block letters\)/)).toHaveValue("E2E CANDIDATE");
-  await page.getByRole("button", { name: "Save draft" }).click();
-  await expect(page.getByRole("status").filter({ hasText: "All changes saved" })).toBeVisible();
-  await page.getByRole("link", { name: "Review and submit" }).first().click();
-  await expect(page.getByRole("heading", { name: "Review your application" })).toBeVisible();
-  await expect(page.getByRole("button", { name: /Submit application/ })).toBeDisabled();
-});
-
-test("HR officer sees the application workspace; candidate cannot", async ({ page, browser }) => {
-  await signIn(page, "hr@example.test");
-  await expect(page).toHaveURL(/\/staff/);
-  await expect(page.getByRole("heading", { name: /Welcome back/ })).toBeVisible();
-  await expect(page.getByText("Drafts in progress")).toBeVisible();
-  const ctx = await browser.newContext();
-  const cand = await ctx.newPage();
-  await signIn(cand, "candidate2@example.test");
-  const res = await cand.goto("/staff");
+  const res = await page.goto("/staff");
   expect(res?.status()).toBe(403);
-  await ctx.close();
 });
 
 test("cross-origin POST is rejected", async ({ request }) => {

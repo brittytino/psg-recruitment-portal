@@ -5,7 +5,9 @@ import { Alert, Badge, CsrfInput, formatDateTime, statusTone } from "~/component
 import { handleAction, readForm, requireUser } from "~/lib/http.server";
 import { STATUS_LABELS, type AppStatus } from "~/modules/applications/workflow";
 import { listOwnApplications } from "~/modules/applications/service.server";
-import { sendVerification } from "~/modules/auth/account.server";
+import { resendEmailOtp, sendVerification } from "~/modules/auth/account.server";
+import { pendingCookie } from "~/modules/auth/otp.server";
+import { clientIp } from "~/lib/http.server";
 import { rateLimit } from "~/modules/auth/rate-limit.server";
 import { hasRole } from "~/modules/auth/permissions";
 import { POSITION_LABELS } from "~/lib/labels";
@@ -27,7 +29,8 @@ export async function action({ request, context }: Route.ActionArgs) {
     if (form.get("intent") === "resend-verification" && !user.emailVerified) {
       await rateLimit("resend-verify", user.id, 3, 3600);
       await sendVerification(user.id);
-      return { message: "A new verification e-mail has been sent." };
+      const challengeId = await resendEmailOtp(user.id, clientIp(request));
+      throw redirect("/verify-email", { headers: { "Set-Cookie": pendingCookie(challengeId, "/account") } });
     }
     return { message: "" };
   });

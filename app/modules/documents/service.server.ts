@@ -21,6 +21,8 @@ import {
 } from "./policy";
 import { newKey, putFile } from "./storage.server";
 
+const SINGLE_FILE_TYPES: readonly DocType[] = ["PHOTOGRAPH", "SIGNATURE", "RESUME"];
+
 export interface DetectedFile {
   mime: "application/pdf" | "image/jpeg" | "image/png";
   ext: "pdf" | "jpg" | "png";
@@ -36,9 +38,11 @@ export async function inspectUpload(data: Uint8Array, type: DocType): Promise<De
     );
   if (!allowedMime(type).includes(mime))
     throw new ValidationError(
-      type === "PHOTOGRAPH"
-        ? "The photograph must be a JPEG or PNG image"
-        : "This file type is not allowed for this document",
+      type === "PHOTOGRAPH" || type === "SIGNATURE"
+        ? "Upload a JPEG or PNG image"
+        : type === "RESUME"
+          ? "The resume must be a PDF file"
+          : "This file type is not allowed for this document",
     );
   if (mime === "application/pdf") {
     try {
@@ -61,8 +65,10 @@ export async function inspectUpload(data: Uint8Array, type: DocType): Promise<De
   } catch {
     throw new ValidationError("The image could not be read or has unusual dimensions.");
   }
-  if (type === "PHOTOGRAPH" && data.byteLength > PHOTO_MAX_BYTES)
-    throw new ValidationError("The photograph must be 2 MB or smaller");
+  if ((type === "PHOTOGRAPH" || type === "SIGNATURE") && data.byteLength > PHOTO_MAX_BYTES)
+    throw new ValidationError(
+      `The ${type === "PHOTOGRAPH" ? "photograph" : "signature"} must be 2 MB or smaller`,
+    );
   return { mime, ext: mime === "image/png" ? "png" : "jpg" };
 }
 
@@ -81,7 +87,7 @@ export async function uploadDocument(
   if (!EDITABLE.includes(app.status as AppStatus))
     throw new ConflictError("Documents can only be changed while the application is editable");
   const sameType = app.documents.filter((d) => d.documentType === type && !d.removedAt);
-  if (type !== "PHOTOGRAPH" && sameType.length >= MAX_FILES_PER_TYPE)
+  if (!SINGLE_FILE_TYPES.includes(type) && sameType.length >= MAX_FILES_PER_TYPE)
     throw new ValidationError(`At most ${MAX_FILES_PER_TYPE} files per document type`);
 
   const data = new Uint8Array(await file.arrayBuffer());
@@ -89,10 +95,10 @@ export async function uploadDocument(
   const key = newKey("uploads", detected.ext);
   const { sha256, size } = await putFile(key, data);
   return prisma.$transaction(async (tx) => {
-    // A new photograph replaces the previous one.
-    if (type === "PHOTOGRAPH")
+    // A new photograph, signature or resume replaces the previous one.
+    if (SINGLE_FILE_TYPES.includes(type))
       await tx.applicationDocument.updateMany({
-        where: { applicationId, documentType: "PHOTOGRAPH", removedAt: null },
+        where: { applicationId, documentType: type, removedAt: null },
         data: { removedAt: new Date() },
       });
     const doc = await tx.applicationDocument.create({
@@ -173,10 +179,18 @@ export async function authorizeDocumentDownload(user: SessionUser, documentId: s
 export async function authorizeGeneratedDownload(user: SessionUser, generatedId: string, ip?: string) {
   const g = await prisma.generatedDocument.findUnique({
     where: { id: generatedId },
-    include: { application: { select: { candidateId: true } } },
+    include: {
+      application: { select: { candidateId: true } },
+      revision: { select: { formVersion: true } },
+    },
   });
   if (!g || g.status !== "READY" || !g.storageKey) throw new NotFoundError("Document");
-  if (g.application.candidateId === user.id) return g;
+  // Candidates download their application form; the consolidated bundle is for the recruitment
+  // office (v1 applications predate the separate form PDF, so their bundle stays available).
+  if (g.application.candidateId === user.id) {
+    if (g.kind === "APPLICATION_PDF" || g.revision.formVersion === 1) return g;
+    throw new NotFoundError("Document");
+  }
   if (!hasPermission(user.grants, "document:download")) throw new NotFoundError("Document");
   const scope = staffApplicationScope(user);
   const visible =
@@ -184,7 +198,7 @@ export async function authorizeGeneratedDownload(user: SessionUser, generatedId:
   if (!visible) throw new NotFoundError("Document");
   await audit({
     actorId: user.id,
-    action: "bundle.downloaded",
+    action: g.kind === "APPLICATION_PDF" ? "application_pdf.downloaded" : "bundle.downloaded",
     entityType: "application",
     entityId: g.applicationId,
     ip,

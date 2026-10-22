@@ -12,16 +12,23 @@ import {
 import type { Route } from "./+types/application";
 import { SectionFields } from "~/components/application-form";
 import { Alert, Badge, ErrorSummary, formatDateTime, statusTone, useCsrf } from "~/components/forms";
+import { UploadsPanel, type UploadedDoc } from "~/components/uploads-panel";
 import { handleAction, readForm, requireUser } from "~/lib/http.server";
-import { FORM_LABELS } from "~/lib/labels";
+import { FORM_LABELS, POSITION_LABELS } from "~/lib/labels";
 import { getOwnApplication, saveDraft } from "~/modules/applications/service.server";
 import { EDITABLE, STATUS_LABELS, type AppStatus } from "~/modules/applications/workflow";
 import { env } from "~/modules/core/env.server";
 import { ValidationError } from "~/modules/core/errors";
-import { removeDocument, uploadDocument } from "~/modules/documents/service.server";
-import { getFormDefinition } from "~/modules/forms/registry";
-import type { Answers, FormCode } from "~/modules/forms/types";
-import { ageOn, validateAnswers, type FieldIssue } from "~/modules/forms/validation";
+import type { DocType } from "~/modules/documents/policy";
+import { getFormDefinition, isDocxForm } from "~/modules/forms/registry";
+import type { Answers, FormCode, SectionDef } from "~/modules/forms/types";
+import {
+  computeDerived,
+  experienceOverlaps,
+  uploadRequired,
+  validateAnswers,
+  type FieldIssue,
+} from "~/modules/forms/validation";
 
 export const meta: Route.MetaFunction = () => [{ title: "Application form — PSG Tech Recruitment" }];
 
@@ -33,6 +40,7 @@ export async function loader({ request, params, context }: Route.LoaderArgs) {
     app.status === "NEEDS_CLARIFICATION"
       ? [...app.statusHistory].reverse().find((h) => h.toStatus === "NEEDS_CLARIFICATION")?.reason
       : null;
+  const position = app.appliedPosition ?? app.vacancy.position;
   return {
     id: app.id,
     status: app.status,
@@ -42,25 +50,33 @@ export async function loader({ request, params, context }: Route.LoaderArgs) {
       title: app.vacancy.title,
       code: app.vacancy.code,
       department: app.vacancy.department.name,
+      position: POSITION_LABELS[position] ?? position,
       closesAt: app.vacancy.closesAt,
     },
     answers: app.draftAnswers as Answers,
     version: app.draftVersion,
     lastSavedAt: app.lastSavedAt,
-    hasPhoto: app.documents.some((d) => d.documentType === "PHOTOGRAPH"),
+    documents: app.documents.map((d): UploadedDoc => ({
+      id: d.id,
+      type: d.documentType as DocType,
+      name: d.originalName,
+      size: d.sizeBytes,
+      scan: d.scanStatus,
+    })),
     clarification,
     maxMb: env().MAX_UPLOAD_MB,
   };
 }
 
-/** Section changes are client-side only; keep unsaved edits by not reloading the draft. */
+/** Step changes are client-side only; keep unsaved edits by not reloading the draft. */
 export function shouldRevalidate({
   currentUrl,
   nextUrl,
   formMethod,
   defaultShouldRevalidate,
 }: ShouldRevalidateFunctionArgs) {
-  if (!formMethod && currentUrl.pathname === nextUrl.pathname) return false;
+  if (!formMethod && currentUrl.pathname === nextUrl.pathname && currentUrl.search !== nextUrl.search)
+    return false;
   return defaultShouldRevalidate;
 }
 
@@ -68,39 +84,6 @@ export async function action({ request, params, context }: Route.ActionArgs) {
   const user = requireUser(context, request);
   const form = await readForm(request, context);
   return handleAction(async () => {
-    const intent = form.get("intent");
-    if (intent === "upload_entry_document") {
-      const file = form.get("file");
-      const docType = form.get("documentType");
-      const doc = await uploadDocument(
-        user,
-        params.id,
-        docType,
-        file instanceof File ? file : null,
-      );
-      return data({
-        ok: true as const,
-        action: "upload" as const,
-        document: {
-          id: doc.id,
-          type: doc.documentType,
-          name: doc.originalName,
-          size: doc.sizeBytes,
-        },
-      });
-    }
-    if (intent === "remove_entry_document") {
-      const documentId = String(form.get("documentId") ?? "");
-      if (documentId) {
-        await removeDocument(user, params.id, documentId);
-      }
-      return data({
-        ok: true as const,
-        action: "remove" as const,
-        documentId,
-      });
-    }
-
     let answers: unknown;
     try {
       answers = JSON.parse(String(form.get("answers") ?? "{}"));
@@ -115,18 +98,24 @@ export async function action({ request, params, context }: Route.ActionArgs) {
 type SaveResponse =
   { ok: true; version: number; savedAt: string } | { formError?: string; details?: unknown; ok?: undefined };
 
+type StepState = "complete" | "errors" | "todo";
+
+const AUTOSAVE_MS = 30_000;
+
 export default function ApplicationEditor({ loaderData }: Route.ComponentProps) {
   const L = loaderData;
   const def = useMemo(() => getFormDefinition(L.formCode, L.formVersion), [L.formCode, L.formVersion]);
+  const v2 = !isDocxForm(def);
   const [params] = useSearchParams();
   const navigate = useNavigate();
   const csrf = useCsrf();
   const fetcher = useFetcher<SaveResponse>();
-  const sectionIndex = Math.max(
+  const sections = def.sections;
+  const stepIndex = Math.max(
     0,
-    def.sections.findIndex((s) => s.id === params.get("section")),
+    sections.findIndex((s) => s.id === params.get("section")),
   );
-  const section = def.sections[sectionIndex]!;
+  const section = sections[stepIndex]!;
 
   const [answers, setAnswers] = useState<Answers>(L.answers);
   const [version, setVersion] = useState(L.version);
@@ -134,7 +123,7 @@ export default function ApplicationEditor({ loaderData }: Route.ComponentProps) 
     L.lastSavedAt ? new Date(L.lastSavedAt).toISOString() : null,
   );
   const [dirty, setDirty] = useState(false);
-  const [showIssues, setShowIssues] = useState(false);
+  const [checked, setChecked] = useState<Set<string>>(new Set());
   const [serverIssues, setServerIssues] = useState<FieldIssue[]>([]);
   const [conflict, setConflict] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -142,20 +131,41 @@ export default function ApplicationEditor({ loaderData }: Route.ComponentProps) 
   const dirtyRef = useRef(false);
   dirtyRef.current = dirty;
 
+  const today = new Date().toISOString().slice(0, 10);
   const derived = useMemo(
-    () => ({
-      department: L.vacancy.department,
-      age:
-        typeof answers.dateOfBirth === "string"
-          ? ageOn(answers.dateOfBirth, new Date().toISOString().slice(0, 10))
-          : null,
-    }),
-    [answers.dateOfBirth, L.vacancy.department],
+    () =>
+      computeDerived(def, answers, {
+        department: L.vacancy.department,
+        position: L.vacancy.position,
+        asOf: today,
+      }),
+    [def, answers, L.vacancy.department, L.vacancy.position, today],
   );
   const allIssues = useMemo(() => validateAnswers(def, answers, "submit"), [def, answers]);
-  const sectionIssues = showIssues
-    ? [...serverIssues, ...allIssues].filter((i) => i.sectionId === section.id)
-    : serverIssues.filter((i) => i.sectionId === section.id);
+  const missingUploads = (def.uploads ?? []).filter(
+    (g) => uploadRequired(g, answers) && !L.documents.some((d) => g.types.includes(d.type)),
+  );
+  const issueCount = (s: SectionDef) =>
+    s.kind === "uploads" ? missingUploads.length : allIssues.filter((i) => i.sectionId === s.id).length;
+  const touched = (s: SectionDef) =>
+    s.kind === "uploads"
+      ? L.documents.length > 0
+      : s.fields.some((f) => {
+          const v = answers[f.key];
+          return v != null && v !== "" && !(Array.isArray(v) && v.length === 0);
+        });
+  const stepState = (s: SectionDef): StepState =>
+    issueCount(s) === 0 && (touched(s) || s.fields.every((f) => f.requirement !== "required"))
+      ? "complete"
+      : checked.has(s.id) && issueCount(s) > 0
+        ? "errors"
+        : "todo";
+  const showErrors = checked.has(section.id);
+  const sectionIssues = [
+    ...serverIssues.filter((i) => i.sectionId === section.id),
+    ...(showErrors ? allIssues.filter((i) => i.sectionId === section.id) : []),
+  ];
+  const overlaps = section.id === "experience" && v2 ? experienceOverlaps(answers, today) : [];
 
   const save = (thenGo?: string) => {
     afterSave.current = thenGo ?? null;
@@ -165,7 +175,6 @@ export default function ApplicationEditor({ loaderData }: Route.ComponentProps) 
     );
   };
 
-  // Handle save responses.
   useEffect(() => {
     if (fetcher.state !== "idle" || !fetcher.data) return;
     const d = fetcher.data;
@@ -186,14 +195,13 @@ export default function ApplicationEditor({ loaderData }: Route.ComponentProps) 
     }
   }, [fetcher.state, fetcher.data, navigate]);
 
-  // Autosave 20 seconds after the last change.
+  // Autosave 30 seconds after the last change.
   useEffect(() => {
     if (!dirty || conflict) return;
-    const t = setTimeout(() => save(), 20_000);
+    const t = setTimeout(() => save(), AUTOSAVE_MS);
     return () => clearTimeout(t);
   }, [answers, dirty, conflict]);
 
-  // Warn before closing the tab with unsaved changes.
   useEffect(() => {
     if (!dirty) return;
     const h = (e: BeforeUnloadEvent) => e.preventDefault();
@@ -201,7 +209,6 @@ export default function ApplicationEditor({ loaderData }: Route.ComponentProps) 
     return () => window.removeEventListener("beforeunload", h);
   }, [dirty]);
 
-  // Block in-app navigation away from the editor with unsaved changes.
   const blocker = useBlocker(
     ({ currentLocation, nextLocation }) =>
       dirtyRef.current && currentLocation.pathname !== nextLocation.pathname,
@@ -212,28 +219,39 @@ export default function ApplicationEditor({ loaderData }: Route.ComponentProps) 
     setDirty(true);
   };
 
-  const sectionUrl = (i: number) => `?section=${def.sections[i]!.id}`;
+  const stepUrl = (i: number) => `/applications/${L.id}?section=${sections[i]!.id}`;
+  const nextUrl =
+    stepIndex < sections.length - 1
+      ? stepUrl(stepIndex + 1)
+      : v2
+        ? `/applications/${L.id}/review`
+        : `/applications/${L.id}/documents`;
+  const goTo = (url: string) => (dirty ? save(url) : navigate(url));
+  const continueStep = () => {
+    setChecked((c) => new Set(c).add(section.id));
+    goTo(nextUrl);
+  };
   const saving = fetcher.state !== "idle";
-  const issueCount = (id: string) => allIssues.filter((i) => i.sectionId === id).length;
-  const complete = def.sections.filter((s) => issueCount(s.id) === 0).length;
+  const complete = sections.filter((s) => stepState(s) === "complete").length;
+  const pct = Math.round((complete / sections.length) * 100);
 
   return (
     <div className="space-y-6">
-      <div className="flex flex-wrap items-start justify-between gap-4">
+      <header className="flex flex-wrap items-start justify-between gap-4">
         <div>
-          <p className="text-sm text-muted">{FORM_LABELS[L.formCode]}</p>
-          <h1>{L.vacancy.title}</h1>
+          <p className="text-sm font-medium text-muted">{FORM_LABELS[L.formCode]}</p>
+          <h1 className="text-2xl sm:text-3xl">{L.vacancy.title}</h1>
           <p className="mt-1 text-sm text-muted">
-            {L.vacancy.department} · Closes {formatDateTime(L.vacancy.closesAt)}
+            {L.vacancy.department} · {L.vacancy.position} · Closes {formatDateTime(L.vacancy.closesAt)}
           </p>
         </div>
         <Badge tone={statusTone(L.status)}>{STATUS_LABELS[L.status as AppStatus]}</Badge>
-      </div>
+      </header>
 
       {L.clarification && (
         <Alert tone="warning" title="Clarification requested by the recruitment office">
           <p className="whitespace-pre-line">{L.clarification}</p>
-          <p className="mt-1">Update your application and submit it again from the review page.</p>
+          <p className="mt-1">Update your application and submit it again from the review step.</p>
         </Alert>
       )}
       {conflict && (
@@ -258,112 +276,126 @@ export default function ApplicationEditor({ loaderData }: Route.ComponentProps) 
         </Alert>
       )}
 
-      <div className="grid gap-6 lg:grid-cols-[18rem_1fr]">
-        <nav aria-label="Application sections" className="card h-fit p-3">
-          <p className="px-2 text-sm font-semibold" id="progress-label">
-            Progress: {complete} of {def.sections.length} sections complete
-          </p>
-          <progress
-            className="mx-2 mt-2 h-2 w-[calc(100%-1rem)]"
-            max={def.sections.length}
-            value={complete}
-            aria-labelledby="progress-label"
+      {/* Mobile progress */}
+      <div className="lg:hidden">
+        <div className="flex items-center justify-between text-sm font-medium">
+          <span>
+            Step {stepIndex + 1} of {sections.length}
+          </span>
+          <span>{pct}% complete</span>
+        </div>
+        <progress className="mt-2 h-2 w-full" max={100} value={pct} aria-label="Application progress" />
+        <details className="mt-3 rounded-2xl border border-line bg-white p-3">
+          <summary className="cursor-pointer text-sm font-semibold">All steps</summary>
+          <StepList
+            sections={sections}
+            current={stepIndex}
+            state={stepState}
+            issues={issueCount}
+            url={stepUrl}
+            reviewUrl={`/applications/${L.id}/review`}
           />
-          <ol className="mt-3 space-y-1">
-            {def.sections.map((s, i) => {
-              const n = issueCount(s.id);
-              return (
-                <li key={s.id}>
-                  <Link
-                    to={sectionUrl(i)}
-                    aria-current={i === sectionIndex ? "step" : undefined}
-                    className="flex items-center justify-between gap-2 rounded px-2 py-1.5 text-sm no-underline text-ink hover:bg-brand-50 aria-[current=step]:bg-brand-50 aria-[current=step]:font-semibold"
-                  >
-                    <span>
-                      {i + 1}. {s.title}
-                    </span>
-                    <span className={`text-xs ${n ? "text-warning" : "text-success"}`}>
-                      {n ? `${n} to do` : "Complete"}
-                    </span>
-                  </Link>
-                </li>
-              );
-            })}
-            <li>
-              <Link
-                to={`/applications/${L.id}/documents`}
-                className="block rounded px-2 py-1.5 text-sm no-underline text-ink hover:bg-brand-50"
-              >
-                Documents and photograph{" "}
-                <span className={`text-xs ${L.hasPhoto ? "text-success" : "text-warning"}`}>
-                  {L.hasPhoto ? "Photo uploaded" : "Photo needed"}
-                </span>
-              </Link>
-            </li>
-            <li>
-              <Link
-                to={`/applications/${L.id}/review`}
-                className="block rounded px-2 py-1.5 text-sm font-medium no-underline hover:bg-brand-50"
-              >
-                Review and submit
-              </Link>
-            </li>
-          </ol>
+        </details>
+      </div>
+
+      <div className="grid gap-6 lg:grid-cols-[17rem_minmax(0,1fr)]">
+        <nav aria-label="Application steps" className="card hidden h-fit p-4 lg:sticky lg:top-24 lg:block">
+          <p className="text-sm font-semibold" id="progress-label">
+            {complete} of {sections.length} steps complete
+          </p>
+          <progress className="mt-2 h-2 w-full" max={100} value={pct} aria-labelledby="progress-label" />
+          <StepList
+            sections={sections}
+            current={stepIndex}
+            state={stepState}
+            issues={issueCount}
+            url={stepUrl}
+            reviewUrl={`/applications/${L.id}/review`}
+          />
+          {!v2 && (
+            <Link
+              to={`/applications/${L.id}/documents`}
+              className="mt-1 block rounded-lg px-2 py-2 text-sm no-underline text-ink hover:bg-soft"
+            >
+              Documents and photograph
+            </Link>
+          )}
         </nav>
 
-        <section aria-labelledby="section-title" className="card space-y-5">
-          <div>
-            <p className="text-sm text-muted">
-              Section {sectionIndex + 1} of {def.sections.length}
-              {section.sourceHeading ? ` · Official heading: “${section.sourceHeading}”` : ""} · Page
-              {section.pages.length > 1 ? "s" : ""} {section.pages.join(", ")}
+        <section aria-labelledby="section-title" className="card mx-auto w-full max-w-[920px] space-y-6">
+          <div className="border-b border-line pb-4">
+            <p className="text-sm font-medium text-brand-700">
+              Step {stepIndex + 1} of {sections.length}
             </p>
-            <h2 id="section-title" className="text-xl">
+            <h2 id="section-title" className="mt-1 text-xl sm:text-2xl">
               {section.title}
             </h2>
-            {section.description && <p className="mt-1 text-sm text-muted">{section.description}</p>}
+            {section.description && <p className="mt-2 text-[15px] text-muted">{section.description}</p>}
+            <p className="mt-2 text-sm text-muted">
+              Fields marked <span className="font-semibold text-danger">*</span> are required.
+            </p>
           </div>
+
           <ErrorSummary
-            title="Please check this section"
+            title={`Please check ${sectionIssues.length} item${sectionIssues.length === 1 ? "" : "s"} in this step`}
             messages={sectionIssues.map((i) => ({
               text: i.message,
               href: `#q-${i.path.replace(/\./g, "-")}`,
             }))}
           />
-          <SectionFields
-            section={section}
-            answers={answers}
-            derived={derived}
-            issues={sectionIssues}
-            onChange={onChange}
-            applicationId={L.id}
-            csrf={csrf}
-            maxUploadMb={L.maxMb}
-          />
+          {overlaps.length > 0 && (
+            <Alert tone="warning" title="Overlapping periods">
+              Positions {overlaps.map((i) => i + 1).join(", ")} overlap in time. Overlapping months are
+              counted once in your total experience. Check the dates if this is not intended.
+            </Alert>
+          )}
 
-          <div className="flex flex-wrap items-center justify-between gap-3 border-t border-line pt-4">
+          {section.kind === "uploads" ? (
+            <UploadsPanel
+              applicationId={L.id}
+              groups={def.uploads ?? []}
+              answers={answers}
+              documents={L.documents}
+              maxUploadMb={L.maxMb}
+            />
+          ) : (
+            <SectionFields
+              section={section}
+              answers={answers}
+              derived={derived}
+              issues={sectionIssues}
+              onChange={onChange}
+              applicationId={L.id}
+              csrf={csrf}
+              maxUploadMb={L.maxMb}
+            />
+          )}
+
+          <div className="flex flex-col-reverse gap-3 border-t border-line pt-5 sm:flex-row sm:items-center sm:justify-between">
             <p className="text-sm text-muted" role="status" aria-live="polite">
               {saving
                 ? "Saving…"
                 : dirty
-                  ? "Unsaved changes"
+                  ? "Unsaved changes (saved automatically every 30 seconds)"
                   : savedAt
-                    ? `All changes saved · last saved ${formatDateTime(savedAt)}`
+                    ? `All changes saved · ${formatDateTime(savedAt)}`
                     : "Not saved yet"}
             </p>
-            <div className="flex flex-wrap gap-2">
-              {sectionIndex > 0 && (
-                <Link to={sectionUrl(sectionIndex - 1)} className="btn-secondary">
-                  Previous section
-                </Link>
+            <div className="flex flex-wrap gap-2 sm:justify-end">
+              {stepIndex > 0 && (
+                <button
+                  type="button"
+                  className="btn-secondary"
+                  disabled={saving}
+                  onClick={() => goTo(stepUrl(stepIndex - 1))}
+                >
+                  Back
+                </button>
               )}
-              <button type="button" className="btn-secondary" onClick={() => setShowIssues(true)}>
-                Check this section
-              </button>
               <button
                 type="button"
                 className="btn-secondary"
-                disabled={saving || !!conflict}
+                disabled={saving || !!conflict || !dirty}
                 onClick={() => save()}
               >
                 Save draft
@@ -372,20 +404,82 @@ export default function ApplicationEditor({ loaderData }: Route.ComponentProps) 
                 type="button"
                 className="btn-primary"
                 disabled={saving || !!conflict}
-                onClick={() =>
-                  save(
-                    sectionIndex < def.sections.length - 1
-                      ? `/applications/${L.id}${sectionUrl(sectionIndex + 1)}`
-                      : `/applications/${L.id}/documents`,
-                  )
-                }
+                onClick={continueStep}
               >
-                Save and continue
+                {stepIndex < sections.length - 1 ? "Save and continue" : "Review application"}
               </button>
             </div>
           </div>
         </section>
       </div>
     </div>
+  );
+}
+
+function StepList({
+  sections,
+  current,
+  state,
+  issues,
+  url,
+  reviewUrl,
+}: {
+  sections: SectionDef[];
+  current: number;
+  state: (s: SectionDef) => StepState;
+  issues: (s: SectionDef) => number;
+  url: (i: number) => string;
+  reviewUrl: string;
+}) {
+  return (
+    <ol className="mt-3 space-y-0.5">
+      {sections.map((s, i) => {
+        const st = state(s);
+        return (
+          <li key={s.id}>
+            <Link
+              to={url(i)}
+              aria-current={i === current ? "step" : undefined}
+              className="flex items-center gap-2.5 rounded-lg px-2 py-2 text-sm no-underline text-ink hover:bg-soft aria-[current=step]:bg-brand-50 aria-[current=step]:font-semibold"
+            >
+              <span
+                aria-hidden="true"
+                className={`grid h-6 w-6 shrink-0 place-items-center rounded-full text-xs font-bold ${
+                  st === "complete"
+                    ? "bg-success text-white"
+                    : st === "errors"
+                      ? "bg-danger text-white"
+                      : "border border-line bg-white text-muted"
+                }`}
+              >
+                {st === "complete" ? "✓" : st === "errors" ? "!" : i + 1}
+              </span>
+              <span className="min-w-0 flex-1">{s.title}</span>
+              <span className="sr-only">
+                {st === "complete"
+                  ? "complete"
+                  : st === "errors"
+                    ? `${issues(s)} items to fix`
+                    : "not complete"}
+              </span>
+            </Link>
+          </li>
+        );
+      })}
+      <li>
+        <Link
+          to={reviewUrl}
+          className="mt-1 flex items-center gap-2.5 rounded-lg px-2 py-2 text-sm font-semibold no-underline hover:bg-soft"
+        >
+          <span
+            aria-hidden="true"
+            className="grid h-6 w-6 place-items-center rounded-full bg-ink text-xs text-white"
+          >
+            ➜
+          </span>
+          Review, preview and submit
+        </Link>
+      </li>
+    </ol>
   );
 }

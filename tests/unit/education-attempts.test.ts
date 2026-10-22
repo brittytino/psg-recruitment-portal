@@ -82,11 +82,7 @@ describe("Education qualifications number of attempts", () => {
       attempts: null,
     };
 
-    const issuesWithAttempts = validateAnswers(
-      def,
-      { academicQualifications: [validRow] },
-      "submit",
-    );
+    const issuesWithAttempts = validateAnswers(def, { academicQualifications: [validRow] }, "submit");
     expect(issuesWithAttempts.some((i) => i.path.includes("attempts"))).toBe(false);
 
     const issuesWithoutAttempts = validateAnswers(

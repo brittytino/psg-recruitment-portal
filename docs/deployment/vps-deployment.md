@@ -33,11 +33,13 @@ docker login ghcr.io
 ./infrastructure/blue-green/deploy.sh ghcr.io/<org>/<repo>/app:<sha12>
 ```
 
-Then create the first Super Admin (runs only while none exists; prints a one-time 72-hour setup link):
+Then run the seed once. It registers the form templates and creates the Dean and Principal (Admin) and HR – N4 Section accounts if missing; each receives a 72-hour set-password e-mail (the link is also printed once):
 
 ```sh
-ENV_FILE=.env.production sh -c '. infrastructure/blue-green/lib.sh; dc --profile ops run --rm -e BOOTSTRAP_ADMIN_EMAIL=admin@<college-domain> -e APP_ORIGIN=https://<domain> migrate node build-worker/seed.js'
+ENV_FILE=.env.production sh -c '. infrastructure/blue-green/lib.sh; dc --profile ops run --rm -e APP_ORIGIN=https://<domain> migrate node build-worker/seed.js'
 ```
+
+SMTP must work before staff can sign in: every staff sign-in is confirmed with an e-mailed code.
 
 ## Operations
 

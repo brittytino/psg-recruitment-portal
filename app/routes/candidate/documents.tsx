@@ -27,6 +27,8 @@ export async function loader({ request, params, context }: Route.LoaderArgs) {
   const user = requireUser(context, request);
   const app = await getOwnApplication(user, params.id);
   if (!EDITABLE.includes(app.status as AppStatus)) throw redirect(`/applications/${app.id}/receipt`);
+  // Version 2 forms have the documents step inside the application form.
+  if (app.formTemplate.version >= 2) throw redirect(`/applications/${app.id}?section=documents`);
   return {
     id: app.id,
     title: app.vacancy.title,
@@ -94,9 +96,9 @@ export default function Documents({ loaderData, actionData }: Route.ComponentPro
       )}
 
       <div className="rounded-2xl border border-line bg-soft/70 p-4 text-sm text-muted">
-        <span className="font-semibold text-ink">Qualification &amp; experience certificates:</span> Supporting
-        documents for academic qualifications (degree certificates, mark sheets) and employment experience
-        testimonials are attached directly to each entry in the respective sections of your form.
+        <span className="font-semibold text-ink">Qualification &amp; experience certificates:</span>{" "}
+        Supporting documents for academic qualifications (degree certificates, mark sheets) and employment
+        experience testimonials are attached directly to each entry in the respective sections of your form.
       </div>
 
       <section className="card" aria-labelledby="checklist">

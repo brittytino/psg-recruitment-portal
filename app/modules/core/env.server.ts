@@ -23,6 +23,8 @@ const schema = z.object({
   SMTP_USER: z.string().optional(),
   SMTP_PASSWORD: z.string().optional(),
   MAIL_FROM: z.string().min(3),
+  /** Development only: print sign-in codes to the server log (rejected in production). */
+  DEV_LOG_OTP: bool.default(false),
   LOG_LEVEL: z.enum(["fatal", "error", "warn", "info", "debug", "trace"]).default("info"),
   GIT_SHA: z.string().default("dev"),
 });
@@ -42,6 +44,7 @@ export function env(): Env {
   const e = parsed.data;
   if (e.NODE_ENV === "production") {
     if (e.MALWARE_SCAN === "disabled") throw new Error("MALWARE_SCAN=disabled is not allowed in production");
+    if (e.DEV_LOG_OTP) throw new Error("DEV_LOG_OTP=true is not allowed in production");
     if (e.SESSION_SECRET.startsWith("replace-with"))
       throw new Error("SESSION_SECRET still has the example value");
   }

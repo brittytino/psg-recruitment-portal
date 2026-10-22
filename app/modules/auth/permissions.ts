@@ -2,15 +2,18 @@
  * Role -> permission matrix (shared by server and UI). The UI uses it only to hide controls;
  * every loader/action/download re-checks on the server, together with record-level scope rules in
  * policy.server.ts. See docs/architecture/authorization-matrix.md.
+ *
+ *  - ADMIN: Dean and Principal. Full control of the system.
+ *  - HR: HR – N4 Section. Job profiles, all applications, downloads, summaries and exports.
+ *  - HOD: reviews the applications of their own department that were assigned to them.
+ *  - CANDIDATE: their own applications only.
  */
-export const ROLES = [
-  "CANDIDATE",
-  "HR_OFFICER",
-  "DEPARTMENT_REVIEWER",
-  "RECRUITMENT_ADMIN",
-  "SUPER_ADMIN",
-] as const;
+export const ROLES = ["CANDIDATE", "HR", "HOD", "ADMIN"] as const;
 export type RoleName = (typeof ROLES)[number];
+
+/** Staff roles that Admin can grant (candidates register themselves). */
+export const STAFF_ROLES = ["ADMIN", "HR", "HOD"] as const satisfies readonly RoleName[];
+export type StaffRole = (typeof STAFF_ROLES)[number];
 
 export type Permission =
   | "application:own"
@@ -20,59 +23,59 @@ export type Permission =
   | "application:assign"
   | "application:export"
   | "review:record"
+  | "summary:generate"
+  | "summary:read"
+  | "position:approve"
   | "document:download"
   | "document:regenerate"
   | "recruitment:manage"
   | "user:manage"
+  | "settings:manage"
   | "audit:read";
 
 export const ROLE_PERMISSIONS: Record<RoleName, readonly Permission[]> = {
   CANDIDATE: ["application:own"],
-  HR_OFFICER: [
+  HR: [
     "application:list",
     "application:read",
     "application:transition",
     "application:assign",
     "application:export",
+    "summary:read",
     "document:download",
     "document:regenerate",
     "recruitment:manage",
   ],
-  DEPARTMENT_REVIEWER: ["application:list", "application:read", "review:record", "document:download"],
-  RECRUITMENT_ADMIN: [
-    "user:manage",
-    "recruitment:manage",
-    "audit:read",
+  HOD: ["application:list", "application:read", "review:record", "summary:generate", "document:download"],
+  ADMIN: [
     "application:list",
     "application:read",
     "application:transition",
     "application:assign",
     "application:export",
+    "summary:read",
+    "position:approve",
     "document:download",
     "document:regenerate",
-    "review:record",
-  ],
-  SUPER_ADMIN: [
-    "user:manage",
     "recruitment:manage",
+    "user:manage",
+    "settings:manage",
     "audit:read",
-    "application:list",
-    "application:read",
-    "application:transition",
-    "application:assign",
-    "application:export",
-    "document:download",
-    "document:regenerate",
-    "review:record",
   ],
 };
 
 export const ROLE_LABELS: Record<RoleName, string> = {
   CANDIDATE: "Candidate",
-  HR_OFFICER: "HR Officer (HR-N4 Section)",
-  DEPARTMENT_REVIEWER: "HOD / Department Reviewer",
-  RECRUITMENT_ADMIN: "Admin (Dean / Principal)",
-  SUPER_ADMIN: "Admin (Dean / Principal)",
+  HR: "HR – N4 Section",
+  HOD: "Head of Department (HOD)",
+  ADMIN: "Admin (Dean / Principal)",
+};
+
+export const ROLE_DESCRIPTIONS: Record<RoleName, string> = {
+  CANDIDATE: "Applies for vacancies.",
+  HR: "Enters job profiles, views and downloads every application, views approved summary sheets and exports.",
+  HOD: "Reviews the applications of their own department that are assigned to them.",
+  ADMIN: "Full control: users and roles, departments, assignment to HODs, position-change approvals.",
 };
 
 export interface RoleGrant {
@@ -95,24 +98,33 @@ export function isStaff(grants: readonly RoleGrant[]): boolean {
 }
 
 export function isAdmin(grants: readonly RoleGrant[]): boolean {
-  return grants.some((g) => g.role === "SUPER_ADMIN" || g.role === "RECRUITMENT_ADMIN");
+  return hasRole(grants, "ADMIN");
 }
 
 export function isHrOfficer(grants: readonly RoleGrant[]): boolean {
-  return grants.some((g) => g.role === "HR_OFFICER");
+  return hasRole(grants, "HR");
 }
 
 export function isHodReviewer(grants: readonly RoleGrant[]): boolean {
-  return grants.some((g) => g.role === "DEPARTMENT_REVIEWER");
+  return hasRole(grants, "HOD");
 }
 
-export function getPrimaryRoleBadge(grants: readonly RoleGrant[]): {
-  label: string;
-  tone: "info" | "warning" | "neutral" | "success" | "danger";
-} {
-  if (isAdmin(grants)) return { label: "Admin (Dean / Principal)", tone: "info" };
-  if (isHrOfficer(grants)) return { label: "HR - N4 Section", tone: "warning" };
-  if (isHodReviewer(grants)) return { label: "HOD / Dept Reviewer", tone: "neutral" };
-  if (isStaff(grants)) return { label: "Staff", tone: "neutral" };
-  return { label: "Applicant", tone: "success" };
+/** Department ids a HOD is responsible for. */
+export function hodDepartments(grants: readonly RoleGrant[]): string[] {
+  return grants.filter((g) => g.role === "HOD" && g.departmentId).map((g) => g.departmentId!);
+}
+
+/** Highest-privilege role label, for headers and badges. */
+export function primaryRoleLabel(grants: readonly RoleGrant[]): string {
+  if (isAdmin(grants)) return "Admin";
+  if (isHrOfficer(grants)) return "HR – N4 Section";
+  if (isHodReviewer(grants)) return "HOD";
+  return "Applicant";
+}
+
+/** Where a user lands after signing in. */
+export function homePath(grants: readonly RoleGrant[]): string {
+  if (isAdmin(grants) || isHrOfficer(grants)) return "/staff";
+  if (isHodReviewer(grants)) return "/staff/review";
+  return "/account";
 }

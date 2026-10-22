@@ -1,56 +1,83 @@
+import { useState } from "react";
 import { Form, useSearchParams } from "react-router";
 import type { Route } from "./+types/users";
-import { Alert, Badge, ConfirmDialog, CsrfInput, TextInput } from "~/components/forms";
-import { handleAction, readForm, requireUser } from "~/lib/http.server";
-import { hasPermission, ROLE_LABELS, type RoleName } from "~/modules/auth/permissions";
-import { ForbiddenError, ValidationError } from "~/modules/core/errors";
+import {
+  Alert,
+  Badge,
+  ConfirmDialog,
+  CsrfInput,
+  ErrorSummary,
+  formatDateTime,
+  TextInput,
+} from "~/components/forms";
+import { EmptyState, PageHeader, Tabs } from "~/components/staff";
+import { handleAction, readForm, requireStaff } from "~/lib/http.server";
+import {
+  ROLE_DESCRIPTIONS,
+  ROLE_LABELS,
+  STAFF_ROLES,
+  type RoleName,
+  type StaffRole,
+} from "~/modules/auth/permissions";
 import { prisma } from "~/modules/core/db.server";
+import { ValidationError } from "~/modules/core/errors";
 import {
   createStaffUser,
-  grantableRoles,
   grantRole,
-  listUsers,
+  listStaff,
+  resendInvite,
   revokeRole,
   setUserStatus,
 } from "~/modules/users/service.server";
-import { data } from "react-router";
 
-export const meta: Route.MetaFunction = () => [{ title: "Users and roles — Administration" }];
+export const meta: Route.MetaFunction = () => [{ title: "Users and roles — PSG Tech Recruitment" }];
 
 export async function loader({ request, context }: Route.LoaderArgs) {
-  const user = requireUser(context, request);
-  const roles = grantableRoles(user);
-  if (!roles.length) throw data("You do not have access to this page.", { status: 403 });
-  const q = new URL(request.url).searchParams.get("q")?.slice(0, 100) || undefined;
-  const [users, departments, cycles] = await Promise.all([
-    listUsers(user, q),
-    prisma.department.findMany({ orderBy: { name: "asc" }, select: { id: true, name: true } }),
-    prisma.recruitmentCycle.findMany({ orderBy: { opensAt: "desc" }, select: { id: true, title: true } }),
+  const user = requireStaff(context, request, "user:manage");
+  const url = new URL(request.url);
+  const q = url.searchParams.get("q")?.slice(0, 100) || undefined;
+  const role = STAFF_ROLES.find((r) => r === url.searchParams.get("role"));
+  const [users, departments, counts] = await Promise.all([
+    listStaff(user, q, role),
+    prisma.department.findMany({
+      where: { active: true },
+      orderBy: { name: "asc" },
+      select: { id: true, name: true, code: true },
+    }),
+    prisma.userRole.groupBy({
+      by: ["role"],
+      where: { role: { in: [...STAFF_ROLES] } },
+      _count: { _all: true },
+    }),
   ]);
   return {
     users,
     departments,
-    cycles,
-    roles,
-    canCreate: hasPermission(user.grants, "user:manage"),
     selfId: user.id,
+    role: role ?? null,
+    counts: Object.fromEntries(counts.map((c) => [c.role, c._count._all])),
   };
 }
 
 export async function action({ request, context }: Route.ActionArgs) {
-  const user = requireUser(context, request);
+  const user = requireStaff(context, request, "user:manage");
   const form = await readForm(request, context);
   return handleAction(async () => {
     switch (form.get("intent")) {
       case "create":
-        await createStaffUser(user, Object.fromEntries(form));
-        return { message: "Staff account created. A password-setup link has been e-mailed." };
+        await createStaffUser(user, {
+          ...Object.fromEntries(form),
+          departmentIds: form.getAll("departmentIds"),
+        });
+        return {
+          message: "Account created. A link to set the password has been e-mailed (valid for 72 hours).",
+        };
       case "grant":
         await grantRole(user, Object.fromEntries(form));
-        return { message: "Role granted." };
+        return { message: "Role added." };
       case "revoke":
         await revokeRole(user, String(form.get("roleId")));
-        return { message: "Role revoked." };
+        return { message: "Role removed." };
       case "status":
         await setUserStatus(
           user,
@@ -58,178 +85,278 @@ export async function action({ request, context }: Route.ActionArgs) {
           form.get("status") === "DISABLED" ? "DISABLED" : "ACTIVE",
         );
         return { message: "Account status updated." };
+      case "invite":
+        await resendInvite(user, String(form.get("userId")));
+        return { message: "A new set-password link has been e-mailed." };
       default:
         throw new ValidationError("Unknown action");
     }
-  }).catch((e) => {
-    if (e instanceof ForbiddenError) throw data("Forbidden", { status: 403 });
-    throw e;
   });
 }
 
 export default function Users({ loaderData, actionData }: Route.ComponentProps) {
-  const { users, departments, cycles, roles, canCreate, selfId } = loaderData;
+  const { users, departments, selfId, role, counts } = loaderData;
   const [params] = useSearchParams();
-  const fe = actionData && "fieldErrors" in actionData ? actionData.fieldErrors : undefined;
+  const [newRole, setNewRole] = useState<StaffRole>("HOD");
+  const a = actionData as
+    { message?: string; formError?: string; fieldErrors?: Record<string, string[]> } | undefined;
+  const fe = a?.fieldErrors;
   return (
-    <div className="space-y-8">
-      <div className="border-b border-line/70 pb-6">
-        <p className="eyebrow">Access Control</p>
-        <h1 className="mt-1.5 text-3xl sm:text-4xl lg:text-5xl font-extrabold text-ink">
-          Users and role management
-        </h1>
-        <p className="mt-2 text-base text-muted">
-          Invite staff members, assign institutional privileges, and manage account statuses.
-        </p>
-      </div>
-      {actionData && "message" in actionData && actionData.message && (
-        <Alert tone="success">{actionData.message}</Alert>
-      )}
-      {actionData && "formError" in actionData && actionData.formError && (
-        <Alert tone="danger">{actionData.formError}</Alert>
-      )}
-      {canCreate && (
-        <section className="card" aria-labelledby="new-staff">
-          <h2 id="new-staff">Create a staff account</h2>
-          <Form method="post" className="mt-3 grid gap-3 sm:grid-cols-[1fr_1fr_auto] sm:items-end">
-            <CsrfInput />
-            <input type="hidden" name="intent" value="create" />
-            <TextInput label="Full name" name="fullName" required error={fe?.fullName?.[0]} />
-            <TextInput label="E-mail" name="email" type="email" required error={fe?.email?.[0]} />
-            <button type="submit" className="btn-primary">
-              Create and send invitation
-            </button>
-          </Form>
-        </section>
-      )}
-      <Form method="get" className="flex items-end gap-2">
-        <div>
-          <label htmlFor="q" className="block text-sm font-medium">
-            Search staff
-          </label>
-          <input
-            id="q"
-            name="q"
-            type="search"
-            defaultValue={params.get("q") ?? ""}
-            className="field-input mt-1"
-          />
-        </div>
-        <button type="submit" className="btn-secondary">
-          Search
-        </button>
-      </Form>
-      <ul className="space-y-4">
-        {users.map((u) => (
-          <li key={u.id} className="card space-y-3">
-            <div className="flex flex-wrap items-center justify-between gap-2">
-              <div>
-                <p className="font-medium">{u.profile?.fullName ?? u.email}</p>
-                <p className="text-sm text-muted">{u.email}</p>
-              </div>
-              <div className="flex items-center gap-2">
-                <Badge tone={u.status === "ACTIVE" ? "success" : "danger"}>
-                  {u.status === "ACTIVE" ? "Active" : "Disabled"}
-                </Badge>
-                {canCreate && u.id !== selfId && (
-                  <Form method="post">
-                    <CsrfInput />
-                    <input type="hidden" name="intent" value="status" />
-                    <input type="hidden" name="userId" value={u.id} />
-                    <input
-                      type="hidden"
-                      name="status"
-                      value={u.status === "ACTIVE" ? "DISABLED" : "ACTIVE"}
-                    />
-                    <ConfirmDialog
-                      trigger={u.status === "ACTIVE" ? "Disable" : "Enable"}
-                      triggerClassName="btn-secondary py-1"
-                      tone={u.status === "ACTIVE" ? "danger" : "primary"}
-                      title={`${u.status === "ACTIVE" ? "Disable" : "Enable"} this account?`}
-                      confirmLabel="Confirm"
-                    >
-                      <p>
-                        {u.status === "ACTIVE"
-                          ? "The user is signed out immediately and cannot sign in."
-                          : "The user will be able to sign in again."}
-                      </p>
-                    </ConfirmDialog>
-                  </Form>
-                )}
-              </div>
-            </div>
-            <ul className="flex flex-wrap gap-2">
-              {u.roles.map((r) => (
-                <li key={r.id} className="flex items-center gap-1 rounded-full bg-soft px-3 py-1 text-sm">
-                  {ROLE_LABELS[r.role as RoleName]}
-                  {r.department ? ` — ${r.department.name}` : ""}
-                  {r.role === "HR_OFFICER" ? ` — ${r.cycle?.title ?? "all cycles"}` : ""}
-                  {roles.includes(r.role as RoleName) && (
-                    <Form method="post" className="inline">
-                      <CsrfInput />
-                      <input type="hidden" name="intent" value="revoke" />
-                      <input type="hidden" name="roleId" value={r.id} />
-                      <button
-                        type="submit"
-                        className="btn-link ml-1 py-0 text-xs text-danger"
-                        aria-label={`Revoke ${ROLE_LABELS[r.role as RoleName]}`}
-                      >
-                        Revoke
-                      </button>
-                    </Form>
-                  )}
-                </li>
+    <div className="space-y-6">
+      <PageHeader
+        eyebrow="Admin"
+        title="Users and roles"
+        description="Add HODs, HR – N4 Section staff and Admins. New users receive an e-mail to set their password; every sign-in is confirmed with a code sent to their e-mail."
+      />
+      {a?.message && <Alert tone="success">{a.message}</Alert>}
+      {a?.formError && !fe && <Alert tone="danger">{a.formError}</Alert>}
+
+      <section className="card space-y-5" aria-labelledby="new-staff">
+        <h2 id="new-staff" className="text-xl">
+          Add a staff member
+        </h2>
+        <ErrorSummary
+          messages={
+            fe
+              ? Object.entries(fe).flatMap(([k, v]) => (v ?? []).map((text) => ({ text, href: `#f-${k}` })))
+              : []
+          }
+        />
+        <Form method="post" className="space-y-5">
+          <CsrfInput />
+          <input type="hidden" name="intent" value="create" />
+          <div className="grid gap-4 md:grid-cols-2">
+            <TextInput
+              label="Full name"
+              name="fullName"
+              required
+              hint="As it should appear, e.g. Dr. R. Kumar"
+              error={fe?.fullName?.[0]}
+            />
+            <TextInput
+              label="Official e-mail address"
+              name="email"
+              type="email"
+              required
+              hint="e.g. hod.cse@psgtech.ac.in"
+              error={fe?.email?.[0]}
+            />
+          </div>
+          <fieldset>
+            <legend className="text-sm font-semibold">Role</legend>
+            <div className="mt-2 grid gap-3 md:grid-cols-3">
+              {STAFF_ROLES.map((r) => (
+                <label
+                  key={r}
+                  className="flex cursor-pointer items-start gap-3 rounded-xl border border-line p-3 has-[:checked]:border-ink has-[:checked]:bg-soft"
+                >
+                  <input
+                    type="radio"
+                    name="role"
+                    value={r}
+                    checked={newRole === r}
+                    onChange={() => setNewRole(r)}
+                    className="mt-1 h-4 w-4"
+                  />
+                  <span>
+                    <span className="block font-semibold">{ROLE_LABELS[r]}</span>
+                    <span className="text-sm text-muted">{ROLE_DESCRIPTIONS[r]}</span>
+                  </span>
+                </label>
               ))}
-            </ul>
-            <Form method="post" className="grid gap-2 sm:grid-cols-4 sm:items-end">
-              <CsrfInput />
-              <input type="hidden" name="intent" value="grant" />
-              <input type="hidden" name="userId" value={u.id} />
-              <div>
-                <label htmlFor={`role-${u.id}`} className="block text-xs font-medium">
-                  Role
-                </label>
-                <select id={`role-${u.id}`} name="role" className="field-input mt-1">
-                  {roles.map((r) => (
-                    <option key={r} value={r}>
-                      {ROLE_LABELS[r]}
-                    </option>
-                  ))}
-                </select>
-              </div>
-              <div>
-                <label htmlFor={`dept-${u.id}`} className="block text-xs font-medium">
-                  Department (reviewers)
-                </label>
-                <select id={`dept-${u.id}`} name="departmentId" className="field-input mt-1">
-                  <option value="">—</option>
+            </div>
+          </fieldset>
+          {newRole === "HOD" && (
+            <fieldset id="f-departmentIds">
+              <legend className="text-sm font-semibold">
+                Department(s) this HOD reviews <span className="text-danger">*</span>
+              </legend>
+              {departments.length === 0 ? (
+                <p className="mt-2 text-sm text-warning">
+                  Create the department first under{" "}
+                  <a href="/admin?tab=departments">Job profiles → Departments</a>.
+                </p>
+              ) : (
+                <div className="mt-2 grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
                   {departments.map((d) => (
-                    <option key={d.id} value={d.id}>
-                      {d.name}
-                    </option>
+                    <label key={d.id} className="flex items-center gap-2.5 text-[15px]">
+                      <input type="checkbox" name="departmentIds" value={d.id} className="h-4 w-4" />
+                      {d.name} ({d.code})
+                    </label>
                   ))}
-                </select>
-              </div>
-              <div>
-                <label htmlFor={`cycle-${u.id}`} className="block text-xs font-medium">
-                  Cycle (HR; blank = all)
-                </label>
-                <select id={`cycle-${u.id}`} name="cycleId" className="field-input mt-1">
-                  <option value="">All cycles</option>
-                  {cycles.map((c) => (
-                    <option key={c.id} value={c.id}>
-                      {c.title}
-                    </option>
+                </div>
+              )}
+              {fe?.departmentIds && <p className="mt-1 text-sm text-danger">{fe.departmentIds[0]}</p>}
+            </fieldset>
+          )}
+          <button type="submit" className="btn-primary">
+            Create account and send invitation
+          </button>
+        </Form>
+      </section>
+
+      <div className="flex flex-wrap items-end justify-between gap-3">
+        <Tabs
+          items={[
+            { to: "?", label: "All staff", active: !role },
+            ...STAFF_ROLES.map((r) => ({
+              to: `?role=${r}`,
+              label: ROLE_LABELS[r],
+              active: role === r,
+              count: counts[r] ?? 0,
+            })),
+          ]}
+        />
+        <Form method="get" className="flex items-end gap-2">
+          {role && <input type="hidden" name="role" value={role} />}
+          <div>
+            <label htmlFor="q" className="sr-only">
+              Search staff
+            </label>
+            <input
+              id="q"
+              name="q"
+              type="search"
+              placeholder="Search name or e-mail"
+              defaultValue={params.get("q") ?? ""}
+              className="field-input w-64"
+            />
+          </div>
+          <button type="submit" className="btn-secondary">
+            Search
+          </button>
+        </Form>
+      </div>
+
+      {users.length === 0 ? (
+        <EmptyState title="No staff accounts found" />
+      ) : (
+        <ul className="space-y-3">
+          {users.map((u) => {
+            const staffRoles = u.roles.filter((r) => r.role !== "CANDIDATE");
+            return (
+              <li key={u.id} className="card space-y-4 p-5">
+                <div className="flex flex-wrap items-start justify-between gap-3">
+                  <div>
+                    <p className="text-lg font-semibold">{u.profile?.fullName ?? u.email}</p>
+                    <p className="text-sm text-muted">
+                      {u.email} · last sign-in {u.lastLoginAt ? formatDateTime(u.lastLoginAt) : "never"}
+                    </p>
+                  </div>
+                  <div className="flex flex-wrap items-center gap-2">
+                    <Badge tone={u.status === "ACTIVE" ? "success" : "danger"}>
+                      {u.status === "ACTIVE" ? "Active" : "Disabled"}
+                    </Badge>
+                    {!u.lastLoginAt && (
+                      <Form method="post">
+                        <CsrfInput />
+                        <input type="hidden" name="intent" value="invite" />
+                        <input type="hidden" name="userId" value={u.id} />
+                        <button type="submit" className="btn-secondary px-3 py-1.5 text-sm">
+                          Resend invitation
+                        </button>
+                      </Form>
+                    )}
+                    {u.id !== selfId && (
+                      <Form method="post">
+                        <CsrfInput />
+                        <input type="hidden" name="intent" value="status" />
+                        <input type="hidden" name="userId" value={u.id} />
+                        <input
+                          type="hidden"
+                          name="status"
+                          value={u.status === "ACTIVE" ? "DISABLED" : "ACTIVE"}
+                        />
+                        <ConfirmDialog
+                          trigger={u.status === "ACTIVE" ? "Disable" : "Enable"}
+                          triggerClassName="btn-secondary px-3 py-1.5 text-sm"
+                          tone={u.status === "ACTIVE" ? "danger" : "primary"}
+                          title={`${u.status === "ACTIVE" ? "Disable" : "Enable"} ${u.profile?.fullName ?? u.email}?`}
+                          confirmLabel="Confirm"
+                        >
+                          <p>
+                            {u.status === "ACTIVE"
+                              ? "They are signed out immediately and cannot sign in."
+                              : "They will be able to sign in again."}
+                          </p>
+                        </ConfirmDialog>
+                      </Form>
+                    )}
+                  </div>
+                </div>
+                <ul className="flex flex-wrap gap-2" aria-label="Roles">
+                  {staffRoles.map((r) => (
+                    <li
+                      key={r.id}
+                      className="flex items-center gap-2 rounded-full border border-line bg-soft py-1 pl-3 pr-1 text-sm"
+                    >
+                      <span className="font-medium">
+                        {ROLE_LABELS[r.role as RoleName]}
+                        {r.department ? ` — ${r.department.code}` : ""}
+                      </span>
+                      <Form method="post">
+                        <CsrfInput />
+                        <input type="hidden" name="intent" value="revoke" />
+                        <input type="hidden" name="roleId" value={r.id} />
+                        <ConfirmDialog
+                          trigger="Remove"
+                          triggerClassName="rounded-full px-2 py-0.5 text-xs font-semibold text-danger hover:bg-danger-50"
+                          tone="danger"
+                          title="Remove this role?"
+                          confirmLabel="Remove role"
+                        >
+                          <p>
+                            {ROLE_LABELS[r.role as RoleName]}
+                            {r.department ? ` (${r.department.name})` : ""} will be removed from {u.email}.
+                          </p>
+                        </ConfirmDialog>
+                      </Form>
+                    </li>
                   ))}
-                </select>
-              </div>
-              <button type="submit" className="btn-secondary">
-                Grant role
-              </button>
-            </Form>
-          </li>
-        ))}
-      </ul>
+                </ul>
+                <details>
+                  <summary className="cursor-pointer text-sm font-semibold text-brand-700">
+                    Add a role
+                  </summary>
+                  <Form method="post" className="mt-3 grid gap-3 sm:grid-cols-[1fr_1fr_auto] sm:items-end">
+                    <CsrfInput />
+                    <input type="hidden" name="intent" value="grant" />
+                    <input type="hidden" name="userId" value={u.id} />
+                    <div>
+                      <label htmlFor={`role-${u.id}`} className="block text-sm font-semibold">
+                        Role
+                      </label>
+                      <select id={`role-${u.id}`} name="role" className="field-input mt-1">
+                        {STAFF_ROLES.map((r) => (
+                          <option key={r} value={r}>
+                            {ROLE_LABELS[r]}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+                    <div>
+                      <label htmlFor={`dept-${u.id}`} className="block text-sm font-semibold">
+                        Department (for HOD)
+                      </label>
+                      <select id={`dept-${u.id}`} name="departmentId" className="field-input mt-1">
+                        <option value="">—</option>
+                        {departments.map((d) => (
+                          <option key={d.id} value={d.id}>
+                            {d.name}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+                    <button type="submit" className="btn-secondary">
+                      Add role
+                    </button>
+                  </Form>
+                </details>
+              </li>
+            );
+          })}
+        </ul>
+      )}
     </div>
   );
 }
