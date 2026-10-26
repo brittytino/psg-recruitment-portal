@@ -17,6 +17,7 @@ const SENDS_PER_HOUR = 5;
 const PURPOSE_TEXT: Record<OtpPurpose, string> = {
   STAFF_LOGIN: "signing in",
   EMAIL_VERIFICATION: "verifying your e-mail address",
+  LOGIN: "signing in",
 };
 
 /** 6-digit code from a CSPRNG (leading zeros kept). */
@@ -96,9 +97,11 @@ export async function verifyOtp(
   if (!/^[0-9a-f-]{36}$/.test(challengeId)) return invalid;
   await rateLimit("otp-verify-ip", ip, 60, 900);
   const c = await prisma.otpChallenge.findUnique({ where: { id: challengeId } });
+  const isLoginPurpose = (p: OtpPurpose) => p === "STAFF_LOGIN" || p === "LOGIN";
+  const purposeMatches = c && (c.purpose === purpose || (isLoginPurpose(purpose) && isLoginPurpose(c.purpose)));
   if (
     !c ||
-    c.purpose !== purpose ||
+    !purposeMatches ||
     c.consumedAt ||
     c.expiresAt < new Date() ||
     c.attempts >= OTP_MAX_ATTEMPTS

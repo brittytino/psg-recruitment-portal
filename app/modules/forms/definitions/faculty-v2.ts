@@ -1,25 +1,43 @@
 import { date, derived, list, monthYear, num, select, table, text, textarea } from "../builders";
-import { INDIAN_RELIGIONS } from "../religions";
+import {
+  ACADEMIC_DEGREES,
+  ACADEMIC_DISCIPLINES,
+  BOOK_PUBLISHERS,
+  COMPETITIVE_EXAMINATIONS,
+  CONFERENCE_INDEXING,
+  CONFERENCE_LEVELS,
+  DESIGNATIONS,
+  EMPLOYMENT_NATURE,
+  EMPLOYMENT_TYPES,
+  HSC_MAJOR_STREAMS,
+  INDIAN_RELIGIONS,
+  INDIAN_STATES,
+  JOINING_TIME_OPTIONS,
+  JOURNAL_PUBLICATION_TYPES,
+  MEMBERSHIP_TYPES,
+  MODES_OF_EDUCATION,
+  MOTHER_TONGUES,
+  NATIONALITIES,
+  PATENT_STATUS,
+  PHD_STATUS_OPTIONS,
+  PROFESSIONAL_BODIES,
+  PROJECT_ROLES,
+  PROJECT_STATUS,
+  QUALIFICATION_CLASSES,
+  QUALIFICATION_LEVELS,
+  REFERENCE_RELATIONSHIPS,
+  RELATIVE_RELATIONSHIPS,
+  SCHOOL_BOARDS,
+  VACANCY_SOURCES,
+} from "../options";
 import type { FormCode, FormDefinition, ScalarField, SectionDef, UploadGroup } from "../types";
-
-/**
- * PSG College of Technology faculty application — version 2 (2026-27 onwards).
- *
- * One structure for every post (Professor, Associate Professor, Assistant Professor). It keeps every
- * field of the official v1 forms and adds the fields approved for 2026-27 (school/college education,
- * CGPA and class, mode of study, attempts, arrears, scale of pay, journal/conference/book records,
- * research metrics, projects, patents, guideship, competitive exams, references, salary expectations
- * and relatives in PSG institutions). The application PDF is drawn directly (renderer "pdf").
- *
- * Page numbers in `source` refer to the step of the online form (there is no Word template).
- */
 
 const YES_NO = [
   { value: "Yes", label: "Yes" },
   { value: "No", label: "No" },
 ];
-const MODE = ["Full-time", "Part-time", "Distance Education"];
-const CLASS_OPTIONS = ["First Class with Distinction / Honours", "First Class", "Second Class", "Other"];
+const MODE = [...MODES_OF_EDUCATION];
+const CLASS_OPTIONS = [...QUALIFICATION_CLASSES];
 const NOT_CURRENT = { key: "isCurrent", in: ["No"] } as const;
 const EMPLOYED = { key: "currentlyEmployed", in: ["Yes"] } as const;
 const HAS_PHD = { key: "phdStatus", in: ["Awarded", "Thesis submitted", "Pursuing"] } as const;
@@ -43,7 +61,13 @@ const address = (side: "present" | "permanent", step: number): ScalarField[] => 
       requirement: "required",
       maxLength: 100,
     }),
-    text(`${side}State`, `${head} — State`, step, "State", { requirement: "required", maxLength: 100 }),
+    select(`${side}State`, `${head} — State`, step, "State", [...INDIAN_STATES], {
+      requirement: "required",
+      allowOther: true,
+      otherOptionValue: "Other State / UT",
+      otherLabel: "Specify State / UT",
+      otherMaxLength: 80,
+    }),
     text(`${side}Pin`, `${head} — PIN code`, step, "PIN", {
       requirement: "required",
       inputMode: "numeric",
@@ -103,9 +127,27 @@ function commonSections(): SectionDef[] {
           maxLength: 100,
         }),
         text("district", "District of birth", 2, "District", { requirement: "required", maxLength: 100 }),
-        text("state", "State of birth", 2, "State", { requirement: "required", maxLength: 100 }),
-        text("motherTongue", "Mother tongue", 2, "Mother tongue", { requirement: "required", maxLength: 60 }),
-        text("nationality", "Nationality", 2, "Nationality", { requirement: "required", maxLength: 60 }),
+        select("state", "State of birth", 2, "State", [...INDIAN_STATES], {
+          requirement: "required",
+          allowOther: true,
+          otherOptionValue: "Other State / UT",
+          otherLabel: "Specify state or union territory",
+          otherMaxLength: 80,
+        }),
+        select("motherTongue", "Mother tongue", 2, "Mother tongue", [...MOTHER_TONGUES], {
+          requirement: "required",
+          allowOther: true,
+          otherOptionValue: "Other",
+          otherLabel: "Specify mother tongue",
+          otherMaxLength: 60,
+        }),
+        select("nationality", "Nationality", 2, "Nationality", [...NATIONALITIES], {
+          requirement: "required",
+          allowOther: true,
+          otherOptionValue: "Other",
+          otherLabel: "Specify nationality",
+          otherMaxLength: 60,
+        }),
         select("religion", "Religion", 2, "Religion", [...INDIAN_RELIGIONS], {
           requirement: "policy",
           allowOther: true,
@@ -200,7 +242,13 @@ function commonSections(): SectionDef[] {
           maxLength: 200,
           wide: true,
         }),
-        text("sslcBoard", "SSLC — Board", 4, "Board", { requirement: "required", maxLength: 120 }),
+        select("sslcBoard", "SSLC — Board", 4, "Board", [...SCHOOL_BOARDS], {
+          requirement: "required",
+          allowOther: true,
+          otherOptionValue: "Other",
+          otherLabel: "Specify SSLC board",
+          otherMaxLength: 120,
+        }),
         num("sslcYear", "SSLC — Year of completion", 4, "Year", { requirement: "required", ...YEAR }),
         text("sslcMarks", "SSLC — Marks / percentage", 4, "Marks", {
           requirement: "required",
@@ -214,17 +262,26 @@ function commonSections(): SectionDef[] {
           max: 20,
           integer: true,
         }),
-        text("hscMajor", "HSC — Major subjects (group)", 4, "Major subject", {
+        select("hscMajor", "HSC — Major subjects (group)", 4, "Major subject", [...HSC_MAJOR_STREAMS], {
           requirement: "required",
-          maxLength: 150,
-          help: "For example Mathematics, Physics, Chemistry, Computer Science.",
+          allowOther: true,
+          otherOptionValue: "Other",
+          otherLabel: "Specify HSC major subjects",
+          otherMaxLength: 150,
+          help: "Select your main subjects or choose Other to specify.",
         }),
         text("hscSchool", "HSC — School", 4, "HSC School", {
           requirement: "required",
           maxLength: 200,
           wide: true,
         }),
-        text("hscBoard", "HSC — Board", 4, "Board", { requirement: "required", maxLength: 120 }),
+        select("hscBoard", "HSC — Board", 4, "Board", [...SCHOOL_BOARDS], {
+          requirement: "required",
+          allowOther: true,
+          otherOptionValue: "Other",
+          otherLabel: "Specify HSC board",
+          otherMaxLength: 120,
+        }),
         num("hscYear", "HSC — Year of completion", 4, "Year", { requirement: "required", ...YEAR }),
         text("hscMarks", "HSC — Marks / percentage", 4, "Marks", { requirement: "required", maxLength: 30 }),
         select("hscMode", "HSC — Mode of education", 4, "Mode", MODE, { requirement: "required" }),
@@ -254,17 +311,22 @@ function commonSections(): SectionDef[] {
               "Level",
               5,
               "Level",
-              [
-                { value: "UG", label: "UG — Under-graduate" },
-                { value: "PG", label: "PG — Post-graduate" },
-                { value: "MPHIL", label: "M.Phil." },
-                { value: "DIPLOMA", label: "Diploma" },
-                { value: "OTHER", label: "Other" },
-              ],
+              [...QUALIFICATION_LEVELS],
               { requirement: "required" },
             ),
-            text("degree", "Degree", 5, "Degree", { requirement: "required", maxLength: 150 }),
-            text("specialisation", "Branch / specialisation", 5, "Specialisation", { maxLength: 200 }),
+            select("degree", "Degree", 5, "Degree", [...ACADEMIC_DEGREES], {
+              requirement: "required",
+              allowOther: true,
+              otherOptionValue: "Other",
+              otherLabel: "Specify degree (e.g. B.Tech., M.Tech.)",
+              otherMaxLength: 100,
+            }),
+            select("specialisation", "Branch / specialisation", 5, "Specialisation", [...ACADEMIC_DISCIPLINES], {
+              allowOther: true,
+              otherOptionValue: "Other",
+              otherLabel: "Specify branch / specialisation",
+              otherMaxLength: 150,
+            }),
             text("college", "College", 5, "College", { requirement: "required", maxLength: 200 }),
             text("university", "University", 5, "University", { requirement: "required", maxLength: 200 }),
             monthYear("monthYear", "Month & year of completion", 5, "Year of completion", {
@@ -316,7 +378,7 @@ function commonSections(): SectionDef[] {
           "Ph.D. status",
           5,
           "Ph.D.",
-          ["Awarded", "Thesis submitted", "Pursuing", "Not applicable"],
+          [...PHD_STATUS_OPTIONS],
           { requirement: "required" },
         ),
         text("phdTitle", "Ph.D. thesis title", 5, "Thesis", {
@@ -331,9 +393,12 @@ function commonSections(): SectionDef[] {
           requirement: "required",
         }),
         text("phdSupervisor", "Ph.D. supervisor", 5, "Supervisor", { maxLength: 150, when: HAS_PHD }),
-        text("phdSpecialisation", "Ph.D. specialisation", 5, "Specialisation", {
-          maxLength: 200,
+        select("phdSpecialisation", "Ph.D. specialisation", 5, "Specialisation", [...ACADEMIC_DISCIPLINES], {
           when: HAS_PHD,
+          allowOther: true,
+          otherOptionValue: "Other",
+          otherLabel: "Specify Ph.D. specialisation",
+          otherMaxLength: 150,
         }),
         num("phdRegistrationYear", "Year of registration", 5, "Registration", { ...YEAR, when: HAS_PHD }),
         monthYear("phdAwardDate", "Month & year of award / thesis submission", 5, "Award", {
@@ -414,13 +479,19 @@ function commonSections(): SectionDef[] {
               maxLength: 200,
             }),
             text("institutionAddress", "Address of the institution", 7, "Address", { maxLength: 300 }),
-            text("designation", "Designation", 7, "Designation", { requirement: "required", maxLength: 150 }),
+            select("designation", "Designation", 7, "Designation", [...DESIGNATIONS], {
+              requirement: "required",
+              allowOther: true,
+              otherOptionValue: "Other",
+              otherLabel: "Specify designation",
+              otherMaxLength: 120,
+            }),
             select(
               "nature",
               "Nature of work",
               7,
               "Teaching / Industry / Research",
-              ["Teaching", "Industry", "Research"],
+              [...EMPLOYMENT_NATURE],
               {
                 requirement: "required",
               },
@@ -430,8 +501,13 @@ function commonSections(): SectionDef[] {
               "Employment type",
               7,
               "Type",
-              ["Regular", "Contract", "Ad hoc", "Visiting"],
-              {},
+              [...EMPLOYMENT_TYPES],
+              {
+                allowOther: true,
+                otherOptionValue: "Other",
+                otherLabel: "Specify employment type",
+                otherMaxLength: 80,
+              },
             ),
             date("from", "From", 7, "From", { requirement: "required" }),
             select("isCurrent", "Currently working here?", 7, "Current", YES_NO, { requirement: "required" }),
@@ -479,10 +555,13 @@ function commonSections(): SectionDef[] {
         select("currentlyEmployed", "Are you currently employed?", 7, "Currently employed", YES_NO, {
           requirement: "required",
         }),
-        text("presentPost", "Present post", 7, "Present post", {
-          maxLength: 150,
+        select("presentPost", "Present post", 7, "Present post", [...DESIGNATIONS], {
           when: EMPLOYED,
           requirement: "required",
+          allowOther: true,
+          otherOptionValue: "Other",
+          otherLabel: "Specify present post / designation",
+          otherMaxLength: 120,
         }),
         num("basicPay", "Basic pay (₹ per month)", 7, "Basic", { when: EMPLOYED }),
         num("totalEmoluments", "Total emoluments (₹ per month)", 7, "Total emoluments", { when: EMPLOYED }),
@@ -546,8 +625,14 @@ function commonSections(): SectionDef[] {
               "Publication type",
               9,
               "Publication Type",
-              ["SCI / SCIE", "Scopus", "Web of Science", "UGC-CARE", "Other"],
-              { requirement: "required" },
+              [...JOURNAL_PUBLICATION_TYPES],
+              {
+                requirement: "required",
+                allowOther: true,
+                otherOptionValue: "Other",
+                otherLabel: "Specify indexing / database",
+                otherMaxLength: 100,
+              },
             ),
             text("doi", "DOI / URL", 9, "DOI", { maxLength: 300 }),
           ],
@@ -567,14 +652,19 @@ function commonSections(): SectionDef[] {
             }),
             text("organiser", "Organised by", 9, "Organiser", { maxLength: 200 }),
             num("year", "Year", 9, "Year", { requirement: "required", ...YEAR }),
-            select("level", "Level", 9, "Level", ["International", "National"], { requirement: "required" }),
+            select("level", "Level", 9, "Level", [...CONFERENCE_LEVELS], { requirement: "required" }),
             select(
               "publicationType",
               "Proceedings indexed in",
               9,
               "Publication Type",
-              ["Scopus", "Web of Science", "IEEE Xplore", "Not indexed", "Other"],
-              {},
+              [...CONFERENCE_INDEXING],
+              {
+                allowOther: true,
+                otherOptionValue: "Other",
+                otherLabel: "Specify proceedings indexing",
+                otherMaxLength: 100,
+              },
             ),
             text("doi", "DOI / URL", 9, "DOI", { maxLength: 300 }),
           ],
@@ -593,7 +683,12 @@ function commonSections(): SectionDef[] {
           [
             text("authors", "Author name(s)", 9, "Authors", { requirement: "required", maxLength: 300 }),
             text("title", "Book title", 9, "Title", { requirement: "required", maxLength: 300 }),
-            text("publisher", "Publisher", 9, "Publisher", { maxLength: 200 }),
+            select("publisher", "Publisher", 9, "Publisher", [...BOOK_PUBLISHERS], {
+              allowOther: true,
+              otherOptionValue: "Other",
+              otherLabel: "Specify publisher",
+              otherMaxLength: 150,
+            }),
             text("isbn", "ISBN", 9, "ISBN", { maxLength: 30 }),
             num("year", "Year", 9, "Year", YEAR),
           ],
@@ -608,7 +703,12 @@ function commonSections(): SectionDef[] {
             text("authors", "Author name(s)", 9, "Authors", { requirement: "required", maxLength: 300 }),
             text("chapter", "Chapter title", 9, "Chapter", { requirement: "required", maxLength: 300 }),
             text("book", "Book title", 9, "Book", { maxLength: 300 }),
-            text("publisher", "Publisher", 9, "Publisher", { maxLength: 200 }),
+            select("publisher", "Publisher", 9, "Publisher", [...BOOK_PUBLISHERS], {
+              allowOther: true,
+              otherOptionValue: "Other",
+              otherLabel: "Specify publisher",
+              otherMaxLength: 150,
+            }),
             num("year", "Year", 9, "Year", YEAR),
           ],
           { templateRows: 0, maxRows: 200, itemLabel: "Book chapter", countLabel: "Total book chapters" },
@@ -652,8 +752,13 @@ function commonSections(): SectionDef[] {
             date("sanctionedDate", "Sanctioned date", 10, "Sanctioned Date"),
             text("period", "Period", 10, "Period", { maxLength: 60, help: "For example 3 years." }),
             num("amount", "Sanctioned amount (₹)", 10, "Sanctioned Amount", { max: 10_000_000_000 }),
-            select("role", "Your role", 10, "Role", ["Principal Investigator", "Co-Investigator"], {}),
-            select("status", "Status", 10, "Status", ["Ongoing", "Completed"], { requirement: "required" }),
+            select("role", "Your role", 10, "Role", [...PROJECT_ROLES], {
+              allowOther: true,
+              otherOptionValue: "Other",
+              otherLabel: "Specify project role",
+              otherMaxLength: 100,
+            }),
+            select("status", "Status", 10, "Status", [...PROJECT_STATUS], { requirement: "required" }),
           ],
           { templateRows: 0, maxRows: 60, itemLabel: "Research project" },
         ),
@@ -671,8 +776,12 @@ function commonSections(): SectionDef[] {
             text("applicationNumber", "Application number", 10, "Application Number", { maxLength: 60 }),
             date("filingDate", "Date of filing", 10, "Date of Filing"),
             text("filedBy", "Filed by", 10, "Filed By", { maxLength: 200 }),
-            select("status", "Status", 10, "Status", ["Filed", "Published", "Granted"], {
+            select("status", "Status", 10, "Status", [...PATENT_STATUS], {
               requirement: "required",
+              allowOther: true,
+              otherOptionValue: "Other",
+              otherLabel: "Specify patent status",
+              otherMaxLength: 60,
             }),
             date("statusDate", "Date of current status", 10, "Date"),
           ],
@@ -697,14 +806,18 @@ function commonSections(): SectionDef[] {
           11,
           "Membership of Professional Bodies",
           [
-            text("body", "Professional body", 11, "Body", {
+            select("body", "Professional body", 11, "Body", [...PROFESSIONAL_BODIES], {
               requirement: "required",
-              maxLength: 200,
-              help: "IEEE, ACM, ISTE, CSI, IEI, …",
+              allowOther: true,
+              otherOptionValue: "Other",
+              otherLabel: "Specify professional body",
+              otherMaxLength: 150,
             }),
-            text("type", "Type of membership", 11, "Type", {
-              maxLength: 100,
-              help: "Life member, Senior member, …",
+            select("type", "Type of membership", 11, "Type", [...MEMBERSHIP_TYPES], {
+              allowOther: true,
+              otherOptionValue: "Other",
+              otherLabel: "Specify membership type",
+              otherMaxLength: 80,
             }),
             text("membershipId", "Membership number", 11, "Membership ID", { maxLength: 60 }),
             num("since", "Member since (year)", 11, "Since", YEAR),
@@ -746,7 +859,7 @@ function commonSections(): SectionDef[] {
               "Examination",
               11,
               "Exam",
-              ["GATE", "UGC-NET", "CSIR-NET", "SET", "SLET", "Other"],
+              [...COMPETITIVE_EXAMINATIONS],
               {
                 requirement: "required",
                 allowOther: true,
@@ -804,9 +917,11 @@ function commonSections(): SectionDef[] {
               pattern: MOBILE,
             }),
             text("email", "E-mail", 12, "E-mail", { inputMode: "email", maxLength: 200, pattern: EMAIL }),
-            text("relationship", "Professional relationship", 12, "Relationship", {
-              maxLength: 150,
-              help: "For example Ph.D. supervisor, Head of Department.",
+            select("relationship", "Professional relationship", 12, "Relationship", [...REFERENCE_RELATIONSHIPS], {
+              allowOther: true,
+              otherOptionValue: "Other",
+              otherLabel: "Specify relationship",
+              otherMaxLength: 100,
             }),
           ],
           { templateRows: 0, minRows: 1, maxRows: 2, requirement: "required", itemLabel: "Reference" },
@@ -832,7 +947,7 @@ function commonSections(): SectionDef[] {
           "Joining time required, if selected",
           13,
           "Joining Time Required, if Selected",
-          ["Immediate", "15 days", "1 month", "2 months", "3 months", "Other"],
+          [...JOINING_TIME_OPTIONS],
           {
             requirement: "required",
             allowOther: true,
@@ -846,8 +961,14 @@ function commonSections(): SectionDef[] {
           "I came to know about the vacancy through",
           13,
           "I came to know about the vacancy through",
-          ["The Hindu newspaper", "Naukri.com", "College website", "Known source", "Other"],
-          { requirement: "required" },
+          [...VACANCY_SOURCES],
+          {
+            requirement: "required",
+            allowOther: true,
+            otherOptionValue: "Other",
+            otherLabel: "Specify vacancy source",
+            otherMaxLength: 100,
+          },
         ),
         text("vacancySourceDetail", "Name of the known source / other source", 13, "Known Source", {
           maxLength: 200,
@@ -868,9 +989,12 @@ function commonSections(): SectionDef[] {
           "In case of Close Relatives/Known Persons employed in PSG Institutions",
           [
             text("name", "Name", 14, "Name", { requirement: "required", maxLength: 120 }),
-            text("relationship", "Relationship", 14, "Relationship", {
+            select("relationship", "Relationship", 14, "Relationship", [...RELATIVE_RELATIONSHIPS], {
               requirement: "required",
-              maxLength: 80,
+              allowOther: true,
+              otherOptionValue: "Other",
+              otherLabel: "Specify relationship",
+              otherMaxLength: 80,
             }),
             text("institution", "Institution", 14, "Institution", {
               requirement: "required",

@@ -92,21 +92,21 @@ echo ===========================================================================
 echo.
 echo    [WEB PORTAL]      http://localhost:6969
 echo    [SIGN IN PAGE]    http://localhost:6969/login
+echo    [DATABASE HOST]   localhost:6543  (PostgreSQL 17, internal 5432)
 echo    [DATABASE VIEWER] http://localhost:6981  (Adminer: db / srportal / srp_owner)
-echo    [EMAIL INBOX]     http://localhost:6980  (Mailpit catch-all inbox)
+echo    [EMAIL INBOX]     http://localhost:8025  (Mailpit web UI, SMTP on 2525)
 echo.
-echo    UNIVERSAL PASSWORD: Demo@12345
+echo    AUTHENTICATION:
+echo    100%% Passwordless Email OTP (6-digit codes delivered via Mailpit / SMTP)
 echo.
-echo    KEY DEMO ACCOUNTS:
-echo    • Admin (DEAN - Dr. S. Saravanan): dean.admn@psgtech.ac.in
-echo    • Admin (Principal):               principal@psgtech.ac.in
-echo    • HR-N4 Section:                   admin.n4@psgtech.ac.in  (Job profile entry and screening)
-echo    • HOD (CSE):               hod.cse@psgtech.ac.in   (Review CSE applicants)
-echo    • HOD (MCA):               hod.mca@psgtech.ac.in   (Review MCA applicants)
-echo    • HOD (EEE):               hod.eee@psgtech.ac.in   (Review EEE applicants)
-echo    • HOD (ECE):               hod.ece@psgtech.ac.in   (Review ECE applicants)
-echo    • Candidate (Applicant 1): candidate@example.test  (Dr. R. Sathish Kumar)
-echo    • Candidate (Applicant 2): candidate2@example.test (Dr. P. Priya)
+echo    APPROVED INITIAL PRIVILEGED ACCOUNTS:
+echo    • Super Admin (Tino):             brittytino08@gmail.com  (Full System Admin)
+echo    • Dean (Dr. S. Saravanan):        dean.admn@psgtech.ac.in (Recruitment Oversight)
+echo    • Principal (Dr. G. Thilagavathi): principal@psgtech.ac.in (Recruitment Oversight)
+echo    • HR-N4 Section:                  admin.n4@psgtech.ac.in  (Job Profiles & Screening)
+echo    • HOD (CSE):                      hod.cse@psgtech.ac.in   (CSE Review & Summary Sheet)
+echo.
+echo    * Production starts cleanly with NO dummy applicants or fake recruitment data.
 echo ================================================================================
 echo.
 
@@ -147,7 +147,7 @@ start "" "http://localhost:6969"
 goto interactive_loop
 
 :do_open_mail
-start "" "http://localhost:6980"
+start "" "http://localhost:8025"
 goto interactive_loop
 
 :do_clean_rebuild
@@ -185,11 +185,11 @@ echo.
 echo ================================================================================
 echo    REGISTERING FORM TEMPLATES AND STAFF ACCOUNTS
 echo ================================================================================
-echo Seeding form templates and the Dean, Principal and HR - N4 accounts...
+echo Seeding form templates and the approved institutional accounts...
 echo.
 
 setlocal DisableDelayedExpansion
-set "DATABASE_URL=postgresql://srp_owner:PsgTech_DbOwner_2026%%21@localhost:65432/srportal?schema=public"
+set "DATABASE_URL=postgresql://srp_owner:PsgTech_DbOwner_2026%%21@localhost:6543/srportal?schema=public"
 cmd /c "npx tsx prisma/seed.ts"
 set "SEED_EXIT_CODE=%errorlevel%"
 endlocal & set "SEED_EXIT_CODE=%SEED_EXIT_CODE%"
@@ -209,7 +209,7 @@ goto interactive_loop
 
 :do_studio
 echo Starting Prisma Studio on host...
-start "Prisma Studio" cmd /k "set \"DATABASE_URL=postgresql://srp_owner:PsgTech_DbOwner_2026%%21@localhost:65432/srportal?schema=public\" && npx prisma studio --port 5555"
+start "Prisma Studio" cmd /k "set \"DATABASE_URL=postgresql://srp_owner:PsgTech_DbOwner_2026%%21@localhost:6543/srportal?schema=public\" && npx prisma studio --port 5555"
 goto interactive_loop
 
 :do_logs

@@ -16,7 +16,13 @@ export async function loader({ request, context }: Route.LoaderArgs) {
   const url = new URL(request.url);
   const q = parseListQuery(url);
   const columns = parseColumns(url.searchParams.getAll("cols"));
-  const { csv, rows } = await exportCsv(user, q, columns);
+  const selectedIds = url.searchParams.getAll("ids").filter(Boolean);
+  const { csv, rows } = await exportCsv(
+    user,
+    q,
+    columns,
+    selectedIds.length > 0 ? selectedIds : undefined,
+  );
   await prisma.user.update({ where: { id: user.id }, data: { exportColumns: columns } });
   await audit({
     actorId: user.id,

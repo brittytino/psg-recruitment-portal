@@ -97,49 +97,18 @@ export default function Review({ loaderData: L, actionData }: Route.ComponentPro
         </Alert>
       )}
 
-      {v2 ? (
-        <section className="card space-y-4" aria-labelledby="preview">
-          <div className="flex flex-wrap items-center justify-between gap-3">
-            <div>
-              <h2 id="preview" className="text-xl">
-                Application preview
-              </h2>
-              <p className="mt-1 text-sm text-muted">
-                This is how your application will be printed. It is marked “preview” until you submit.
-              </p>
-            </div>
-            <div className="flex flex-wrap gap-2">
-              <a
-                href={`/applications/${L.id}/preview.pdf`}
-                target="_blank"
-                rel="noreferrer"
-                className="btn-secondary"
-              >
-                Open preview in a new tab
-              </a>
-              <Link to={`/applications/${L.id}`} className="btn-secondary">
-                Go back and edit
-              </Link>
-            </div>
-          </div>
-          <iframe
-            title="Preview of your application (PDF)"
-            src={`/applications/${L.id}/preview.pdf#view=FitH`}
-            className="h-[75vh] min-h-[480px] w-full rounded-2xl border border-line bg-soft"
-          />
-          <p className="text-sm text-muted">
-            Cannot see the preview? <a href={`/applications/${L.id}/preview.pdf`}>Download the preview PDF</a>
-            .
-          </p>
-        </section>
-      ) : (
-        def.sections.map((s) => (
+      {def.sections
+        .filter((s) => s.kind !== "uploads")
+        .map((s) => (
           <section key={s.id} className="card" aria-labelledby={`r-${s.id}`}>
-            <div className="flex items-baseline justify-between gap-2">
+            <div className="flex items-baseline justify-between gap-2 border-b border-line pb-2">
               <h2 id={`r-${s.id}`} className="text-xl">
                 {s.title}
               </h2>
-              <Link to={`/applications/${L.id}?section=${s.id}`}>
+              <Link
+                to={`/applications/${L.id}?section=${s.id}`}
+                className="text-sm font-semibold text-brand-700 hover:underline"
+              >
                 Change <span className="sr-only">{s.title}</span>
               </Link>
             </div>
@@ -161,8 +130,42 @@ export default function Review({ loaderData: L, actionData }: Route.ComponentPro
                 ))}
             </dl>
           </section>
-        ))
-      )}
+        ))}
+
+      <section className="card space-y-4" aria-labelledby="preview">
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <div>
+            <h2 id="preview" className="text-xl">
+              Application PDF preview
+            </h2>
+            <p className="mt-1 text-sm text-muted">
+              This preview reflects your currently saved draft answers and documents. It is watermarked as a
+              preview until formal submission.
+            </p>
+          </div>
+          <div className="flex flex-wrap gap-2">
+            <a
+              href={`/applications/${L.id}/preview.pdf`}
+              target="_blank"
+              rel="noreferrer"
+              className="btn-secondary"
+            >
+              Open preview in a new tab
+            </a>
+            <Link to={`/applications/${L.id}`} className="btn-secondary">
+              Go back and edit
+            </Link>
+          </div>
+        </div>
+        <iframe
+          title="Preview of your application (PDF)"
+          src={`/applications/${L.id}/preview.pdf#view=FitH`}
+          className="h-[75vh] min-h-[480px] w-full rounded-2xl border border-line bg-soft"
+        />
+        <p className="text-sm text-muted">
+          Cannot view the embedded PDF? <a href={`/applications/${L.id}/preview.pdf`}>Download the preview PDF</a>.
+        </p>
+      </section>
 
       <section className="card" aria-labelledby="r-docs">
         <div className="flex items-baseline justify-between">

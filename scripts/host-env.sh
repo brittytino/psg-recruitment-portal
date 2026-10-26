@@ -3,9 +3,9 @@
 # services (docker compose -f compose.yaml -f compose.dev.yaml up -d db redis converter clamav mailpit).
 # Usage:  . scripts/host-env.sh && npm run dev
 export NODE_ENV="${NODE_ENV:-development}"
-export APP_ORIGIN="${APP_ORIGIN:-http://localhost:5173}"
-export DATABASE_URL="${HOST_DATABASE_URL:-postgresql://srp_app:PsgTech_DbApp_2026!@localhost:65432/srportal?schema=public}"
-export MIGRATION_DATABASE_URL="${HOST_MIGRATION_DATABASE_URL:-postgresql://srp_owner:PsgTech_DbOwner_2026!@localhost:65432/srportal?schema=public}"
+export APP_ORIGIN="${APP_ORIGIN:-http://localhost:6969}"
+export DATABASE_URL="${HOST_DATABASE_URL:-postgresql://srp_app:PsgTech_DbApp_2026!@localhost:6543/srportal?schema=public}"
+export MIGRATION_DATABASE_URL="${HOST_MIGRATION_DATABASE_URL:-postgresql://srp_owner:PsgTech_DbOwner_2026!@localhost:6543/srportal?schema=public}"
 export REDIS_URL="${HOST_REDIS_URL:-redis://localhost:63879}"
 export SESSION_SECRET="${SESSION_SECRET:-host-development-secret-at-least-32-characters}"
 export COOKIE_SECURE=false
@@ -16,6 +16,6 @@ export MALWARE_SCAN="${MALWARE_SCAN:-clamav}"
 export CLAMAV_HOST=localhost
 export CLAMAV_PORT=63310
 export SMTP_HOST=localhost
-export SMTP_PORT=61025
+export SMTP_PORT=2525
 export MAIL_FROM="PSG Tech Recruitment <recruitment@localhost>"
 export LOG_LEVEL="${LOG_LEVEL:-info}"

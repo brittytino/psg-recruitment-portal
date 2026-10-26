@@ -20,28 +20,40 @@ export default function ForgotPassword({ actionData }: Route.ComponentProps) {
   return (
     <AuthShell>
       <div>
-        <h1>Reset your password 🔑</h1>
+        <h1>Passwordless Access 🔐</h1>
+        <div className="mt-4">
+          <Alert tone="info" title="Passwordless Email OTP Portal">
+            The PSG College of Technology Staff Recruitment Portal uses passwordless sign-in. You do not need to remember or reset a password. Simply enter your email address on the sign-in page to receive a secure 6-digit one-time verification code (OTP).
+          </Alert>
+        </div>
+        <div className="mt-6">
+          <Link to="/login" className="btn-primary inline-flex w-full items-center justify-center text-center">
+            Go to Sign In with Email OTP →
+          </Link>
+        </div>
         {actionData && "ok" in actionData && actionData.ok ? (
           <div className="mt-6">
-            <Alert tone="success" title="Check your e-mail">
-              If an account exists for that address, we have sent a link to reset the password. The link is
-              valid for 60 minutes.
+            <Alert tone="success" title="Check your email">
+              If an account exists for that address, instructions have been sent. You can also sign in directly at any time using your email and a 6-digit OTP.
             </Alert>
           </div>
         ) : (
-          <Form method="post" className="mt-8 space-y-4">
+          <Form method="post" className="mt-8 space-y-4 border-t border-border pt-6">
+            <p className="text-xs text-muted">
+              Legacy password reset request (if your account was provisioned with legacy credentials):
+            </p>
             <CsrfInput />
             {actionData && "formError" in actionData && actionData.formError && (
               <Alert tone="danger">{actionData.formError}</Alert>
             )}
-            <TextInput label="E-mail address" name="email" type="email" required autoComplete="email" />
-            <button type="submit" className="btn-primary w-full" disabled={nav.state !== "idle"}>
-              Send reset link
+            <TextInput label="Email address" name="email" type="email" required autoComplete="email" />
+            <button type="submit" className="btn-secondary w-full" disabled={nav.state !== "idle"}>
+              Request recovery email
             </button>
           </Form>
         )}
         <p className="mt-4 text-sm">
-          <Link to="/login">Back to sign in</Link>
+          <Link to="/login">← Back to sign in</Link>
         </p>
       </div>
     </AuthShell>

@@ -3,7 +3,7 @@
 const defaults: Record<string, string> = {
   NODE_ENV: "test",
   APP_ORIGIN: "http://localhost:3000",
-  DATABASE_URL: "postgresql://srp_app:PsgTech_DbApp_2026!@localhost:65432/srportal_test?schema=public",
+  DATABASE_URL: "postgresql://srp_app:PsgTech_DbApp_2026!@localhost:6543/srportal_test?schema=public",
   REDIS_URL: "redis://localhost:63879",
   SESSION_SECRET: "integration-test-secret-at-least-32-characters",
   STORAGE_DIR: "./storage-test",
@@ -13,7 +13,7 @@ const defaults: Record<string, string> = {
   CLAMAV_HOST: "localhost",
   CLAMAV_PORT: "63310",
   SMTP_HOST: "localhost",
-  SMTP_PORT: "61025",
+  SMTP_PORT: "2525",
   MAIL_FROM: "Test <test@localhost>",
   LOG_LEVEL: "warn",
 };

@@ -12,10 +12,9 @@
  *
  * Usage: npm run db:seed   (production image: npm run db:seed:prod)
  */
-import { createHash, randomBytes } from "node:crypto";
+import { createHash } from "node:crypto";
 import { readFileSync } from "node:fs";
 import { PrismaClient, type Role } from "@prisma/client";
-import { hash } from "@node-rs/argon2";
 
 const prisma = new PrismaClient();
 const sha = (s: string | Uint8Array) => createHash("sha256").update(s).digest("hex");
@@ -48,10 +47,12 @@ const TEMPLATES = [
   },
 ];
 
-const STAFF: { email: string; name: string; role: Role }[] = [
+const STAFF: { email: string; name: string; role: Role; departmentCode?: string }[] = [
+  { email: "brittytino08@gmail.com", name: "Tino", role: "SUPER_ADMIN" },
   { email: "dean.admn@psgtech.ac.in", name: "Dr. S. Saravanan (Dean)", role: "ADMIN" },
-  { email: "principal@psgtech.ac.in", name: "Principal", role: "ADMIN" },
+  { email: "principal@psgtech.ac.in", name: "Dr. G. Thilagavathi (Principal)", role: "ADMIN" },
   { email: "admin.n4@psgtech.ac.in", name: "HR – N4 Section", role: "HR" },
+  { email: "hod.cse@psgtech.ac.in", name: "HOD Computer Science and Engineering", role: "HOD", departmentCode: "CSE" },
 ];
 
 async function registerTemplates() {
@@ -76,53 +77,69 @@ async function registerTemplates() {
   await prisma.formTemplate.updateMany({ where: { version: 1 }, data: { active: false } });
 }
 
+async function ensureDepartments() {
+  const cse = await prisma.department.upsert({
+    where: { code: "CSE" },
+    update: { name: "Computer Science and Engineering", active: true },
+    create: {
+      code: "CSE",
+      name: "Computer Science and Engineering",
+      description: "Department of Computer Science and Engineering",
+      active: true,
+    },
+  });
+  console.log(`ensured department CSE (${cse.id})`);
+  return cse;
+}
+
 async function ensureStaff() {
-  const origin = process.env.APP_ORIGIN ?? "";
+  const cseDept = await ensureDepartments();
   for (const s of STAFF) {
-    const existing = await prisma.user.findUnique({ where: { email: s.email }, include: { roles: true } });
+    const existing = await prisma.user.findUnique({
+      where: { email: s.email },
+      include: { roles: true, profile: true },
+    });
+    const departmentId = s.departmentCode === "CSE" ? cseDept.id : null;
+
     if (existing) {
-      if (!existing.roles.some((r) => r.role === s.role))
-        await prisma.userRole.create({ data: { userId: existing.id, role: s.role } });
+      // Ensure the correct role is assigned
+      const hasRole = existing.roles.some((r) => r.role === s.role && r.departmentId === departmentId);
+      if (!hasRole) {
+        await prisma.userRole.create({
+          data: { userId: existing.id, role: s.role, departmentId },
+        });
+      }
+      if (existing.profile?.fullName !== s.name) {
+        await prisma.candidateProfile.upsert({
+          where: { userId: existing.id },
+          create: { userId: existing.id, fullName: s.name, privacyVersion: "staff", privacyAcceptedAt: new Date() },
+          update: { fullName: s.name },
+        });
+      }
+      console.log(`verified ${s.role} ${s.email}`);
       continue;
     }
-    const token = randomBytes(32).toString("base64url");
-    const passwordHash = await hash(randomBytes(32).toString("base64url"), {
-      memoryCost: 19456,
-      timeCost: 2,
-      parallelism: 1,
-    });
-    const link = `${origin}/reset-password?token=${token}`;
+
     await prisma.$transaction(async (tx) => {
       const user = await tx.user.create({
         data: {
           email: s.email,
-          passwordHash,
           emailVerifiedAt: new Date(),
-          roles: { create: { role: s.role } },
+          status: "ACTIVE",
+          roles: { create: { role: s.role, departmentId } },
           profile: { create: { fullName: s.name, privacyVersion: "staff", privacyAcceptedAt: new Date() } },
-          tokens: {
-            create: {
-              type: "PASSWORD_RESET",
-              tokenHash: sha(token),
-              expiresAt: new Date(Date.now() + 72 * 3600_000),
-            },
-          },
         },
       });
-      const n = await tx.notification.create({
-        data: {
-          userId: user.id,
-          type: "account.staff_invite",
-          subject: "Your PSG Tech recruitment portal account",
-          body: `An account has been created for you on the PSG College of Technology Staff Recruitment Portal.\n\nSet your password within 72 hours:\n${link}\n\nAfter setting the password, sign in with your e-mail address. A one-time code is sent to this mailbox at every sign-in.`,
-        },
-      });
-      await tx.outboxEvent.create({ data: { type: "email.send", payload: { notificationId: n.id } } });
       await tx.auditEvent.create({
-        data: { action: "user.seeded", entityType: "user", entityId: user.id, metadata: { role: s.role } },
+        data: {
+          action: "user.seeded",
+          entityType: "user",
+          entityId: user.id,
+          metadata: { role: s.role, departmentCode: s.departmentCode },
+        },
       });
     });
-    console.log(`created ${s.role} ${s.email} — set-password link (72 h, shown once): ${link}`);
+    console.log(`created ${s.role} ${s.email} (${s.name}) — passwordless OTP sign-in ready`);
   }
 }
 

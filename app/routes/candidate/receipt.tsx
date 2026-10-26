@@ -3,6 +3,7 @@ import type { Route } from "./+types/receipt";
 import { Alert, Badge, ConfirmDialog, CsrfInput, formatDateTime, statusTone } from "~/components/forms";
 import { handleAction, readForm, requireUser } from "~/lib/http.server";
 import { getOwnApplication, withdraw } from "~/modules/applications/service.server";
+import { POSITION_LABELS } from "~/lib/labels";
 import {
   availableTransitions,
   PROCESSING_LABELS,
@@ -16,18 +17,32 @@ export const meta: Route.MetaFunction = () => [{ title: "Application status — 
 export async function loader({ request, params, context }: Route.LoaderArgs) {
   const user = requireUser(context, request);
   const app = await getOwnApplication(user, params.id);
-  const bundle = app.currentRevisionId
+  const applicationPdf = app.currentRevisionId
     ? await prisma.generatedDocument.findFirst({
         where: {
           revisionId: app.currentRevisionId,
           status: "READY",
-          // v1 forms have no separate application PDF; their bundle is the candidate copy.
           kind: app.formTemplate.version === 1 ? "CONSOLIDATED_BUNDLE" : "APPLICATION_PDF",
         },
         orderBy: { version: "desc" },
         select: { id: true, pageCount: true },
       })
     : null;
+
+  const consolidatedBundle = app.currentRevisionId
+    ? await prisma.generatedDocument.findFirst({
+        where: {
+          revisionId: app.currentRevisionId,
+          status: "READY",
+          kind: "CONSOLIDATED_BUNDLE",
+        },
+        orderBy: { version: "desc" },
+        select: { id: true, pageCount: true },
+      })
+    : null;
+
+  const appliedPos = app.appliedPosition ?? app.vacancy.position;
+
   return {
     id: app.id,
     referenceNo: app.referenceNo,
@@ -37,12 +52,14 @@ export async function loader({ request, params, context }: Route.LoaderArgs) {
     revisionNo: app.currentRevision?.revisionNo ?? null,
     title: app.vacancy.title,
     department: app.vacancy.department.name,
+    position: POSITION_LABELS[appliedPos] ?? appliedPos,
     history: app.statusHistory.map((h) => ({
       to: h.toStatus as AppStatus,
       at: h.createdAt,
       candidateVisibleReason: h.toStatus === "NEEDS_CLARIFICATION" ? h.reason : null,
     })),
-    bundle,
+    applicationPdf,
+    consolidatedBundle,
     canWithdraw: availableTransitions(app.status as AppStatus, "candidate").some((t) => t.to === "WITHDRAWN"),
   };
 }
@@ -75,10 +92,14 @@ export default function Receipt({ loaderData: L, actionData }: Route.ComponentPr
         <h1 id="rcpt">Application {L.referenceNo ?? "(not yet submitted)"}</h1>
         <dl className="mt-4 grid gap-3 text-sm sm:grid-cols-2">
           <div>
-            <dt className="text-muted">Vacancy</dt>
+            <dt className="text-muted">Vacancy &amp; Department</dt>
             <dd className="font-medium">
               {L.title} — {L.department}
             </dd>
+          </div>
+          <div>
+            <dt className="text-muted">Position Applied For</dt>
+            <dd className="font-medium">{L.position}</dd>
           </div>
           <div>
             <dt className="text-muted">Status</dt>
@@ -87,21 +108,45 @@ export default function Receipt({ loaderData: L, actionData }: Route.ComponentPr
             </dd>
           </div>
           <div>
-            <dt className="text-muted">Submitted</dt>
+            <dt className="text-muted">Submitted At</dt>
             <dd className="font-medium">
               {formatDateTime(L.submittedAt)}
               {L.revisionNo ? ` (revision ${L.revisionNo})` : ""}
             </dd>
           </div>
           <div>
-            <dt className="text-muted">Application PDF</dt>
+            <dt className="text-muted">Submitted Application PDF</dt>
             <dd>
-              {L.bundle ? (
-                <a href={`/files/bundles/${L.bundle.id}`}>
-                  Download your submitted application (PDF, {L.bundle.pageCount} pages)
+              {L.applicationPdf ? (
+                <a
+                  href={`/files/bundles/${L.applicationPdf.id}`}
+                  className="font-medium text-brand-700 underline"
+                  download
+                >
+                  Download Application PDF ({L.applicationPdf.pageCount} pages)
                 </a>
               ) : (
                 <span>{PROCESSING_LABELS[L.processingStatus] ?? L.processingStatus}</span>
+              )}
+            </dd>
+          </div>
+          <div>
+            <dt className="text-muted">Consolidated Bundle (Application + Attachments)</dt>
+            <dd>
+              {L.consolidatedBundle ? (
+                <a
+                  href={`/files/bundles/${L.consolidatedBundle.id}`}
+                  className="font-medium text-brand-700 underline"
+                  download
+                >
+                  Download Complete Bundle (PDF, {L.consolidatedBundle.pageCount} pages)
+                </a>
+              ) : (
+                <span className="text-muted">
+                  {L.processingStatus === "PROCESSING" || L.processingStatus === "QUEUED"
+                    ? "Generating attachment bundle…"
+                    : "Not available or generating"}
+                </span>
               )}
             </dd>
           </div>

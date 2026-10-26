@@ -467,9 +467,18 @@ export function parseColumns(raw: string[] | null | undefined): ExportColumnKey[
 }
 
 /** Filtered rows (database data) as CSV with the chosen columns. Admin and HR only. */
-export async function exportCsv(user: SessionUser | null, q: ListQuery, columns: ExportColumnKey[]) {
+export async function exportCsv(
+  user: SessionUser | null,
+  q: ListQuery,
+  columns: ExportColumnKey[],
+  selectedIds?: string[],
+) {
   const u = requirePermission(user, "application:export");
-  const where = scopedWhere(u, q);
+  const baseWhere = scopedWhere(u, q);
+  const where: Prisma.ApplicationWhereInput =
+    selectedIds && selectedIds.length > 0
+      ? { AND: [baseWhere, { id: { in: selectedIds } }] }
+      : baseWhere;
   const lines: string[] = [];
   const labels = new Map(EXPORT_COLUMNS.map((c) => [c.key, c.label]));
   lines.push(columns.map((c) => csvCell(labels.get(c))).join(","));
@@ -488,7 +497,34 @@ export async function exportCsv(user: SessionUser | null, q: ListQuery, columns:
     }
     if (batch.length < 200) break;
   }
-  return { csv: "﻿" + lines.join("\r\n") + "\r\n", rows: n };
+  return { csv: "\uFEFF" + lines.join("\r\n") + "\r\n", rows: n };
+}
+
+/** Previews export rows from database with selected columns and filters. */
+export async function previewExport(
+  user: SessionUser | null,
+  q: ListQuery,
+  columns: ExportColumnKey[],
+  selectedIds?: string[],
+  limit = 5,
+) {
+  const u = requirePermission(user, "application:export");
+  const baseWhere = scopedWhere(u, q);
+  const where: Prisma.ApplicationWhereInput =
+    selectedIds && selectedIds.length > 0
+      ? { AND: [baseWhere, { id: { in: selectedIds } }] }
+      : baseWhere;
+  const labels = new Map(EXPORT_COLUMNS.map((c) => [c.key, c.label]));
+  const headers = columns.map((c) => labels.get(c) ?? c);
+  const batch = await prisma.application.findMany({
+    where,
+    orderBy: [{ department: { name: "asc" } }, { referenceNo: "asc" }, { id: "asc" }],
+    take: limit,
+    include: exportInclude,
+  });
+  const rows = batch.map((r, i) => columns.map((c) => exportValue(c, r, i + 1)));
+  const total = await prisma.application.count({ where });
+  return { headers, rows, total };
 }
 
 export async function auditLog(

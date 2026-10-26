@@ -98,7 +98,7 @@ services:
     image: axllent/mailpit:v1.27.10
     restart: unless-stopped
     ports:
-      - "${MAILPIT_UI_HOST_PORT:-6980}:8025"
+      - "${MAILPIT_UI_HOST_PORT:-8025}:8025"
     networks: [backend, frontend]
 
   # Visual database management tool (Adminer) accessible at http://localhost:6981

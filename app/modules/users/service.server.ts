@@ -107,7 +107,7 @@ export async function createStaffUser(actor: SessionUser | null, input: unknown)
       u.id,
       "account.staff_invite",
       "Your PSG Tech recruitment portal account",
-      `An account has been created for you on the PSG College of Technology Staff Recruitment Portal.\n\nSet your password within 72 hours:\n${env().APP_ORIGIN}/reset-password?token=${token}\n\nAfter that, sign in with this e-mail address. A one-time code is sent to this mailbox at every sign-in.`,
+      `An account has been created for you on the PSG College of Technology Staff Recruitment Portal.\n\nSign in directly using your email address:\n${env().APP_ORIGIN}/login\n\nA secure 6-digit one-time verification code (OTP) will be sent to this email address on every sign-in. No password is required.`,
     );
     await audit(
       {
@@ -238,8 +238,8 @@ export async function resendInvite(actor: SessionUser | null, userId: string) {
       tx,
       userId,
       "account.staff_invite",
-      "Set your PSG Tech recruitment portal password",
-      `Use this link within 72 hours to set your password:\n${env().APP_ORIGIN}/reset-password?token=${token}`,
+      "Sign-in instructions for PSG Tech recruitment portal",
+      `An administrator has resent your sign-in details for the PSG College of Technology Staff Recruitment Portal.\n\nSign in directly using your email address:\n${env().APP_ORIGIN}/login\n\nA secure 6-digit one-time verification code (OTP) will be sent to your email address on every sign-in. No password is required.`,
     );
     await audit({ actorId: a.id, action: "user.invite_resent", entityType: "user", entityId: userId }, tx);
   });

@@ -10,44 +10,34 @@ import { pendingCookie } from "~/modules/auth/otp.server";
 
 export const meta: Route.MetaFunction = () => [{ title: "Register — PSG Tech Recruitment" }];
 
-export function loader({ context, request }: Route.LoaderArgs) {
+export function loader({ context }: Route.LoaderArgs) {
   if (context.get(userContext)) throw redirect("/account");
-  return { done: new URL(request.url).searchParams.get("done") === "1" };
+  return null;
 }
 
 export async function action({ request, context }: Route.ActionArgs) {
   const form = await readForm(request, context);
   return handleAction(async () => {
     const challengeId = await registerCandidate(Object.fromEntries(form), clientIp(request));
-    throw redirect("/verify-email", { headers: { "Set-Cookie": pendingCookie(challengeId, "/account") } });
+    throw redirect("/login/verify", { headers: { "Set-Cookie": pendingCookie(challengeId, "/account") } });
   });
 }
 
-export default function Register({ loaderData, actionData }: Route.ComponentProps) {
+export default function Register({ actionData }: Route.ComponentProps) {
   const nav = useNavigation();
   const fe = actionData && "fieldErrors" in actionData ? actionData.fieldErrors : undefined;
-  if (loaderData.done)
-    return (
-      <div className="mx-auto max-w-lg space-y-4">
-        <h1>Check your e-mail 📬</h1>
-        <Alert tone="success" title="Registration received">
-          If the address can be registered, we have sent a verification link to it. Open the link to activate
-          your account, then sign in.
-        </Alert>
-        <p>
-          <Link to="/login">Go to sign in</Link>
-        </p>
-      </div>
-    );
+  const busy = nav.state !== "idle";
+
   const summary = fe
     ? Object.entries(fe).flatMap(([k, v]) => (v ?? []).map((text) => ({ text, href: `#f-${k}` })))
     : [];
+
   return (
     <AuthShell>
       <div>
         <h1>Create a candidate account</h1>
         <p className="mt-2 text-sm text-muted">
-          Already registered? <Link to="/login">Sign in</Link>
+          Already registered? <Link to="/login">Sign in with OTP</Link>
         </p>
         <div className="mt-6">
           {actionData && "formError" in actionData && actionData.formError && !summary.length && (
@@ -65,6 +55,7 @@ export default function Register({ loaderData, actionData }: Route.ComponentProp
               autoComplete="name"
               error={errorFor(fe, "fullName")}
               maxLength={120}
+              placeholder="e.g. Dr. Rajesh Kumar"
             />
             <TextInput
               label="E-mail address"
@@ -73,24 +64,21 @@ export default function Register({ loaderData, actionData }: Route.ComponentProp
               required
               autoComplete="email"
               error={errorFor(fe, "email")}
+              placeholder="e.g. rajesh@example.com"
             />
             <TextInput
-              label="Password"
-              name="password"
-              type="password"
-              required
-              autoComplete="new-password"
-              hint="At least 10 characters. A passphrase of several words is a good choice."
-              error={errorFor(fe, "password")}
+              label="Mobile number (optional)"
+              name="phone"
+              type="tel"
+              autoComplete="tel"
+              error={errorFor(fe, "phone")}
+              placeholder="e.g. 9876543210"
+              hint="10-digit Indian mobile number."
             />
-            <TextInput
-              label="Confirm password"
-              name="confirmPassword"
-              type="password"
-              required
-              autoComplete="new-password"
-              error={errorFor(fe, "confirmPassword")}
-            />
+            <div className="rounded-xl border border-line bg-soft p-3 text-xs text-muted">
+              <span className="font-semibold text-ink">No password required.</span> A 6-digit one-time code
+              will be sent to your e-mail address to verify your account and sign you in.
+            </div>
             <div className="space-y-1">
               <div className="flex items-start gap-2">
                 <input
@@ -111,8 +99,8 @@ export default function Register({ loaderData, actionData }: Route.ComponentProp
                 </p>
               )}
             </div>
-            <button type="submit" className="btn-primary w-full" disabled={nav.state !== "idle"}>
-              {nav.state !== "idle" ? "Creating account…" : "Create account"}
+            <button type="submit" className="btn-primary w-full" disabled={busy}>
+              {busy ? "Sending verification code…" : "Register with Email OTP"}
             </button>
           </Form>
         </div>

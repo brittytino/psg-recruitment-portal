@@ -310,15 +310,46 @@ type OfficeData = Extract<Route.ComponentProps["loaderData"], { office: true }>;
 function OfficeSummary({ L }: { L: OfficeData }) {
   const [params] = useSearchParams();
   const [cols, setCols] = useState<Set<string>>(new Set(L.columns));
+  const [selectedRows, setSelectedRows] = useState<Set<string>>(new Set());
+  const [showPreview, setShowPreview] = useState(false);
   const groups = [...new Set(EXPORT_COLUMNS.map((c) => c.group))];
   const filterKeys = ["departmentId", "position", "status", "cycleId", "phd", "exam", "minExp", "q"];
+
+  const allVisibleIds = L.list.rows.map((r) => r.id);
+  const allVisibleSelected = allVisibleIds.length > 0 && allVisibleIds.every((id) => selectedRows.has(id));
+
+  const toggleSelectAllVisible = () => {
+    if (allVisibleSelected) {
+      setSelectedRows(new Set());
+    } else {
+      setSelectedRows(new Set(allVisibleIds));
+    }
+  };
+
+  const toggleRow = (id: string) => {
+    setSelectedRows((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  };
+
+  const exportCount = selectedRows.size > 0 ? selectedRows.size : L.list.total;
+  const selectedColsList = EXPORT_COLUMNS.filter((c) => cols.has(c.key));
+
   return (
     <>
       <section className="card space-y-4" aria-labelledby="all">
         <div className="flex flex-wrap items-end justify-between gap-3">
-          <h2 id="all" className="text-xl">
-            Summary of applications
-          </h2>
+          <div>
+            <h2 id="all" className="text-xl">
+              Summary of applications
+            </h2>
+            <p className="mt-1 text-sm text-muted">
+              Select specific rows to export, or export all matching applications directly.
+            </p>
+          </div>
           <Form method="get" className="flex flex-wrap items-end gap-3">
             <FilterSelect
               name="departmentId"
@@ -337,6 +368,35 @@ function OfficeSummary({ L }: { L: OfficeData }) {
             </button>
           </Form>
         </div>
+
+        {L.list.rows.length > 0 && (
+          <div className="flex flex-wrap items-center justify-between gap-2 rounded-xl bg-soft p-3 text-sm">
+            <div className="flex items-center gap-3">
+              <button
+                type="button"
+                onClick={toggleSelectAllVisible}
+                className="btn-secondary py-1 text-xs"
+              >
+                {allVisibleSelected ? "Deselect all visible" : "Select all on page"}
+              </button>
+              {selectedRows.size > 0 && (
+                <button
+                  type="button"
+                  onClick={() => setSelectedRows(new Set())}
+                  className="btn-secondary py-1 text-xs"
+                >
+                  Clear selection
+                </button>
+              )}
+            </div>
+            <span className="text-muted font-medium">
+              {selectedRows.size > 0
+                ? `${selectedRows.size} application${selectedRows.size === 1 ? "" : "s"} selected for export`
+                : `No specific rows selected (all ${L.list.total} will be exported)`}
+            </span>
+          </div>
+        )}
+
         {L.list.rows.length === 0 ? (
           <EmptyState title="No applications for these filters" />
         ) : (
@@ -345,6 +405,15 @@ function OfficeSummary({ L }: { L: OfficeData }) {
               <caption className="sr-only">Summary of applications</caption>
               <thead>
                 <tr>
+                  <th scope="col" className="w-10 text-center">
+                    <input
+                      type="checkbox"
+                      aria-label="Select all applications on this page"
+                      checked={allVisibleSelected}
+                      onChange={toggleSelectAllVisible}
+                      className="h-4 w-4 rounded"
+                    />
+                  </th>
                   <th scope="col" className="text-right">
                     S. No.
                   </th>
@@ -356,7 +425,16 @@ function OfficeSummary({ L }: { L: OfficeData }) {
               </thead>
               <tbody>
                 {L.list.rows.map((r, i) => (
-                  <tr key={r.id}>
+                  <tr key={r.id} className={selectedRows.has(r.id) ? "bg-brand-50/50" : undefined}>
+                    <td className="text-center">
+                      <input
+                        type="checkbox"
+                        aria-label={`Select ${r.currentRevision?.candidateName ?? r.referenceNo}`}
+                        checked={selectedRows.has(r.id)}
+                        onChange={() => toggleRow(r.id)}
+                        className="h-4 w-4 rounded"
+                      />
+                    </td>
                     <td className="text-right tabular-nums">{(L.q.page - 1) * L.list.rows.length + i + 1}</td>
                     <td>
                       <Link to={`/staff/applications/${r.id}`} className="font-semibold">
@@ -382,7 +460,8 @@ function OfficeSummary({ L }: { L: OfficeData }) {
             </table>
             {L.list.pages > 1 && (
               <p className="mt-3 text-sm text-muted">
-                Showing {L.list.rows.length} of {L.list.total}. The export below includes all {L.list.total}.
+                Showing {L.list.rows.length} of {L.list.total}. The export below includes {exportCount} row
+                {exportCount === 1 ? "" : "s"}.
               </p>
             )}
           </div>
@@ -396,8 +475,8 @@ function OfficeSummary({ L }: { L: OfficeData }) {
               Export to Excel (CSV)
             </h2>
             <p className="mt-1 text-[15px] text-muted">
-              Choose the columns. The file contains every application that matches the current filters (
-              {L.list.total}), taken from the database at the moment you download it. Opens directly in Excel.
+              Choose the columns and export either selected rows ({selectedRows.size > 0 ? selectedRows.size : "all"})
+              or all matching filters ({L.list.total}). Safe from spreadsheet formula injection.
             </p>
           </div>
           <Form method="get" action="/staff/export.csv" reloadDocument className="space-y-5">
@@ -406,6 +485,9 @@ function OfficeSummary({ L }: { L: OfficeData }) {
               .map((k) => (
                 <input key={k} type="hidden" name={k} value={params.get(k)!} />
               ))}
+            {Array.from(selectedRows).map((id) => (
+              <input key={id} type="hidden" name="ids" value={id} />
+            ))}
             <div className="flex flex-wrap gap-2">
               <button
                 type="button"
@@ -462,9 +544,80 @@ function OfficeSummary({ L }: { L: OfficeData }) {
                 </fieldset>
               ))}
             </div>
-            <button type="submit" className="btn-primary" disabled={cols.size === 0}>
-              Download CSV ({L.list.total} row{L.list.total === 1 ? "" : "s"})
-            </button>
+
+            {/* Export Preview Area */}
+            <div className="rounded-2xl border border-line bg-soft/60 p-4 space-y-3">
+              <div className="flex items-center justify-between">
+                <div>
+                  <h3 className="text-sm font-semibold text-ink">Export Preview</h3>
+                  <p className="text-xs text-muted">
+                    {cols.size} columns, {exportCount} row{exportCount === 1 ? "" : "s"} ready for export
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setShowPreview((p) => !p)}
+                  className="btn-secondary py-1 text-xs"
+                >
+                  {showPreview ? "Hide preview" : "Show preview"}
+                </button>
+              </div>
+
+              {showPreview && (
+                <div className="overflow-x-auto border-t border-line pt-3">
+                  <p className="mb-2 text-xs text-muted">Previewing first 3 rows with selected columns:</p>
+                  <table className="table text-xs">
+                    <thead>
+                      <tr>
+                        {selectedColsList.map((c) => (
+                          <th key={c.key} scope="col">
+                            {c.label}
+                          </th>
+                        ))}
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {L.list.rows.slice(0, 3).map((r, i) => (
+                        <tr key={r.id}>
+                          {selectedColsList.map((c) => {
+                            let val: string | number;
+                            if (c.key === "sNo") val = i + 1;
+                            else if (c.key === "referenceNo") val = r.referenceNo ?? "—";
+                            else if (c.key === "candidateName") val = r.currentRevision?.candidateName ?? "";
+                            else if (c.key === "department") val = r.vacancy.department.name;
+                            else if (c.key === "appliedFor")
+                              val = POSITION_LABELS[r.appliedPosition ?? r.vacancy.position] ?? "";
+                            else if (c.key === "status") val = STATUS_LABELS[r.status as AppStatus];
+                            else if (c.key === "phdStatus") val = r.currentRevision?.phdStatus ?? "None";
+                            else val = "—";
+                            return (
+                              <td key={c.key} className="whitespace-nowrap">
+                                {val}
+                              </td>
+                            );
+                          })}
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+            </div>
+
+            <div className="flex items-center gap-3">
+              <button type="submit" className="btn-primary" disabled={cols.size === 0}>
+                Download CSV ({exportCount} row{exportCount === 1 ? "" : "s"})
+              </button>
+              {selectedRows.size > 0 && (
+                <button
+                  type="button"
+                  onClick={() => setSelectedRows(new Set())}
+                  className="btn-secondary text-sm"
+                >
+                  Reset to export all {L.list.total}
+                </button>
+              )}
+            </div>
           </Form>
         </section>
       )}

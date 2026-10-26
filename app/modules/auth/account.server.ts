@@ -5,10 +5,9 @@ import { prisma } from "~/modules/core/db.server";
 import { env } from "~/modules/core/env.server";
 import { ValidationError } from "~/modules/core/errors";
 import { notify } from "~/modules/notifications/outbox.server";
-import { dummyHash, hashPassword, passwordProblems, verifyPassword } from "./password.server";
+import { hashPassword, passwordProblems } from "./password.server";
 import { issueOtp, verifyOtp } from "./otp.server";
 import { rateLimit } from "./rate-limit.server";
-import { getSetting } from "~/modules/settings/service.server";
 import { createSession, destroyAllSessions, hashToken } from "./session.server";
 
 export { PRIVACY_NOTICE_VERSION } from "~/lib/privacy";
@@ -16,21 +15,13 @@ import { PRIVACY_NOTICE_VERSION } from "~/lib/privacy";
 
 const VERIFY_TTL_MS = 48 * 3600 * 1000;
 const RESET_TTL_MS = 60 * 60 * 1000;
-const MAX_FAILED_LOGINS = 8;
-const LOCK_MINUTES = 15;
 
-export const registerSchema = z
-  .object({
-    fullName: z.string().trim().min(2, "Enter your full name").max(120),
-    email: z.string().trim().toLowerCase().email("Enter a valid e-mail address").max(200),
-    password: z.string().max(128),
-    confirmPassword: z.string(),
-    privacy: z.literal("on", { error: "You must accept the privacy notice to continue" }),
-  })
-  .refine((d) => d.password === d.confirmPassword, {
-    path: ["confirmPassword"],
-    message: "Passwords do not match",
-  });
+export const registerSchema = z.object({
+  fullName: z.string().trim().min(2, "Enter your full name").max(120),
+  email: z.string().trim().toLowerCase().email("Enter a valid e-mail address").max(200),
+  phone: z.string().trim().optional().or(z.literal("")),
+  privacy: z.literal("on", { error: "You must accept the privacy notice to continue" }),
+});
 
 async function issueToken(userId: string, type: "EMAIL_VERIFICATION" | "PASSWORD_RESET", ttlMs: number) {
   const token = randomBytes(32).toString("base64url");
@@ -41,8 +32,7 @@ async function issueToken(userId: string, type: "EMAIL_VERIFICATION" | "PASSWORD
 }
 
 /**
- * Registers a candidate. Always responds the same way whether or not the e-mail already exists,
- * so registration cannot be used to enumerate accounts; an existing user receives a notice instead.
+ * Registers a candidate with passwordless email OTP verification.
  */
 export async function registerCandidate(input: unknown, ip: string): Promise<string> {
   await rateLimit("register", ip, 10, 3600);
@@ -52,46 +42,47 @@ export async function registerCandidate(input: unknown, ip: string): Promise<str
       "Please correct the highlighted fields",
       z.flattenError(parsed.error).fieldErrors,
     );
-  const { fullName, email, password } = parsed.data;
-  const problems = passwordProblems(password, email);
-  if (problems.length) throw new ValidationError("Please choose a stronger password", { password: problems });
+  const { fullName, email, phone } = parsed.data;
 
-  const existing = await prisma.user.findUnique({ where: { email } });
+  const existing = await prisma.user.findUnique({ where: { email }, include: { roles: true } });
   if (existing) {
+    const isCand = existing.roles.some((r) => r.role === "CANDIDATE");
+    if (isCand && existing.status === "ACTIVE") {
+      return await issueOtp(existing.id, "LOGIN", ip);
+    }
     await prisma.$transaction(async (tx) => {
       await notify(
         tx,
         existing.id,
         "account.exists",
-        "Registration attempt for your account",
-        "Someone tried to register a new account with your e-mail address. If this was you, sign in or reset your password instead. If not, you can ignore this message.",
+        "Sign-in attempt for your account",
+        "Someone tried to register with your e-mail address on the PSG Tech Staff Recruitment Portal. Sign in using your email address to receive a one-time code.",
       );
     });
-    // Same response as a new registration: a code page that no code will satisfy.
     return randomUUID();
   }
-  const passwordHash = await hashPassword(password);
+
   const user = await prisma.$transaction(async (tx) => {
     const u = await tx.user.create({
       data: {
         email,
-        passwordHash,
+        status: "ACTIVE",
         roles: { create: { role: "CANDIDATE" } },
         profile: {
-          create: { fullName, privacyVersion: PRIVACY_NOTICE_VERSION, privacyAcceptedAt: new Date() },
+          create: {
+            fullName,
+            phone: phone || null,
+            privacyVersion: PRIVACY_NOTICE_VERSION,
+            privacyAcceptedAt: new Date(),
+          },
         },
       },
     });
     await audit({ actorId: u.id, action: "account.registered", entityType: "user", entityId: u.id, ip }, tx);
     return u;
   });
-  await sendVerification(user.id);
-  try {
-    return await issueOtp(user.id, "EMAIL_VERIFICATION", ip);
-  } catch {
-    // The verification link was sent; the code can be requested again from the account page.
-    return randomUUID();
-  }
+
+  return await issueOtp(user.id, "LOGIN", ip);
 }
 
 /** Verifies a candidate's e-mail address with the 6-digit code. */
@@ -147,28 +138,76 @@ export type LoginResult =
   | { ok: "otp"; challengeId: string; userId: string }
   | { ok: false; message: string };
 
-/** Admin and HR always confirm sign-in with an e-mail code; HODs unless Admin turned it off. */
-async function needsLoginOtp(userId: string): Promise<boolean> {
-  const roles = (await prisma.userRole.findMany({ where: { userId }, select: { role: true } })).map(
-    (r) => r.role,
-  );
-  if (roles.includes("ADMIN") || roles.includes("HR")) return true;
-  if (roles.includes("HOD")) return getSetting("hodLoginOtp");
-  return false;
+export type RequestOtpResult =
+  | { ok: true; challengeId: string; email: string }
+  | { ok: false; message: string };
+
+/**
+ * Initiates passwordless e-mail OTP login for all users (candidates and staff).
+ */
+export async function requestLoginOtp(emailRaw: string, ip: string): Promise<RequestOtpResult> {
+  const email = emailRaw.trim().toLowerCase();
+  const valid = z.string().email().safeParse(email);
+  if (!valid.success) return { ok: false, message: "Enter a valid e-mail address." };
+
+  await rateLimit("login-ip", ip, 30, 900);
+  await rateLimit("login-account", hashToken(email), 10, 900);
+
+  const user = await prisma.user.findUnique({ where: { email } });
+  if (!user) {
+    return {
+      ok: false,
+      message: "No account found with this e-mail address. If you are an applicant, please create an account first.",
+    };
+  }
+
+  if (user.status === "DISABLED") {
+    return {
+      ok: false,
+      message: "This account has been disabled. Please contact the recruitment office.",
+    };
+  }
+
+  if (user.lockedUntil && user.lockedUntil > new Date()) {
+    return {
+      ok: false,
+      message: "This account is temporarily locked after repeated failed attempts. Please try again later.",
+    };
+  }
+
+  try {
+    const challengeId = await issueOtp(user.id, "LOGIN", ip);
+    return { ok: true, challengeId, email };
+  } catch (err) {
+    return {
+      ok: false,
+      message: err instanceof Error ? err.message : "The code could not be sent. Please try again shortly.",
+    };
+  }
 }
 
-/** Second sign-in step: checks the e-mailed code and creates the session. */
+/** Verifies the e-mailed code and creates the session for any user. */
 export async function completeLoginWithOtp(
   challengeId: string,
   code: string,
   ip: string,
   userAgent: string | null,
 ): Promise<LoginResult> {
-  const r = await verifyOtp(challengeId, code, "STAFF_LOGIN", ip);
+  const r = await verifyOtp(challengeId, code, "LOGIN", ip);
   if (!r.ok) return r;
   const user = await prisma.user.findUnique({ where: { id: r.userId } });
   if (!user || user.status !== "ACTIVE") return { ok: false, message: "This account cannot sign in." };
-  await prisma.user.update({ where: { id: user.id }, data: { lastLoginAt: new Date() } });
+
+  await prisma.user.update({
+    where: { id: user.id },
+    data: {
+      lastLoginAt: new Date(),
+      failedLoginCount: 0,
+      lockedUntil: null,
+      emailVerifiedAt: user.emailVerifiedAt ?? new Date(),
+    },
+  });
+
   const setCookie = await createSession(user.id, userAgent);
   await audit({
     actorId: user.id,
@@ -183,65 +222,21 @@ export async function completeLoginWithOtp(
 
 export async function resendLoginOtp(challengeId: string, ip: string): Promise<string> {
   const c = await prisma.otpChallenge.findUnique({ where: { id: challengeId } });
-  if (!c || c.purpose !== "STAFF_LOGIN") throw new ValidationError("Sign in again to receive a new code.");
-  return issueOtp(c.userId, "STAFF_LOGIN", ip);
+  if (!c) throw new ValidationError("Sign in again to receive a new code.");
+  return issueOtp(c.userId, c.purpose, ip);
 }
 
-const GENERIC_LOGIN_ERROR = "The e-mail address or password is incorrect.";
-
-/** Password login with per-account lockout and per-IP/per-account rate limits. */
+/** Passwordless login with rate limits and instant OTP issue. */
 export async function login(
   emailRaw: string,
-  password: string,
+  _password: string,
   ip: string,
-  userAgent: string | null,
+  _userAgent: string | null,
 ): Promise<LoginResult> {
-  const email = emailRaw.trim().toLowerCase();
-  await rateLimit("login-ip", ip, 30, 900);
-  await rateLimit("login-account", hashToken(email), 10, 900);
-  const user = await prisma.user.findUnique({ where: { email } });
-  if (!user) {
-    await verifyPassword(await dummyHash(), password);
-    return { ok: false, message: GENERIC_LOGIN_ERROR };
-  }
-  if (user.lockedUntil && user.lockedUntil > new Date())
-    return {
-      ok: false,
-      message:
-        "This account is temporarily locked after repeated failed sign-in attempts. Try again later or reset your password.",
-    };
-  const valid = await verifyPassword(user.passwordHash, password);
-  if (!valid || user.status !== "ACTIVE") {
-    const failed = user.failedLoginCount + 1;
-    await prisma.user.update({
-      where: { id: user.id },
-      data: {
-        failedLoginCount: failed,
-        lockedUntil: failed >= MAX_FAILED_LOGINS ? new Date(Date.now() + LOCK_MINUTES * 60_000) : null,
-      },
-    });
-    await audit({
-      actorId: user.id,
-      action: "auth.login_failed",
-      entityType: "user",
-      entityId: user.id,
-      ip,
-      metadata: { failed },
-    });
-    return { ok: false, message: GENERIC_LOGIN_ERROR };
-  }
-  if (await needsLoginOtp(user.id)) {
-    await prisma.user.update({ where: { id: user.id }, data: { failedLoginCount: 0, lockedUntil: null } });
-    const challengeId = await issueOtp(user.id, "STAFF_LOGIN", ip);
-    return { ok: "otp", challengeId, userId: user.id };
-  }
-  await prisma.user.update({
-    where: { id: user.id },
-    data: { failedLoginCount: 0, lockedUntil: null, lastLoginAt: new Date() },
-  });
-  const setCookie = await createSession(user.id, userAgent);
-  await audit({ actorId: user.id, action: "auth.login", entityType: "user", entityId: user.id, ip });
-  return { ok: true, setCookie, userId: user.id };
+  const r = await requestLoginOtp(emailRaw, ip);
+  if (!r.ok) return { ok: false, message: r.message };
+  const user = await prisma.user.findUniqueOrThrow({ where: { email: emailRaw.trim().toLowerCase() } });
+  return { ok: "otp", challengeId: r.challengeId, userId: user.id };
 }
 
 /** Starts password recovery. Identical response whether or not the account exists. */

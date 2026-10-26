@@ -104,9 +104,15 @@ describe("roles", () => {
     expect(hasPermission(g("HR"), "application:export")).toBe(true);
     expect(hasPermission(g("HR"), "user:manage")).toBe(false);
   });
-  it("gives Admin full control", () => {
-    for (const p of ["user:manage", "settings:manage", "position:approve", "audit:read"] as const)
-      expect(hasPermission(g("ADMIN"), p)).toBe(true);
+  it("gives Admin operational recruitment control and Super Admin full control", () => {
+    expect(hasPermission(g("ADMIN"), "position:approve")).toBe(true);
+    expect(hasPermission(g("ADMIN"), "application:assign")).toBe(true);
+    expect(hasPermission(g("ADMIN"), "user:manage")).toBe(false);
+    expect(hasPermission(g("ADMIN"), "settings:manage")).toBe(false);
+    expect(hasPermission(g("ADMIN"), "audit:read")).toBe(false);
+
+    for (const p of ["user:manage", "settings:manage", "position:approve", "audit:read", "system:manage"] as const)
+      expect(hasPermission(g("SUPER_ADMIN"), p)).toBe(true);
   });
   it("sends each role to its home page", () => {
     expect(homePath(g("HOD"))).toBe("/staff/review");
@@ -136,8 +142,13 @@ describe("CSV export", () => {
   it("quotes cells and neutralises spreadsheet formulas", () => {
     expect(csvCell('He said "hi"')).toBe('"He said ""hi"""');
     expect(csvCell("=HYPERLINK(1)")).toBe(`"'=HYPERLINK(1)"`);
+    expect(csvCell("+1234")).toBe(`"'+1234"`);
     expect(csvCell("-5")).toBe(`"'-5"`);
+    expect(csvCell("@SUM(A1:A5)")).toBe(`"'@SUM(A1:A5)"`);
+    expect(csvCell("\tcmd")).toBe(`"'\tcmd"`);
+    expect(csvCell("\rcmd")).toBe(`"'\rcmd"`);
     expect(csvCell(null)).toBe('""');
+    expect(csvCell("Normal Safe Text")).toBe('"Normal Safe Text"');
   });
   it("keeps only known columns and falls back to the summary columns", () => {
     expect(parseColumns(["candidateName", "nope"])).toEqual(["candidateName"]);

@@ -76,6 +76,7 @@ export function TextInput({
   autoComplete,
   inputMode,
   maxLength,
+  placeholder,
 }: {
   label: string;
   name: string;
@@ -89,6 +90,7 @@ export function TextInput({
   autoComplete?: string;
   inputMode?: React.HTMLAttributes<HTMLInputElement>["inputMode"];
   maxLength?: number;
+  placeholder?: string;
 }) {
   return (
     <Field label={label} name={name} hint={hint} error={error} required={required}>
@@ -107,6 +109,7 @@ export function TextInput({
           autoComplete={autoComplete}
           inputMode={inputMode}
           maxLength={maxLength}
+          placeholder={placeholder}
           className="field-input"
         />
       )}

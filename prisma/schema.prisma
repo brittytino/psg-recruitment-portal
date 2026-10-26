@@ -15,13 +15,15 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
-/// ADMIN = Dean / Principal (full control). HR = HR – N4 Section. HOD = department reviewer,
-/// scoped to one department per UserRole row.
+/// SUPER_ADMIN = Tino (highest privileges: system config, audit logs, users, roles, settings).
+/// ADMIN = Dean / Principal (recruitment administration, bulk assignment, review, summary sheets).
+/// HR = HR – N4 Section. HOD = department reviewer, scoped to authorized departments.
 enum Role {
   CANDIDATE
   HR
   HOD
   ADMIN
+  SUPER_ADMIN
 }
 
 enum UserStatus {
@@ -37,6 +39,7 @@ enum AuthTokenType {
 enum OtpPurpose {
   STAFF_LOGIN
   EMAIL_VERIFICATION
+  LOGIN
 }
 
 enum CycleStatus {
@@ -161,7 +164,7 @@ model User {
   id               String     @id @default(uuid()) @db.Uuid
   /// Stored lower-cased; unique.
   email            String     @unique
-  passwordHash     String
+  passwordHash     String?
   status           UserStatus @default(ACTIVE)
   emailVerifiedAt  DateTime?  @db.Timestamptz(3)
   failedLoginCount Int        @default(0)

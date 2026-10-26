@@ -56,10 +56,9 @@ export default function LoginVerify({ actionData }: Route.ComponentProps) {
     <AuthShell>
       <div className="space-y-5">
         <div>
-          <h1>Check your e-mail</h1>
+          <h1>Enter verification code</h1>
           <p className="mt-2 text-muted">
-            For security, staff sign-in needs a one-time code. We sent a 6-digit code to your official e-mail
-            address. It expires in 10 minutes.
+            We sent a 6-digit one-time password (OTP) to your e-mail address. Enter the code below to complete sign-in. It expires in 10 minutes.
           </p>
         </div>
         {a?.message && <Alert tone="success">{a.message}</Alert>}

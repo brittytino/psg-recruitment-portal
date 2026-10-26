@@ -1,0 +1,8 @@
+-- AlterEnum
+ALTER TYPE "Role" ADD VALUE IF NOT EXISTS 'SUPER_ADMIN';
+
+-- AlterEnum
+ALTER TYPE "OtpPurpose" ADD VALUE IF NOT EXISTS 'LOGIN';
+
+-- AlterTable
+ALTER TABLE "users" ALTER COLUMN "passwordHash" DROP NOT NULL;

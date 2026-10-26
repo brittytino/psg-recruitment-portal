@@ -185,10 +185,19 @@ export async function authorizeGeneratedDownload(user: SessionUser, generatedId:
     },
   });
   if (!g || g.status !== "READY" || !g.storageKey) throw new NotFoundError("Document");
-  // Candidates download their application form; the consolidated bundle is for the recruitment
-  // office (v1 applications predate the separate form PDF, so their bundle stays available).
+  // Candidates download their application form or their full consolidated bundle (application + attachments).
   if (g.application.candidateId === user.id) {
-    if (g.kind === "APPLICATION_PDF" || g.revision.formVersion === 1) return g;
+    if (g.kind === "APPLICATION_PDF" || g.kind === "CONSOLIDATED_BUNDLE" || g.revision.formVersion === 1) {
+      await audit({
+        actorId: user.id,
+        action: g.kind === "APPLICATION_PDF" ? "application_pdf.downloaded" : "bundle.downloaded",
+        entityType: "application",
+        entityId: g.applicationId,
+        ip,
+        metadata: { generatedId, version: g.version },
+      });
+      return g;
+    }
     throw new NotFoundError("Document");
   }
   if (!hasPermission(user.grants, "document:download")) throw new NotFoundError("Document");
