@@ -270,8 +270,9 @@ function bindAssistant(b: Binder) {
       (r) => {
         const cls = s(r.class) || s(r.classOrMarks);
         const cgpa = s(r.cgpaOrMarks);
+        const mode = s(r.modeOfStudy);
         const marks = [cls, cgpa].filter(Boolean).join(" / ");
-        return [marks, r.attempts ? `(${r.attempts} att.)` : ""]
+        return [marks, mode ? `[${mode}]` : "", r.attempts ? `(${r.attempts} att.)` : ""]
           .filter(Boolean)
           .join(" ");
       },
@@ -450,8 +451,9 @@ function bindAssociate(b: Binder) {
       (r) => {
         const cls = s(r.class) || s(r.classPercent);
         const cgpa = s(r.cgpaOrMarks);
+        const mode = s(r.modeOfStudy);
         const marks = [cls, cgpa].filter(Boolean).join(" / ");
-        return [marks, r.attempts ? `(${r.attempts} att.)` : ""]
+        return [marks, mode ? `[${mode}]` : "", r.attempts ? `(${r.attempts} att.)` : ""]
           .filter(Boolean)
           .join(" ");
       },

@@ -1,5 +1,6 @@
 import { date, derived, list, monthYear, num, select, table, text, textarea } from "../builders";
 import { INDIAN_RELIGIONS } from "../religions";
+import { MODES_OF_STUDY, QUALIFICATION_CLASSES } from "../qualifications";
 import type { FormDefinition, ScalarField } from "../types";
 
 const titleYear = (page: number): ScalarField[] => [
@@ -277,15 +278,16 @@ export const associateProfessorV1: FormDefinition = {
             monthYear("monthYear", "Month & year", 2, "MONTH & YEAR", { requirement: "required" }),
             text("college", "College", 2, "COLLEGE", { requirement: "required", maxLength: 200 }),
             text("university", "University", 2, "UNIVERSITY", { requirement: "required", maxLength: 200 }),
-            text("class", "Class", 2, "CLASS", {
+            select("class", "Class", 2, "CLASS", [...QUALIFICATION_CLASSES], {
               requirement: "required",
-              maxLength: 60,
-              placeholder: "e.g. First Class with Distinction",
             }),
             text("cgpaOrMarks", "(CGPA/Marks)", 2, "CGPA/MARKS", {
               requirement: "required",
               maxLength: 60,
               placeholder: "e.g. 8.5 CGPA or 85%",
+            }),
+            select("modeOfStudy", "Mode of study", 2, "MODE OF STUDY", [...MODES_OF_STUDY], {
+              requirement: "required",
             }),
             num("attempts", "No. of attempts", 2, "NO. OF ATTEMPTS", {
               requirement: "required",

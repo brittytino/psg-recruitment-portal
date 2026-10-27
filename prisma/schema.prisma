@@ -397,6 +397,7 @@ model Qualification {
   passedOn    String?
   class       String?
   cgpaOrMarks String?
+  modeOfStudy String?
   attempts    Int?                @default(1)
   revision    ApplicationRevision @relation(fields: [revisionId], references: [id])
 

@@ -210,6 +210,7 @@ function extractQualifications(code: FormCode, a: Answers) {
       passedOn: s(r.monthYearOfPassing),
       class: s(r.class) ?? s(r.classOrMarks),
       cgpaOrMarks: s(r.cgpaOrMarks),
+      modeOfStudy: s(r.modeOfStudy),
       attempts: numVal(r.attempts),
     }));
   return rows("educationalQualifications").map((r, i) => ({
@@ -221,6 +222,7 @@ function extractQualifications(code: FormCode, a: Answers) {
     passedOn: s(r.monthYear),
     class: s(r.class) ?? s(r.classPercent),
     cgpaOrMarks: s(r.cgpaOrMarks),
+    modeOfStudy: s(r.modeOfStudy),
     attempts: numVal(r.attempts),
   }));
 }
