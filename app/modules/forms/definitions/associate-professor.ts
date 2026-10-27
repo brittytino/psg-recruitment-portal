@@ -277,7 +277,16 @@ export const associateProfessorV1: FormDefinition = {
             monthYear("monthYear", "Month & year", 2, "MONTH & YEAR", { requirement: "required" }),
             text("college", "College", 2, "COLLEGE", { requirement: "required", maxLength: 200 }),
             text("university", "University", 2, "UNIVERSITY", { requirement: "required", maxLength: 200 }),
-            text("classPercent", "Class & % of marks", 2, "CLASS  &  % OF MARKS", { maxLength: 60 }),
+            text("class", "Class", 2, "CLASS", {
+              requirement: "required",
+              maxLength: 60,
+              placeholder: "e.g. First Class with Distinction",
+            }),
+            text("cgpaOrMarks", "(CGPA/Marks)", 2, "CGPA/MARKS", {
+              requirement: "required",
+              maxLength: 60,
+              placeholder: "e.g. 8.5 CGPA or 85%",
+            }),
             num("attempts", "No. of attempts", 2, "NO. OF ATTEMPTS", {
               requirement: "required",
               min: 1,

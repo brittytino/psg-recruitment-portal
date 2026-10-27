@@ -73,7 +73,8 @@ describe("Education qualifications number of attempts", () => {
       degree: "B.E.",
       university: "Anna University",
       institution: "PSG Tech",
-      classOrMarks: "First / 80%",
+      class: "First Class",
+      cgpaOrMarks: "80%",
       monthYearOfPassing: "2015-05",
       attempts: 1,
     };

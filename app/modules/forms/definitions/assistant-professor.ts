@@ -145,9 +145,15 @@ export const assistantProfessorV1: FormDefinition = {
               requirement: "required",
               maxLength: 200,
             }),
-            text("classOrMarks", "Class / Marks obtained", 1, "Class/ Marks obtained", {
+            text("class", "Class", 1, "Class", {
               requirement: "required",
               maxLength: 60,
+              placeholder: "e.g. First Class with Distinction",
+            }),
+            text("cgpaOrMarks", "(CGPA/Marks)", 1, "CGPA/Marks", {
+              requirement: "required",
+              maxLength: 60,
+              placeholder: "e.g. 8.5 CGPA or 85%",
             }),
             monthYear("monthYearOfPassing", "Month & Year of Passing", 1, "Month & Year of  Passing", {
               requirement: "required",
