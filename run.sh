@@ -12,6 +12,7 @@
 #   ./run.sh status | ps      Show status of portal containers
 #   ./run.sh health           Check /healthz/ready health endpoint
 #   ./run.sh seed             Seed form templates & approved institutional accounts
+#   ./run.sh env              Copy .env.example to .env directly
 #   ./run.sh rebuild          Clean rebuild images with --no-cache and start
 #   ./run.sh studio           Launch Prisma Studio database GUI
 #   ./run.sh shell [service]  Open shell inside a container (default: app)
@@ -78,47 +79,23 @@ check_prerequisites() {
     fi
 }
 
+copy_env_file() {
+    if [ ! -f .env.example ]; then
+        echo -e "${RED}[ERROR] .env.example not found in $(pwd)!${NC}"
+        return 1
+    fi
+    echo -e "${CYAN}[INFO] Copying .env.example to .env...${NC}"
+    cp -f .env.example .env
+    chmod 644 .env 2>/dev/null || true
+    echo -e "${GREEN}[OK] Successfully copied .env.example -> .env${NC}"
+}
+
 ensure_env_file() {
-    if [ ! -f .env ]; then
-        echo -e "${CYAN}[INFO] .env not found. Creating from .env.example...${NC}"
-        if [ ! -f .env.example ]; then
-            echo -e "${RED}[ERROR] .env.example not found.${NC}"
-            exit 1
-        fi
-
-        # If node and init-env.sh are available, use the project helper
-        if command -v node >/dev/null 2>&1 && [ -f scripts/init-env.sh ]; then
-            chmod +x scripts/init-env.sh 2>/dev/null || true
-            ./scripts/init-env.sh
-        else
-            # Standalone secure fallback using openssl or /dev/urandom
-            rand_b64() {
-                local len="$1"
-                if command -v openssl >/dev/null 2>&1; then
-                    openssl rand -base64 "$len" 2>/dev/null | tr -dc 'A-Za-z0-9_-' | head -c "$len"
-                else
-                    head -c "$len" /dev/urandom | base64 | tr -dc 'A-Za-z0-9_-' | head -c "$len"
-                fi
-            }
-
-            local owner_pass app_pass session_sec conv_tok
-            owner_pass="$(rand_b64 24)"
-            app_pass="$(rand_b64 24)"
-            session_sec="$(rand_b64 48)"
-            conv_tok="$(rand_b64 24)"
-
-            sed \
-                -e "s|^POSTGRES_PASSWORD=.*|POSTGRES_PASSWORD=${owner_pass}|" \
-                -e "s|^APP_DB_PASSWORD=.*|APP_DB_PASSWORD=${app_pass}|" \
-                -e "s|^DATABASE_URL=.*|DATABASE_URL=postgresql://srp_app:${app_pass}@db:5432/srportal?schema=public|" \
-                -e "s|^MIGRATION_DATABASE_URL=.*|MIGRATION_DATABASE_URL=postgresql://srp_owner:${owner_pass}@db:5432/srportal?schema=public|" \
-                -e "s|^SESSION_SECRET=.*|SESSION_SECRET=${session_sec}|" \
-                -e "s|^CONVERTER_TOKEN=.*|CONVERTER_TOKEN=${conv_tok}|" \
-                .env.example > .env
-
-            chmod 600 .env 2>/dev/null || true
-            echo -e "${GREEN}[OK] Created .env with generated random secrets.${NC}"
-        fi
+    if [ ! -f .env ] || [ ! -s .env ]; then
+        echo -e "${CYAN}[INFO] .env not found or empty. Initializing configuration...${NC}"
+        copy_env_file
+    else
+        echo -e "${GREEN}[OK] Found existing .env file.${NC}"
     fi
 }
 
@@ -335,6 +312,7 @@ do_help() {
     echo "  status, ps        Show container status and published ports"
     echo "  health            Query the /healthz/ready status endpoint"
     echo "  seed              Seed form templates & approved institutional accounts"
+    echo "  env, copy-env     Copy .env.example to .env directly"
     echo "  rebuild, --clean  Rebuild Docker images without cache (--no-cache) and start"
     echo "  studio            Launch Prisma Studio GUI on port 5555"
     echo "  shell [svc]       Open interactive shell inside service (default: app)"
@@ -359,13 +337,14 @@ interactive_loop() {
         echo -e "  [${CYAN}D${NC}] Open / Show Database Viewer (Adminer)"
         echo -e "  [${CYAN}M${NC}] Open / Show Mailbox Inbox (Mailpit)"
         echo -e "  [${CYAN}A${NC}] Seed / Register Form Templates & Staff Accounts"
+        echo -e "  [${CYAN}E${NC}] Copy / Reset .env from .env.example"
         echo -e "  [${CYAN}S${NC}] Launch Prisma Studio GUI"
         echo -e "  [${CYAN}L${NC}] View Container Logs"
         echo -e "  [${CYAN}R${NC}] Clean Rebuild (--no-cache)"
         echo -e "  [${CYAN}X${NC}] Stop Stack and Exit"
         echo -e "  [${CYAN}Q${NC}] Quit menu (keep stack running)"
         echo ""
-        read -r -p "Enter choice [B/D/M/A/S/L/R/X/Q]: " choice || exit 0
+        read -r -p "Enter choice [B/D/M/A/E/S/L/R/X/Q]: " choice || exit 0
         case "$choice" in
             [bB])
                 echo -e "${GREEN}Portal URL: http://${host_ip}:6969${NC}"
@@ -387,6 +366,9 @@ interactive_loop() {
                 ;;
             [aA])
                 do_seed || true
+                ;;
+            [eE])
+                copy_env_file
                 ;;
             [sS])
                 do_studio || true
@@ -419,6 +401,9 @@ interactive_loop() {
 CMD="${1:-}"
 
 case "$CMD" in
+    env|copy-env|init-env)
+        copy_env_file
+        ;;
     stop)
         check_prerequisites
         $COMPOSE "${COMPOSE_ARGS[@]}" stop

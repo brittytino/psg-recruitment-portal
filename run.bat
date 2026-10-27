@@ -18,6 +18,8 @@ if /i "%~1"=="logs" goto do_logs
 if /i "%~1"=="status" goto do_status
 if /i "%~1"=="ps" goto do_status
 if /i "%~1"=="health" goto do_health
+if /i "%~1"=="env" goto do_copy_env
+if /i "%~1"=="copy-env" goto do_copy_env
 if /i "%~1"=="studio" goto do_studio
 if /i "%~1"=="db" goto do_open_db
 if /i "%~1"=="adminer" goto do_open_db
@@ -54,6 +56,7 @@ if not exist .env (
         exit /b 1
     )
     copy /y .env.example .env >nul
+    echo [OK] Successfully copied .env.example -^> .env
 )
 
 echo [1/3] Building Docker images...
@@ -249,6 +252,16 @@ echo Checking portal readiness (http://127.0.0.1:6969/healthz/ready)...
 curl.exe -i http://127.0.0.1:6969/healthz/ready
 exit /b %errorlevel%
 
+:do_copy_env
+if not exist .env.example (
+    echo [ERROR] .env.example not found.
+    exit /b 1
+)
+echo [INFO] Copying .env.example to .env...
+copy /y .env.example .env >nul
+echo [OK] Successfully copied .env.example -^> .env
+exit /b 0
+
 :do_help
 echo ================================================================================
 echo    PSG TECH STAFF RECRUITMENT PORTAL - DOCKER RUNNER
@@ -266,6 +279,7 @@ echo   logs              Stream container logs (app worker db adminer)
 echo   status, ps        Show container status and published ports
 echo   health            Query the /healthz/ready status endpoint
 echo   seed              Seed form templates and approved institutional accounts
+echo   env, copy-env     Copy .env.example to .env directly
 echo   rebuild, --clean  Rebuild Docker images without cache (--no-cache) and start
 echo   studio            Launch Prisma Studio GUI on port 5555
 echo   db, adminer       Open Database Adminer viewer in browser
