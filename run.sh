@@ -92,11 +92,45 @@ copy_env_file() {
 
 ensure_env_file() {
     if [ ! -f .env ] || [ ! -s .env ]; then
-        echo -e "${CYAN}[INFO] .env not found or empty. Initializing configuration...${NC}"
+        echo -e "${CYAN}[INFO] .env not found or empty. Initializing configuration from .env.example...${NC}"
         copy_env_file
     else
         echo -e "${GREEN}[OK] Found existing .env file.${NC}"
     fi
+
+    # Fix placeholder secrets so production env() checks never crash
+    if grep -q "replace-with" .env 2>/dev/null; then
+        echo -e "${CYAN}[INFO] Generating secure cryptographic random secrets in .env...${NC}"
+        local new_session_secret=""
+        if command -v openssl >/dev/null 2>&1; then
+            new_session_secret="$(openssl rand -hex 32)"
+        elif command -v node >/dev/null 2>&1; then
+            new_session_secret="$(node -e "console.log(require('crypto').randomBytes(32).toString('hex'))")"
+        else
+            new_session_secret="$(head -c 32 /dev/urandom | od -An -tx1 | tr -d ' \n')"
+        fi
+        sed -i "s|SESSION_SECRET=replace-with.*|SESSION_SECRET=${new_session_secret}|g" .env
+
+        local new_converter_token=""
+        if command -v openssl >/dev/null 2>&1; then
+            new_converter_token="$(openssl rand -hex 16)"
+        elif command -v node >/dev/null 2>&1; then
+            new_converter_token="$(node -e "console.log(require('crypto').randomBytes(16).toString('hex'))")"
+        else
+            new_converter_token="$(head -c 16 /dev/urandom | od -An -tx1 | tr -d ' \n')"
+        fi
+        sed -i "s|CONVERTER_TOKEN=replace-with.*|CONVERTER_TOKEN=${new_converter_token}|g" .env
+        echo -e "${GREEN}[OK] Replaced default placeholder secrets with cryptographically secure random values.${NC}"
+    fi
+}
+
+ensure_storage_permissions() {
+    echo -e "${CYAN}[INFO] Ensuring storage volume permissions for Linux / Debian...${NC}"
+    # In Linux/Debian, Docker named volumes or storage folders may be initialized with root:root ownership.
+    # The application and worker containers run as non-root user 'node' (UID 1000).
+    # Fix ownership and permissions inside the shared volume before launching services:
+    $COMPOSE "${COMPOSE_ARGS[@]}" run --rm --user 0:0 --no-deps app sh -c \
+        "mkdir -p /var/lib/srportal/storage && chown -R 1000:1000 /var/lib/srportal/storage && chmod -R 775 /var/lib/srportal/storage" >/dev/null 2>&1 || true
 }
 
 get_server_ip() {
@@ -116,20 +150,31 @@ get_server_ip() {
 show_summary() {
     local host_ip
     host_ip="$(get_server_ip)"
+    local port="${APP_HOST_PORT:-6969}"
+    local origin=""
+    if [ -f .env ]; then
+        local env_port
+        env_port="$(grep -E '^APP_HOST_PORT=' .env 2>/dev/null | cut -d '=' -f2 | tr -d '\r\n ' || true)"
+        if [ -n "$env_port" ]; then port="$env_port"; fi
+        origin="$(grep -E '^APP_ORIGIN=' .env 2>/dev/null | cut -d '=' -f2 | tr -d '\r\n ' || true)"
+    fi
 
     echo ""
     echo -e "${BOLD}${BLUE}================================================================================${NC}"
     echo -e "${BOLD}${CYAN}   PSG TECH STAFF RECRUITMENT PORTAL — READY${NC}"
     echo -e "${BOLD}${BLUE}================================================================================${NC}"
     echo ""
+    if [ -n "$origin" ] && [ "$origin" != "http://localhost:6969" ]; then
+        echo -e "   ${BOLD}[PRODUCTION URL]${NC}  ${GREEN}${origin}${NC}"
+    fi
     if [ "$host_ip" != "localhost" ] && [ "$host_ip" != "127.0.0.1" ]; then
-        echo -e "   ${BOLD}[WEB PORTAL]${NC}      http://${host_ip}:6969  (local: http://localhost:6969)"
-        echo -e "   ${BOLD}[SIGN IN PAGE]${NC}    http://${host_ip}:6969/login"
+        echo -e "   ${BOLD}[WEB PORTAL]${NC}      http://${host_ip}:${port}  (local: http://localhost:${port})"
+        echo -e "   ${BOLD}[SIGN IN PAGE]${NC}    http://${host_ip}:${port}/login"
         echo -e "   ${BOLD}[DATABASE VIEWER]${NC} http://${host_ip}:6981  (Adminer: db / srportal / srp_owner)"
         echo -e "   ${BOLD}[EMAIL INBOX]${NC}     http://${host_ip}:8025  (Mailpit web UI, SMTP on 2525)"
     else
-        echo -e "   ${BOLD}[WEB PORTAL]${NC}      http://localhost:6969"
-        echo -e "   ${BOLD}[SIGN IN PAGE]${NC}    http://localhost:6969/login"
+        echo -e "   ${BOLD}[WEB PORTAL]${NC}      http://localhost:${port}"
+        echo -e "   ${BOLD}[SIGN IN PAGE]${NC}    http://localhost:${port}/login"
         echo -e "   ${BOLD}[DATABASE VIEWER]${NC} http://localhost:6981  (Adminer: db / srportal / srp_owner)"
         echo -e "   ${BOLD}[EMAIL INBOX]${NC}     http://localhost:8025  (Mailpit web UI, SMTP on 2525)"
     fi
@@ -155,13 +200,21 @@ wait_for_health() {
     local attempts=0
     local max_attempts=35
     local healthy=false
+    local port="${APP_HOST_PORT:-6969}"
+    if [ -f .env ]; then
+        local env_port
+        env_port="$(grep -E '^APP_HOST_PORT=' .env 2>/dev/null | cut -d '=' -f2 | tr -d '\r\n ' || true)"
+        if [ -n "$env_port" ]; then
+            port="$env_port"
+        fi
+    fi
 
     while [ $attempts -lt $max_attempts ]; do
         attempts=$((attempts + 1))
-        if curl -fsS http://127.0.0.1:6969/healthz/ready >/dev/null 2>&1; then
+        if curl -fsS "http://127.0.0.1:${port}/healthz/ready" >/dev/null 2>&1; then
             healthy=true
             break
-        elif command -v wget >/dev/null 2>&1 && wget -q -O /dev/null http://127.0.0.1:6969/healthz/ready >/dev/null 2>&1; then
+        elif command -v wget >/dev/null 2>&1 && wget -q -O /dev/null "http://127.0.0.1:${port}/healthz/ready" >/dev/null 2>&1; then
             healthy=true
             break
         fi
@@ -174,6 +227,13 @@ wait_for_health() {
         echo -e "${GREEN}[OK] Recruitment Portal is healthy!${NC}"
     else
         echo -e "${YELLOW}[NOTE] Healthcheck timed out or services still initializing (e.g. ClamAV signature update).${NC}"
+        if command -v curl >/dev/null 2>&1; then
+            local health_resp
+            health_resp="$(curl -s "http://127.0.0.1:${port}/healthz/ready" 2>/dev/null || true)"
+            if [ -n "$health_resp" ]; then
+                echo -e "       Readiness status: ${CYAN}${health_resp}${NC}"
+            fi
+        fi
         echo -e "       Containers are running in the background. Use '${BOLD}$0 logs${NC}' to monitor progress."
     fi
 }
@@ -192,6 +252,7 @@ do_start() {
 
     echo ""
     echo -e "${CYAN}[2/3] Starting Docker stack...${NC}"
+    ensure_storage_permissions
     $COMPOSE "${COMPOSE_ARGS[@]}" up -d --remove-orphans --force-recreate
 
     echo ""
@@ -201,9 +262,17 @@ do_start() {
     # Open browser on desktop Linux if display server and xdg-open exist
     if [ -n "${DISPLAY:-}" ] || [ -n "${WAYLAND_DISPLAY:-}" ]; then
         if command -v xdg-open >/dev/null 2>&1; then
-            xdg-open "http://localhost:6969" >/dev/null 2>&1 &
+            xdg-open "http://localhost:${port:-6969}" >/dev/null 2>&1 &
         fi
     fi
+}
+
+do_restart() {
+    check_prerequisites
+    ensure_env_file
+    ensure_storage_permissions
+    $COMPOSE "${COMPOSE_ARGS[@]}" restart
+    wait_for_health
 }
 
 do_seed() {
@@ -257,6 +326,7 @@ do_clean_rebuild() {
     $COMPOSE "${COMPOSE_ARGS[@]}" build --no-cache app worker migrate converter
 
     echo "Starting stack..."
+    ensure_storage_permissions
     $COMPOSE "${COMPOSE_ARGS[@]}" up -d --force-recreate
 
     wait_for_health
@@ -401,6 +471,14 @@ interactive_loop() {
 CMD="${1:-}"
 
 case "$CMD" in
+    prod|production)
+        shift
+        exec ./prod.sh "$@"
+        ;;
+    dev|development)
+        shift
+        exec ./dev.sh "$@"
+        ;;
     env|copy-env|init-env)
         copy_env_file
         ;;
@@ -414,8 +492,7 @@ case "$CMD" in
         $COMPOSE "${COMPOSE_ARGS[@]}" down
         ;;
     restart)
-        check_prerequisites
-        $COMPOSE "${COMPOSE_ARGS[@]}" restart
+        do_restart
         ;;
     logs)
         check_prerequisites
