@@ -80,11 +80,45 @@ check_prerequisites() {
 ensure_dev_env() {
     if [ ! -f .env ] || grep -q "recruitments.psgtech.ac.in" .env 2>/dev/null; then
         echo -e "${CYAN}[INFO] Configuring development environment (.env.development -> .env)...${NC}"
-        if [ -f .env.development ]; then
-            cp -f .env.development .env
-        elif [ -f .env.example ]; then
-            cp -f .env.example .env
+        if [ ! -f .env.development ]; then
+            cat << 'EOF' > .env.development
+APP_ORIGIN=http://localhost:6969
+APP_HOST_PORT=6969
+POSTGRES_HOST_PORT=6543
+REDIS_HOST_PORT=63879
+MAILPIT_UI_HOST_PORT=8025
+MAILPIT_SMTP_HOST_PORT=2525
+CONVERTER_HOST_PORT=63100
+ADMINER_HOST_PORT=6981
+POSTGRES_DB=srportal
+POSTGRES_USER=srp_owner
+POSTGRES_PASSWORD=change-me-owner
+APP_DB_USER=srp_app
+APP_DB_PASSWORD=change-me-app
+DATABASE_URL=postgresql://srp_app:change-me-app@db:5432/srportal?schema=public
+MIGRATION_DATABASE_URL=postgresql://srp_owner:change-me-owner@db:5432/srportal?schema=public
+REDIS_URL=redis://redis:6379
+SESSION_SECRET=e7b8a1c93f0d4529b68a4e1f7c2d8b5a9034ecbf186241a7d903e15b497c28fa
+COOKIE_SECURE=false
+SESSION_TTL_HOURS=12
+STORAGE_DIR=/var/lib/srportal/storage
+MAX_UPLOAD_MB=10
+CONVERTER_URL=http://converter:3100
+CONVERTER_TOKEN=c3f1b8a9d04e762b9a15cd82ef04b971
+MALWARE_SCAN=clamav
+CLAMAV_HOST=clamav
+CLAMAV_PORT=3310
+SMTP_HOST=mailpit
+SMTP_PORT=1025
+SMTP_SECURE=false
+SMTP_USER=
+SMTP_PASSWORD=
+MAIL_FROM="PSG Tech Recruitment <recruitment@localhost>"
+LOG_LEVEL=info
+DEV_LOG_OTP=false
+EOF
         fi
+        cp -f .env.development .env
         chmod 644 .env 2>/dev/null || true
     fi
 
