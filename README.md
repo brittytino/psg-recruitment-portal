@@ -221,11 +221,30 @@ The portal provides an auditable, Excel-compatible CSV export engine:
 - Docker Desktop or Docker Engine ≥ 24.x with Docker Compose v2
 
 ### Quick Start with Docker
+
+**Windows (cmd / PowerShell):**
 ```bat
-REM Windows One-Click Runner:
+REM Interactive runner:
 .\run.bat
+
+REM Or headless / background start:
+.\run.bat start
 ```
-Or via Docker Compose commands:
+
+**Linux Server / macOS (bash / sh):**
+```sh
+# Make executable (first time only)
+chmod +x ./run.sh ./start.sh
+
+# Interactive runner (auto-detects server IP and health)
+./run.sh
+
+# Or start in background / non-interactive (e.g. over SSH, systemd, or CI)
+./run.sh start
+# or ./start.sh
+```
+
+Or via Docker Compose commands manually:
 ```sh
 # Copy environment configuration
 cp .env.example .env

@@ -5,11 +5,19 @@ cd /d "%~dp0"
 title PSG Tech Staff Recruitment Portal
 
 REM CLI Arguments
+if /i "%~1"=="help" goto do_help
+if /i "%~1"=="-h" goto do_help
+if /i "%~1"=="--help" goto do_help
+if /i "%~1"=="/?" goto do_help
+if /i "%~1"=="up" goto do_up_headless
+if /i "%~1"=="start" goto do_up_headless
 if /i "%~1"=="stop" goto do_stop
 if /i "%~1"=="down" goto do_down
 if /i "%~1"=="restart" goto do_restart
 if /i "%~1"=="logs" goto do_logs
 if /i "%~1"=="status" goto do_status
+if /i "%~1"=="ps" goto do_status
+if /i "%~1"=="health" goto do_health
 if /i "%~1"=="studio" goto do_studio
 if /i "%~1"=="db" goto do_open_db
 if /i "%~1"=="adminer" goto do_open_db
@@ -112,6 +120,9 @@ echo.
 
 start "" "http://localhost:6969"
 
+if /i "%~1"=="up" exit /b 0
+if /i "%~1"=="start" exit /b 0
+
 :interactive_loop
 echo.
 echo Select an option:
@@ -198,7 +209,14 @@ echo.
 if "%SEED_EXIT_CODE%"=="0" (
     echo [OK] Seed command completed successfully.
 ) else (
-    echo [ERROR] Seeding failed with exit code %SEED_EXIT_CODE%.
+    echo [INFO] Host seed failed, trying via Docker container runner...
+    docker compose -f compose.yaml -f compose.dev.yaml run --rm migrate node build-worker/seed.js
+    set "SEED_EXIT_CODE=%errorlevel%"
+    if "!SEED_EXIT_CODE!"=="0" (
+        echo [OK] Seed completed successfully via Docker!
+    ) else (
+        echo [ERROR] Seeding failed with exit code !SEED_EXIT_CODE!.
+    )
 )
 
 REM If called as run.bat seed, return the exit code to the terminal.
@@ -225,6 +243,38 @@ start "" "http://localhost:6981/?pgsql=db&username=srp_owner&db=srportal&ns=publ
 if /i "%~1"=="db" exit /b 0
 if /i "%~1"=="adminer" exit /b 0
 goto interactive_loop
+
+:do_health
+echo Checking portal readiness (http://127.0.0.1:6969/healthz/ready)...
+curl.exe -i http://127.0.0.1:6969/healthz/ready
+exit /b %errorlevel%
+
+:do_help
+echo ================================================================================
+echo    PSG TECH STAFF RECRUITMENT PORTAL - DOCKER RUNNER
+echo ================================================================================
+echo.
+echo Usage: run.bat [COMMAND]
+echo.
+echo Commands:
+echo   (none)            Start portal, wait for health, and launch interactive menu
+echo   up, start         Start portal stack in background (non-interactive)
+echo   stop              Gracefully stop containers (preserves data volumes)
+echo   down              Stop and remove containers (preserves data volumes)
+echo   restart           Restart portal containers
+echo   logs              Stream container logs (app worker db adminer)
+echo   status, ps        Show container status and published ports
+echo   health            Query the /healthz/ready status endpoint
+echo   seed              Seed form templates and approved institutional accounts
+echo   rebuild, --clean  Rebuild Docker images without cache (--no-cache) and start
+echo   studio            Launch Prisma Studio GUI on port 5555
+echo   db, adminer       Open Database Adminer viewer in browser
+echo   help, -h, --help  Display this help reference
+echo.
+exit /b 0
+
+:do_up_headless
+goto main_menu
 
 :do_stop
 docker compose -f compose.yaml -f compose.dev.yaml stop
