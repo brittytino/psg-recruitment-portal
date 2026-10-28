@@ -57,6 +57,7 @@ export interface TextField extends BaseField {
   uppercase?: boolean;
   pattern?: { regex: string; message: string };
   inputMode?: "email" | "tel" | "numeric" | "text";
+  placeholder?: string;
 }
 
 export interface TextAreaField extends BaseField {

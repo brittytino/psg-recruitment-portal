@@ -1,5 +1,6 @@
 import { date, derived, monthYear, num, select, table, text, textarea } from "../builders";
 import { INDIAN_RELIGIONS } from "../religions";
+import { MODES_OF_STUDY, QUALIFICATION_CLASSES } from "../qualifications";
 import type { FormDefinition } from "../types";
 
 /**
@@ -145,9 +146,16 @@ export const assistantProfessorV1: FormDefinition = {
               requirement: "required",
               maxLength: 200,
             }),
-            text("classOrMarks", "Class / Marks obtained", 1, "Class/ Marks obtained", {
+            select("class", "Class", 1, "Class", [...QUALIFICATION_CLASSES], {
+              requirement: "required",
+            }),
+            text("cgpaOrMarks", "(CGPA/Marks)", 1, "CGPA/Marks", {
               requirement: "required",
               maxLength: 60,
+              placeholder: "e.g. 8.5 CGPA or 85%",
+            }),
+            select("modeOfStudy", "Mode of study", 1, "Mode of Study", [...MODES_OF_STUDY], {
+              requirement: "required",
             }),
             monthYear("monthYearOfPassing", "Month & Year of Passing", 1, "Month & Year of  Passing", {
               requirement: "required",

@@ -539,6 +539,8 @@ model Qualification {
   specialisation String?
   score          String?
   classAwarded   String?
+  class          String?
+  cgpaOrMarks    String?
   modeOfStudy    String?
   revision       ApplicationRevision @relation(fields: [revisionId], references: [id])
 

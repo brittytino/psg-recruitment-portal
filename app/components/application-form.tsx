@@ -232,6 +232,7 @@ export function ScalarInput({
           type={field.inputMode === "email" ? "email" : field.inputMode === "tel" ? "tel" : "text"}
           inputMode={field.inputMode}
           maxLength={field.maxLength}
+          placeholder={field.placeholder}
           value={str}
           className={`field-input ${field.uppercase ? "uppercase" : ""}`}
           onChange={(e) => set(field.uppercase ? e.target.value.toUpperCase() : e.target.value)}
