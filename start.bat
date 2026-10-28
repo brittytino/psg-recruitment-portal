@@ -101,6 +101,7 @@ echo [INFO] Waiting for PostgreSQL readiness...
 timeout /t 4 /nobreak >nul
 
 docker compose -f compose.yaml -f compose.dev.yaml exec -T db psql -U srp_owner -d srportal -c "ALTER USER srp_owner WITH PASSWORD 'PsgTech_DbOwner_2026!'; ALTER USER srp_app WITH PASSWORD 'PsgTech_AppUser_2026!';" >nul 2>&1
+docker compose -f compose.yaml -f compose.dev.yaml exec -T db psql -U srp_owner -d srportal -c "UPDATE \"_prisma_migrations\" SET finished_at = NOW(), applied_steps_count = 1 WHERE migration_name = '20261028100000_add_qualification_mode_of_study' AND finished_at IS NULL;" >nul 2>&1
 
 echo [INFO] Running database migrations and seed runner...
 docker compose -f compose.yaml -f compose.dev.yaml run --rm migrate

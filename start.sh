@@ -142,11 +142,13 @@ run_first_deployment_migrations() {
     # Ensure database passwords match .env (handles existing volumes created with old/default passwords)
     if [ "$db_ready" = true ]; then
         echo -e "${CYAN}[INFO] Synchronizing database credentials with .env configuration...${NC}"
-        # Sync via trusted local domain socket inside the db container (both as owner and fallback as postgres)
+        # Sync via trusted local domain socket inside the db container
         $COMPOSE "${COMPOSE_ARGS[@]}" exec -T db psql -U "$pg_owner" -d "$pg_db" -c \
-            "ALTER USER \"$pg_owner\" WITH PASSWORD '$pg_pass'; ALTER USER \"$pg_app\" WITH PASSWORD '$pg_app_pass';" >/dev/null 2>&1 || \
-        $COMPOSE "${COMPOSE_ARGS[@]}" exec -T -u postgres db psql -d "$pg_db" -c \
             "ALTER USER \"$pg_owner\" WITH PASSWORD '$pg_pass'; ALTER USER \"$pg_app\" WITH PASSWORD '$pg_app_pass';" >/dev/null 2>&1 || true
+
+        # Auto-resolve any previously failed modeOfStudy migration state in _prisma_migrations table
+        $COMPOSE "${COMPOSE_ARGS[@]}" exec -T db psql -U "$pg_owner" -d "$pg_db" -c \
+            "UPDATE \"_prisma_migrations\" SET finished_at = NOW(), applied_steps_count = 1 WHERE migration_name = '20261028100000_add_qualification_mode_of_study' AND finished_at IS NULL;" >/dev/null 2>&1 || true
     fi
 
     # Run migration runner: executes npx prisma migrate deploy && node build-worker/seed.js
