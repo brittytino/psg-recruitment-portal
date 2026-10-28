@@ -87,14 +87,17 @@ REDIS_HOST_PORT=63879
 MAILPIT_UI_HOST_PORT=8025
 MAILPIT_SMTP_HOST_PORT=2525
 CONVERTER_HOST_PORT=63100
+DB_VIEWER_HOST_PORT=6981
+DB_VIEWER_USER=psgadmin
+DB_VIEWER_PASSWORD=PsgTech@2026!
 ADMINER_HOST_PORT=6981
 POSTGRES_DB=srportal
 POSTGRES_USER=srp_owner
-POSTGRES_PASSWORD=change-me-owner
+POSTGRES_PASSWORD=PsgTech_DbOwner_2026!
 APP_DB_USER=srp_app
-APP_DB_PASSWORD=change-me-app
-DATABASE_URL=postgresql://srp_app:change-me-app@db:5432/srportal?schema=public
-MIGRATION_DATABASE_URL=postgresql://srp_owner:change-me-owner@db:5432/srportal?schema=public
+APP_DB_PASSWORD=PsgTech_AppUser_2026!
+DATABASE_URL=postgresql://srp_app:PsgTech_AppUser_2026!@db:5432/srportal?schema=public
+MIGRATION_DATABASE_URL=postgresql://srp_owner:PsgTech_DbOwner_2026!@db:5432/srportal?schema=public
 REDIS_URL=redis://redis:6379
 SESSION_SECRET=20b98afbbe9a9a92bfc49cbca1ea245b1926da16be5608ce472e9a9ec6ca3386
 COOKIE_SECURE=true
@@ -106,12 +109,23 @@ CONVERTER_TOKEN=Pin8esdf5Fbx61-NgxhyXVruzuam0wdF
 MALWARE_SCAN=clamav
 CLAMAV_HOST=clamav
 CLAMAV_PORT=3310
-SMTP_HOST=mailpit
-SMTP_PORT=1025
+EMAIL_PROVIDER=smtp
+SMTP_HOST=smtp.gmail.com
+SMTP_PORT=587
 SMTP_SECURE=false
-SMTP_USER=
-SMTP_PASSWORD=
-MAIL_FROM="PSG Tech Recruitment <recruitment@psgtech.ac.in>"
+SMTP_USER=recruitments@psgtech.ac.in
+SMTP_PASSWORD=rdyu fhbs megh sgid
+SMTP_FROM_NAME="PSG College of Technology Recruitment"
+SMTP_FROM_EMAIL=recruitments@psgtech.ac.in
+MAIL_FROM="PSG College of Technology Recruitment <recruitments@psgtech.ac.in>"
+SMTP_CONNECTION_TIMEOUT_MS=10000
+SMTP_GREETING_TIMEOUT_MS=10000
+SMTP_SOCKET_TIMEOUT_MS=20000
+OTP_LENGTH=6
+OTP_EXPIRY_MINUTES=5
+OTP_RESEND_COOLDOWN_SECONDS=60
+OTP_MAX_ATTEMPTS=5
+OTP_MAX_SENDS_PER_HOUR=5
 LOG_LEVEL=info
 DEV_LOG_OTP=false
 EOF
@@ -334,7 +348,7 @@ do_help() {
     echo "  restart           Restart production containers"
     echo "  stop              Gracefully stop production containers"
     echo "  down              Stop and remove production containers"
-    echo "  logs [svc...]     Stream container logs (default: app worker db adminer)"
+    echo "  logs [svc...]     Stream container logs (default: app worker db db-viewer)"
     echo "  status, ps        Show status of production containers"
     echo "  health            Query the /healthz/ready endpoint"
     echo "  seed              Seed form templates & approved institutional accounts"
@@ -371,7 +385,7 @@ case "$CMD" in
         if [ $# -gt 0 ]; then
             $COMPOSE "${COMPOSE_ARGS[@]}" logs -f "$@"
         else
-            $COMPOSE "${COMPOSE_ARGS[@]}" logs -f app worker db adminer
+            $COMPOSE "${COMPOSE_ARGS[@]}" logs -f app worker db db-viewer
         fi
         ;;
     status|ps)

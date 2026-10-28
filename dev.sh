@@ -8,7 +8,7 @@
 #   ./dev.sh stop             Stop portal containers (keep data)
 #   ./dev.sh down             Stop and remove portal containers
 #   ./dev.sh restart          Restart portal containers
-#   ./dev.sh logs [svc...]    Follow container logs (default: app worker db adminer)
+#   ./dev.sh logs [svc...]    Follow container logs (default: app worker db db-viewer)
 #   ./dev.sh status | ps      Show status of portal containers
 #   ./dev.sh health           Check /healthz/ready health endpoint
 #   ./dev.sh seed             Seed form templates & approved institutional accounts
@@ -89,6 +89,9 @@ REDIS_HOST_PORT=63879
 MAILPIT_UI_HOST_PORT=8025
 MAILPIT_SMTP_HOST_PORT=2525
 CONVERTER_HOST_PORT=63100
+DB_VIEWER_HOST_PORT=6981
+DB_VIEWER_USER=
+DB_VIEWER_PASSWORD=
 ADMINER_HOST_PORT=6981
 POSTGRES_DB=srportal
 POSTGRES_USER=srp_owner
@@ -108,12 +111,23 @@ CONVERTER_TOKEN=c3f1b8a9d04e762b9a15cd82ef04b971
 MALWARE_SCAN=clamav
 CLAMAV_HOST=clamav
 CLAMAV_PORT=3310
+EMAIL_PROVIDER=mailpit
 SMTP_HOST=mailpit
 SMTP_PORT=1025
 SMTP_SECURE=false
-SMTP_USER=
-SMTP_PASSWORD=
-MAIL_FROM="PSG Tech Recruitment <recruitment@localhost>"
+SMTP_USER=recruitments@psgtech.ac.in
+SMTP_PASSWORD=rdyu fhbs megh sgid
+SMTP_FROM_NAME="PSG College of Technology Recruitment"
+SMTP_FROM_EMAIL=recruitments@psgtech.ac.in
+MAIL_FROM="PSG College of Technology Recruitment <recruitments@psgtech.ac.in>"
+SMTP_CONNECTION_TIMEOUT_MS=10000
+SMTP_GREETING_TIMEOUT_MS=10000
+SMTP_SOCKET_TIMEOUT_MS=20000
+OTP_LENGTH=6
+OTP_EXPIRY_MINUTES=5
+OTP_RESEND_COOLDOWN_SECONDS=60
+OTP_MAX_ATTEMPTS=5
+OTP_MAX_SENDS_PER_HOUR=5
 LOG_LEVEL=info
 DEV_LOG_OTP=false
 EOF
@@ -177,12 +191,12 @@ show_summary() {
     if [ "$host_ip" != "localhost" ] && [ "$host_ip" != "127.0.0.1" ]; then
         echo -e "   ${BOLD}[WEB PORTAL]${NC}      http://${host_ip}:${port}  (local: http://localhost:${port})"
         echo -e "   ${BOLD}[SIGN IN PAGE]${NC}    http://${host_ip}:${port}/login"
-        echo -e "   ${BOLD}[DATABASE VIEWER]${NC} http://${host_ip}:6981  (Adminer: db / srportal / srp_owner)"
+        echo -e "   ${BOLD}[DATABASE VIEWER]${NC} http://${host_ip}:6981  (Modern pgweb web interface)"
         echo -e "   ${BOLD}[EMAIL INBOX]${NC}     http://${host_ip}:8025  (Mailpit web UI, SMTP on 2525)"
     else
         echo -e "   ${BOLD}[WEB PORTAL]${NC}      http://localhost:${port}"
         echo -e "   ${BOLD}[SIGN IN PAGE]${NC}    http://localhost:${port}/login"
-        echo -e "   ${BOLD}[DATABASE VIEWER]${NC} http://localhost:6981  (Adminer: db / srportal / srp_owner)"
+        echo -e "   ${BOLD}[DATABASE VIEWER]${NC} http://localhost:6981  (Modern pgweb web interface)"
         echo -e "   ${BOLD}[EMAIL INBOX]${NC}     http://localhost:8025  (Mailpit web UI, SMTP on 2525)"
     fi
     echo -e "   ${BOLD}[DATABASE HOST]${NC}   localhost:6543  (PostgreSQL 17, internal 5432)"
@@ -359,7 +373,7 @@ do_help() {
     echo "  rebuild, --clean  Rebuild Docker images without cache (--no-cache) and start"
     echo "  studio            Launch Prisma Studio GUI on port 5555"
     echo "  shell [svc]       Open interactive shell inside service (default: app)"
-    echo "  db, adminer       Display Database Adminer viewer URL"
+    echo "  db, pgweb, viewer Display Modern Database Viewer (pgweb) URL"
     echo "  help, -h, --help  Display this help reference"
     echo ""
 }
@@ -377,7 +391,7 @@ interactive_loop() {
         echo ""
         echo -e "${BOLD}Select an option:${NC}"
         echo -e "  [${CYAN}B${NC}] Open / Show Portal in Browser"
-        echo -e "  [${CYAN}D${NC}] Open / Show Database Viewer (Adminer)"
+        echo -e "  [${CYAN}D${NC}] Open / Show Database Viewer (pgweb)"
         echo -e "  [${CYAN}M${NC}] Open / Show Mailbox Inbox (Mailpit)"
         echo -e "  [${CYAN}A${NC}] Seed / Register Form Templates & Staff Accounts"
         echo -e "  [${CYAN}S${NC}] Launch Prisma Studio GUI"
@@ -395,9 +409,9 @@ interactive_loop() {
                 fi
                 ;;
             [dD])
-                echo -e "${GREEN}Adminer URL: http://${host_ip}:6981/?pgsql=db&username=srp_owner&db=srportal&ns=public${NC}"
+                echo -e "${GREEN}Database Viewer URL: http://${host_ip}:6981${NC}"
                 if [ -n "${DISPLAY:-}" ] && command -v xdg-open >/dev/null 2>&1; then
-                    xdg-open "http://localhost:6981/?pgsql=db&username=srp_owner&db=srportal&ns=public" >/dev/null 2>&1 &
+                    xdg-open "http://localhost:6981" >/dev/null 2>&1 &
                 fi
                 ;;
             [mM])
@@ -413,7 +427,7 @@ interactive_loop() {
                 do_studio || true
                 ;;
             [lL])
-                $COMPOSE "${COMPOSE_ARGS[@]}" logs -f app worker db adminer
+                $COMPOSE "${COMPOSE_ARGS[@]}" logs -f app worker db db-viewer
                 ;;
             [rR])
                 do_clean_rebuild
@@ -461,7 +475,7 @@ case "$CMD" in
         if [ $# -gt 0 ]; then
             $COMPOSE "${COMPOSE_ARGS[@]}" logs -f "$@"
         else
-            $COMPOSE "${COMPOSE_ARGS[@]}" logs -f app worker db adminer
+            $COMPOSE "${COMPOSE_ARGS[@]}" logs -f app worker db db-viewer
         fi
         ;;
     status|ps)
@@ -484,11 +498,11 @@ case "$CMD" in
         shift
         do_shell "${1:-app}"
         ;;
-    db|adminer)
+    db|pgweb|adminer|viewer)
         local_ip="$(get_server_ip)"
-        echo -e "${GREEN}Adminer URL: http://${local_ip}:6981/?pgsql=db&username=srp_owner&db=srportal&ns=public${NC}"
+        echo -e "${GREEN}Database Viewer URL: http://${local_ip}:6981${NC}"
         if [ -n "${DISPLAY:-}" ] && command -v xdg-open >/dev/null 2>&1; then
-            xdg-open "http://localhost:6981/?pgsql=db&username=srp_owner&db=srportal&ns=public" >/dev/null 2>&1 &
+            xdg-open "http://localhost:6981" >/dev/null 2>&1 &
         fi
         ;;
     up|start)

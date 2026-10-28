@@ -14,3 +14,4 @@ infrastructure/blue-green/state/
 storage-test/
 storage-dev.log
 *.tmp.*
+.deployed

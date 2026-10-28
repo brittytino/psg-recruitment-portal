@@ -188,7 +188,7 @@ show_summary() {
     echo ""
     echo -e "   ${BOLD}[WEB PORTAL URL]${NC}      http://localhost:${port}  (${origin})"
     echo -e "   ${BOLD}[SIGN IN PAGE]${NC}        http://localhost:${port}/login"
-    echo -e "   ${BOLD}[DATABASE VIEWER]${NC}     http://localhost:6981  (Adminer: db / srportal / srp_owner)"
+    echo -e "   ${BOLD}[DATABASE VIEWER]${NC}     http://localhost:6981  (Modern pgweb web interface)"
     echo -e "   ${BOLD}[LOCAL EMAIL INBOX]${NC}   http://localhost:8025  (Mailpit web UI, SMTP on 2525)"
     echo -e "   ${BOLD}[SMTP READINESS CHECK]${NC} http://localhost:${port}/healthz/smtp"
     echo ""

@@ -23,6 +23,8 @@ if /i "%~1"=="copy-env" goto do_copy_env
 if /i "%~1"=="studio" goto do_studio
 if /i "%~1"=="db" goto do_open_db
 if /i "%~1"=="adminer" goto do_open_db
+if /i "%~1"=="pgweb" goto do_open_db
+if /i "%~1"=="viewer" goto do_open_db
 if /i "%~1"=="seed" goto do_seed
 if /i "%~1"=="rebuild" goto do_clean_rebuild
 if /i "%~1"=="--clean" goto do_clean_rebuild
@@ -60,21 +62,9 @@ if not exist .env (
 )
 
 if not exist .deployed (
-    echo [INFO] First-time deployment detected. Running initial build and migrations...
-    echo.
-    echo [1/3] Building Docker images...
-    docker compose -f compose.yaml -f compose.dev.yaml build app worker migrate converter
-    if errorlevel 1 (
-        echo [ERROR] Docker build failed.
-        pause
-        exit /b 1
-    )
-    echo.
-    echo [2/3] Initializing database and bootstrapping institutional accounts...
-    docker compose -f compose.yaml -f compose.dev.yaml up -d db redis
-    docker compose -f compose.yaml -f compose.dev.yaml run --rm migrate
-    docker compose -f compose.yaml -f compose.dev.yaml up -d --remove-orphans
-    echo deployed > .deployed
+    echo [INFO] First-time deployment detected. Initializing stack via start.bat...
+    call start.bat %*
+    exit /b %errorlevel%
 ) else (
     echo [INFO] Bringing up recruitment portal stack...
     docker compose -f compose.yaml -f compose.dev.yaml up -d
@@ -108,7 +98,7 @@ echo.
 echo    [WEB PORTAL]      http://localhost:6969
 echo    [SIGN IN PAGE]    http://localhost:6969/login
 echo    [DATABASE HOST]   localhost:6543  (PostgreSQL 17, internal 5432)
-echo    [DATABASE VIEWER] http://localhost:6981  (Adminer: db / srportal / srp_owner)
+echo    [DATABASE VIEWER] http://localhost:6981  (Modern pgweb web interface)
 echo    [EMAIL INBOX]     http://localhost:8025  (Mailpit web UI, SMTP on 2525)
 echo.
 echo    AUTHENTICATION:
@@ -238,7 +228,7 @@ start "Prisma Studio" cmd /k "set \"DATABASE_URL=postgresql://srp_owner:PsgTech_
 goto interactive_loop
 
 :do_logs
-docker compose -f compose.yaml -f compose.dev.yaml logs -f app worker db adminer
+docker compose -f compose.yaml -f compose.dev.yaml logs -f app worker db db-viewer
 goto interactive_loop
 
 :do_status
@@ -246,9 +236,11 @@ docker compose -f compose.yaml -f compose.dev.yaml ps
 exit /b %errorlevel%
 
 :do_open_db
-start "" "http://localhost:6981/?pgsql=db&username=srp_owner&db=srportal&ns=public"
+start "" "http://localhost:6981"
 if /i "%~1"=="db" exit /b 0
 if /i "%~1"=="adminer" exit /b 0
+if /i "%~1"=="pgweb" exit /b 0
+if /i "%~1"=="viewer" exit /b 0
 goto interactive_loop
 
 :do_health
@@ -279,14 +271,14 @@ echo   up, start         Start portal stack in background (non-interactive)
 echo   stop              Gracefully stop containers (preserves data volumes)
 echo   down              Stop and remove containers (preserves data volumes)
 echo   restart           Restart portal containers
-echo   logs              Stream container logs (app worker db adminer)
+echo   logs              Stream container logs (app worker db db-viewer)
 echo   status, ps        Show container status and published ports
 echo   health            Query the /healthz/ready status endpoint
 echo   seed              Seed form templates and approved institutional accounts
 echo   env, copy-env     Copy .env.example to .env directly
 echo   rebuild, --clean  Rebuild Docker images without cache (--no-cache) and start
 echo   studio            Launch Prisma Studio GUI on port 5555
-echo   db, adminer       Open Database Adminer viewer in browser
+echo   db, viewer, pgweb Open Modern Database Viewer (pgweb) in browser
 echo   help, -h, --help  Display this help reference
 echo.
 exit /b 0

@@ -98,16 +98,16 @@ app/
 
 The application and supporting containers run on documented non-default external ports to prevent conflicts on development and shared hosting machines:
 
-| Service                       | Host Port  | Container Port | Protocol / Path                | Purpose                                   |
-| :---------------------------- | :--------: | :------------: | :----------------------------- | :---------------------------------------- |
-| **Web Portal (App)**          | **`6969`** |     `3000`     | HTTP / `http://localhost:6969` | Main Candidate & Staff Web Application    |
-| **PostgreSQL Database**       | **`6543`** |     `5432`     | TCP (Loopback `127.0.0.1`)     | PostgreSQL 17 host access for tools/tests |
-| **Mailpit Web UI**            | **`8025`** |     `8025`     | HTTP / `http://localhost:8025` | Local transactional email & OTP inbox     |
-| **Mailpit SMTP Server**       | **`2525`** |     `1025`     | SMTP (Loopback `127.0.0.1`)    | SMTP transport for sending test emails    |
-| **Database Viewer (Adminer)** | **`6981`** |     `8080`     | HTTP / `http://localhost:6981` | Web database management interface         |
-| **Redis Cache / Queue**       |  `63879`   |     `6379`     | TCP (Loopback `127.0.0.1`)     | Redis BullMQ queue (devhost network)      |
-| **LibreOffice Converter**     |  `63100`   |     `3100`     | HTTP (Loopback `127.0.0.1`)    | Internal document conversion service      |
-| **ClamAV Antivirus**          |  `63310`   |     `3310`     | TCP (Loopback `127.0.0.1`)     | Antivirus daemon service                  |
+| Service                     | Host Port  | Container Port | Protocol / Path                | Purpose                                     |
+| :-------------------------- | :--------: | :------------: | :----------------------------- | :------------------------------------------ |
+| **Web Portal (App)**        | **`6969`** |     `3000`     | HTTP / `http://localhost:6969` | Main Candidate & Staff Web Application      |
+| **PostgreSQL Database**     | **`6543`** |     `5432`     | TCP (Loopback `127.0.0.1`)     | PostgreSQL 17 host access for tools/tests   |
+| **Mailpit Web UI**          | **`8025`** |     `8025`     | HTTP / `http://localhost:8025` | Local transactional email & OTP inbox       |
+| **Mailpit SMTP Server**     | **`2525`** |     `1025`     | SMTP (Loopback `127.0.0.1`)    | SMTP transport for sending test emails      |
+| **Database Viewer (pgweb)** | **`6981`** |     `8081`     | HTTP / `http://localhost:6981` | Modern web database explorer & query editor |
+| **Redis Cache / Queue**     |  `63879`   |     `6379`     | TCP (Loopback `127.0.0.1`)     | Redis BullMQ queue (devhost network)        |
+| **LibreOffice Converter**   |  `63100`   |     `3100`     | HTTP (Loopback `127.0.0.1`)    | Internal document conversion service        |
+| **ClamAV Antivirus**        |  `63310`   |     `3310`     | TCP (Loopback `127.0.0.1`)     | Antivirus daemon service                    |
 
 ---
 

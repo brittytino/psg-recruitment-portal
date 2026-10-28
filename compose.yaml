@@ -129,18 +129,19 @@ services:
       retries: 5
     networks: [backend, frontend]
 
-  # Visual database management tool (Adminer) accessible at http://localhost:6981
-  adminer:
-    image: adminer:5.3.0
+  # Modern Visual Database Management Tool (pgweb) accessible at http://localhost:6981
+  db-viewer:
+    image: sosedoff/pgweb:0.16.1
     restart: unless-stopped
     environment:
-      ADMINER_DEFAULT_SERVER: db
-      ADMINER_DESIGN: pepa-linha-dark
+      DATABASE_URL: postgresql://${POSTGRES_USER:-srp_owner}:${POSTGRES_PASSWORD}@db:5432/${POSTGRES_DB:-srportal}?sslmode=disable
+      PGWEB_AUTH_USER: ${DB_VIEWER_USER:-}
+      PGWEB_AUTH_PASS: ${DB_VIEWER_PASSWORD:-}
     ports:
-      - "${ADMINER_HOST_PORT:-6981}:8080"
-    networks: [data, frontend]
+      - "${DB_VIEWER_HOST_PORT:-${ADMINER_HOST_PORT:-6981}}:8081"
     depends_on:
       db: { condition: service_healthy }
+    networks: [data, frontend]
 
   # One-shot migration runner (owner role). App and worker start only after it succeeds.
   migrate:

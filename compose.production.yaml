@@ -163,6 +163,21 @@ services:
     deploy: { resources: { limits: { memory: 2g } } }
     logging: *logging
 
+  # Modern Visual Database Management Tool (pgweb)
+  db-viewer:
+    image: sosedoff/pgweb:0.16.1
+    restart: unless-stopped
+    environment:
+      DATABASE_URL: postgresql://${POSTGRES_USER:-srp_owner}:${POSTGRES_PASSWORD}@db:5432/${POSTGRES_DB:-srportal}?sslmode=disable
+      PGWEB_AUTH_USER: ${DB_VIEWER_USER:-psgadmin}
+      PGWEB_AUTH_PASS: ${DB_VIEWER_PASSWORD:-PsgTech@2026!}
+    ports:
+      - "${DB_VIEWER_HOST_PORT:-6981}:8081"
+    depends_on:
+      db: { condition: service_healthy }
+    networks: [data, edge]
+    logging: *logging
+
 networks:
   data: { internal: true }
   backend: {}

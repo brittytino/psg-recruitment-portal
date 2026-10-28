@@ -33,7 +33,7 @@ Mailpit (captured e-mails): http://localhost:6980.
 | Converter                     |       63100 |           3100 | dev override only, 127.0.0.1                           |
 | ClamAV                        |       63310 |           3310 | dev override only, 127.0.0.1                           |
 | Mailpit UI / SMTP             | 8025 / 2525 |    8025 / 1025 | dev override only                                      |
-| Adminer DB Viewer             |        6981 |           8080 | dev override only, 127.0.0.1                           |
+| pgweb DB Viewer               |        6981 |           8081 | Modern web database explorer & query editor            |
 | Blue-green simulation (Nginx) |        6970 |             80 | `compose.production.yaml` with local `.env.production` |
 
 All host ports are variables in `.env`. Check conflicts first: `netstat -ano | findstr :6969` (Windows) or `ss -ltnp | grep 6969` (Linux).

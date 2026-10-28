@@ -13,9 +13,8 @@ services:
     ports: ["127.0.0.1:63310:3310"]
   mailpit:
     ports: ["127.0.0.1:${MAILPIT_SMTP_HOST_PORT:-2525}:1025"]
-  # Database viewer (development only): http://localhost:6981
-  # System: PostgreSQL, Server: db, credentials: POSTGRES_* values from .env
-  adminer:
+  # Modern Database viewer (development only): http://localhost:6981
+  db-viewer:
     networks: [data, devhost]
 
 networks:

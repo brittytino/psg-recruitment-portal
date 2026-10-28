@@ -8,7 +8,7 @@
 #   ./run.sh stop             Stop portal containers (keep data)
 #   ./run.sh down             Stop and remove portal containers
 #   ./run.sh restart          Restart portal containers
-#   ./run.sh logs [service]   Follow container logs (default: app worker db adminer)
+#   ./run.sh logs [service]   Follow container logs (default: app worker db db-viewer)
 #   ./run.sh status | ps      Show status of portal containers
 #   ./run.sh health           Check /healthz/ready health endpoint
 #   ./run.sh seed             Seed form templates & approved institutional accounts
@@ -170,12 +170,12 @@ show_summary() {
     if [ "$host_ip" != "localhost" ] && [ "$host_ip" != "127.0.0.1" ]; then
         echo -e "   ${BOLD}[WEB PORTAL]${NC}      http://${host_ip}:${port}  (local: http://localhost:${port})"
         echo -e "   ${BOLD}[SIGN IN PAGE]${NC}    http://${host_ip}:${port}/login"
-        echo -e "   ${BOLD}[DATABASE VIEWER]${NC} http://${host_ip}:6981  (Adminer: db / srportal / srp_owner)"
+        echo -e "   ${BOLD}[DATABASE VIEWER]${NC} http://${host_ip}:6981  (Modern pgweb web interface)"
         echo -e "   ${BOLD}[EMAIL INBOX]${NC}     http://${host_ip}:8025  (Mailpit web UI, SMTP on 2525)"
     else
         echo -e "   ${BOLD}[WEB PORTAL]${NC}      http://localhost:${port}"
         echo -e "   ${BOLD}[SIGN IN PAGE]${NC}    http://localhost:${port}/login"
-        echo -e "   ${BOLD}[DATABASE VIEWER]${NC} http://localhost:6981  (Adminer: db / srportal / srp_owner)"
+        echo -e "   ${BOLD}[DATABASE VIEWER]${NC} http://localhost:6981  (Modern pgweb web interface)"
         echo -e "   ${BOLD}[EMAIL INBOX]${NC}     http://localhost:8025  (Mailpit web UI, SMTP on 2525)"
     fi
     echo -e "   ${BOLD}[DATABASE HOST]${NC}   localhost:6543  (PostgreSQL 17, internal 5432)"
@@ -390,7 +390,7 @@ do_help() {
     echo "  rebuild, --clean  Rebuild Docker images without cache (--no-cache) and start"
     echo "  studio            Launch Prisma Studio GUI on port 5555"
     echo "  shell [svc]       Open interactive shell inside service (default: app)"
-    echo "  db, adminer       Display Database Adminer viewer URL"
+    echo "  db, pgweb, viewer Display Modern Database Viewer (pgweb) URL"
     echo "  help, -h, --help  Display this help reference"
     echo ""
 }
@@ -408,7 +408,7 @@ interactive_loop() {
         echo ""
         echo -e "${BOLD}Select an option:${NC}"
         echo -e "  [${CYAN}B${NC}] Open / Show Portal in Browser"
-        echo -e "  [${CYAN}D${NC}] Open / Show Database Viewer (Adminer)"
+        echo -e "  [${CYAN}D${NC}] Open / Show Database Viewer (pgweb)"
         echo -e "  [${CYAN}M${NC}] Open / Show Mailbox Inbox (Mailpit)"
         echo -e "  [${CYAN}A${NC}] Seed / Register Form Templates & Staff Accounts"
         echo -e "  [${CYAN}E${NC}] Copy / Reset .env from .env.example"
@@ -427,9 +427,9 @@ interactive_loop() {
                 fi
                 ;;
             [dD])
-                echo -e "${GREEN}Adminer URL: http://${host_ip}:6981/?pgsql=db&username=srp_owner&db=srportal&ns=public${NC}"
+                echo -e "${GREEN}Database Viewer URL: http://${host_ip}:6981${NC}"
                 if [ -n "${DISPLAY:-}" ] && command -v xdg-open >/dev/null 2>&1; then
-                    xdg-open "http://localhost:6981/?pgsql=db&username=srp_owner&db=srportal&ns=public" >/dev/null 2>&1 &
+                    xdg-open "http://localhost:6981" >/dev/null 2>&1 &
                 fi
                 ;;
             [mM])
@@ -448,7 +448,7 @@ interactive_loop() {
                 do_studio || true
                 ;;
             [lL])
-                $COMPOSE "${COMPOSE_ARGS[@]}" logs -f app worker db adminer
+                $COMPOSE "${COMPOSE_ARGS[@]}" logs -f app worker db db-viewer
                 ;;
             [rR])
                 do_clean_rebuild
@@ -504,7 +504,7 @@ case "$CMD" in
         if [ $# -gt 0 ]; then
             $COMPOSE "${COMPOSE_ARGS[@]}" logs -f "$@"
         else
-            $COMPOSE "${COMPOSE_ARGS[@]}" logs -f app worker db adminer
+            $COMPOSE "${COMPOSE_ARGS[@]}" logs -f app worker db db-viewer
         fi
         ;;
     status|ps)
@@ -527,11 +527,11 @@ case "$CMD" in
         shift
         do_shell "${1:-app}"
         ;;
-    db|adminer)
+    db|pgweb|adminer|viewer)
         local_ip="$(get_server_ip)"
-        echo -e "${GREEN}Adminer URL: http://${local_ip}:6981/?pgsql=db&username=srp_owner&db=srportal&ns=public${NC}"
+        echo -e "${GREEN}Database Viewer URL: http://${local_ip}:6981${NC}"
         if [ -n "${DISPLAY:-}" ] && command -v xdg-open >/dev/null 2>&1; then
-            xdg-open "http://localhost:6981/?pgsql=db&username=srp_owner&db=srportal&ns=public" >/dev/null 2>&1 &
+            xdg-open "http://localhost:6981" >/dev/null 2>&1 &
         fi
         ;;
     up|start)
