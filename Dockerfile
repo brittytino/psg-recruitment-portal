@@ -54,6 +54,8 @@ COPY --from=build --chown=node:node /app/build-worker ./build-worker
 COPY --chown=node:node package.json ./
 COPY --chown=node:node prisma ./prisma
 COPY --chown=node:node templates ./templates
+COPY --chown=node:node public ./public
+COPY --chown=node:node server.mjs ./server.mjs
 RUN mkdir -p /var/lib/srportal/storage && chown -R node:node /var/lib/srportal
 USER node
 EXPOSE 3000
