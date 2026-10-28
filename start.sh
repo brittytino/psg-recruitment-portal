@@ -73,6 +73,11 @@ init_environment() {
             cp -f .env.development .env
             echo -e "${GREEN}[OK] Initialized .env from .env.development${NC}"
         fi
+    elif [ "$mode" = "prod" ] || [ "$mode" = "production" ]; then
+        if [ -f .env.production ]; then
+            cp -f .env.production .env
+            echo -e "${GREEN}[OK] Initialized .env from .env.production${NC}"
+        fi
     elif [ ! -f .env ] || [ ! -s .env ]; then
         if [ -f .env.production ]; then
             cp -f .env.production .env
