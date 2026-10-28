@@ -14,14 +14,19 @@ export const meta: Route.MetaFunction = () => [
 
 export async function loader() {
   const vacancies = await listPublishedVacancies();
-  const departments = new Set(vacancies.map((v) => v.departmentId)).size;
+  const departments = new Set(vacancies.map((v) => v.departmentId).filter(Boolean)).size;
+  const researchCount = vacancies.filter((v) => v.recruitmentCategory === "RESEARCH").length;
+  const facultyCount = vacancies.filter((v) => v.recruitmentCategory === "FACULTY").length;
   return {
     vacancies: vacancies.slice(0, 6),
     total: vacancies.length,
     departments,
+    researchCount,
+    facultyCount,
     nextClosing: vacancies[0] ?? null,
   };
 }
+
 
 const STEPS: [string, string, string][] = [
   ["👤", "Create your account", "Register and verify your e-mail address in a minute."],

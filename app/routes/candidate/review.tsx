@@ -31,8 +31,9 @@ export async function loader({ request, params, context }: Route.LoaderArgs) {
     formCode: app.formTemplate.code as FormCode,
     formVersion: app.formTemplate.version,
     title: app.vacancy.title,
-    department: app.vacancy.department.name,
+    department: app.vacancy.department?.name ?? app.vacancy.researchSpecialisation?.name ?? "Research",
     answers: withDerived(def, app.draftAnswers as Answers, derivedContext(app)),
+
     version: app.draftVersion,
     issues,
     documents: app.documents.map((d) => ({ type: d.documentType as DocType, name: d.originalName })),

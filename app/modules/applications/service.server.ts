@@ -20,9 +20,10 @@ import {
 } from "~/modules/forms/validation";
 import { DOCUMENT_TYPE_LABELS, INLINE_ENTRY_DOC_TYPES } from "~/modules/documents/policy";
 import { POSITION_LABELS } from "~/lib/labels";
-import { academicYearOf, ACADEMIC_YEAR, formatReference } from "./reference";
+import { academicYearOf, ACADEMIC_YEAR, formatReference, formatResearchReference } from "./reference";
 import { enqueueOutbox, notify } from "~/modules/notifications/outbox.server";
-import { EDITABLE, findTransition, STATUS_LABELS, type AppStatus } from "./workflow";
+import { EDITABLE, findTransition, STATUS_LABELS, type AppStatus, type RecruitmentCategory } from "./workflow";
+
 
 const today = () => new Date().toISOString().slice(0, 10);
 
@@ -81,8 +82,9 @@ export async function createDraft(user: SessionUser, vacancyId: string): Promise
           vacancyId,
           formTemplateId: vacancy.formTemplateId,
           draftAnswers: {},
-          departmentId: vacancy.departmentId,
-          appliedPosition: vacancy.position,
+          recruitmentCategory: vacancy.recruitmentCategory,
+          departmentId: vacancy.departmentId ?? null,
+          appliedPosition: vacancy.position ?? null,
         },
       });
       await recordStatus(tx, app, null, "DRAFT", user.id);
@@ -116,6 +118,7 @@ export async function getOwnApplication(user: SessionUser, id: string) {
         include: {
           department: true,
           discipline: true,
+          researchSpecialisation: true,
           cycle: true,
           requiredDocuments: { orderBy: { sortOrder: "asc" } },
         },
@@ -135,9 +138,10 @@ export async function listOwnApplications(user: SessionUser) {
   return prisma.application.findMany({
     where: { candidateId: user.id },
     orderBy: { updatedAt: "desc" },
-    include: { vacancy: { include: { department: true } } },
+    include: { vacancy: { include: { department: true, researchSpecialisation: true } } },
   });
 }
+
 
 export interface SaveResult {
   version: number;
@@ -191,11 +195,22 @@ export async function saveDraft(
 
 /** Context for derived values (department, post, age, experience totals). */
 export function derivedContext(app: {
-  vacancy: { department: { name: string }; position: string };
+  vacancy: {
+    department?: { name: string } | null;
+    position?: string | null;
+    researchPositionTitle?: string | null;
+    researchSpecialisation?: { name: string } | null;
+  };
 }): DerivedContext {
+  const dept = app.vacancy.department?.name ?? "";
+  const spec = app.vacancy.researchSpecialisation?.name;
+  const pos =
+    app.vacancy.researchPositionTitle ??
+    (app.vacancy.position ? (POSITION_LABELS[app.vacancy.position] ?? app.vacancy.position) : "Research Assistant");
   return {
-    department: app.vacancy.department.name,
-    position: POSITION_LABELS[app.vacancy.position] ?? app.vacancy.position,
+    department: dept,
+    position: pos,
+    specialisation: spec,
     asOf: today(),
   };
 }
@@ -385,6 +400,17 @@ async function nextReference(tx: Tx, academicYear: string, deptCode: string): Pr
   return formatReference(academicYear, deptCode, rows[0]!.value);
 }
 
+/** Allocates the next "PSGCT<year>RA_<NNNN>" number for research appointments. */
+async function nextResearchReference(tx: Tx, academicYear: string): Promise<string> {
+  const rows = await tx.$queryRaw<{ value: number }[]>`
+    INSERT INTO research_reference_counters ("academicYear", value)
+    VALUES (${academicYear}, 1)
+    ON CONFLICT ("academicYear")
+    DO UPDATE SET value = research_reference_counters.value + 1
+    RETURNING value`;
+  return formatResearchReference(academicYear, rows[0]!.value);
+}
+
 /**
  * Submits the current draft as an immutable revision. All effects happen in one transaction:
  * revision + normalised extracts, reference number, status change + history, bundle-generation
@@ -448,8 +474,12 @@ export async function submit(user: SessionUser, id: string, expectedVersion: num
           employment: { create: extractEmployment(def, answers) },
         },
       });
+      const isResearch = app.recruitmentCategory === "RESEARCH" || !app.vacancy.department;
       const referenceNo =
-        app.referenceNo ?? (await nextReference(tx, academicYear, app.vacancy.department.code));
+        app.referenceNo ??
+        (isResearch
+          ? await nextResearchReference(tx, academicYear)
+          : await nextReference(tx, academicYear, app.vacancy.department!.code));
       const updated = await tx.application.update({
         where: { id },
         data: {
@@ -480,12 +510,14 @@ export async function submit(user: SessionUser, id: string, expectedVersion: num
         },
       });
       await enqueueOutbox(tx, { type: "documents.generate", payload: { generatedDocumentId: gen.id } });
+      const deptOrSpec =
+        app.vacancy.department?.name ?? app.vacancy.researchSpecialisation?.name ?? "Research Appointment";
       await notify(
         tx,
         user.id,
         "application.submitted",
         `Application received — ${referenceNo}`,
-        `Your application for ${app.vacancy.title} (${app.vacancy.department.name}) has been submitted.\n\nApplication reference: ${referenceNo}\nRevision: ${revisionNo}\nSubmitted: ${updated.submittedAt!.toISOString()}\n\nKeep this reference for any correspondence.`,
+        `Your application for ${app.vacancy.title} (${deptOrSpec}) has been submitted.\n\nApplication reference: ${referenceNo}\nRevision: ${revisionNo}\nSubmitted: ${updated.submittedAt!.toISOString()}\n\nKeep this reference for any correspondence.`,
       );
       await audit(
         {
@@ -539,10 +571,12 @@ export async function getStaffApplication(user: SessionUser, id: string) {
         include: {
           department: true,
           discipline: true,
+          researchSpecialisation: true,
           cycle: true,
           requiredDocuments: { orderBy: { sortOrder: "asc" } },
         },
       },
+
       formTemplate: true,
       currentRevision: {
         include: {
@@ -587,7 +621,12 @@ export async function transition(
     },
   });
   if (!app) throw new NotFoundError("Application");
-  const t = findTransition(app.status as AppStatus, to, "hr");
+  const t = findTransition(
+    app.status as AppStatus,
+    to,
+    "hr",
+    app.recruitmentCategory as RecruitmentCategory,
+  );
   if (!t)
     throw new ConflictError(
       `Cannot move from "${STATUS_LABELS[app.status as AppStatus]}" to "${STATUS_LABELS[to]}"`,
@@ -641,3 +680,36 @@ export async function transition(
     }
   });
 }
+
+/** Update confidential internal review note recorded by HR (not visible to candidates). */
+export async function updateInternalNote(
+  user: SessionUser,
+  id: string,
+  internalNote: string | null,
+  ip?: string,
+) {
+  const scope = hrScope(user);
+  if (!scope) throw new ForbiddenError();
+  const app = await prisma.application.findFirst({
+    where: { AND: [{ id }, scope] },
+  });
+  if (!app) throw new NotFoundError("Application");
+  await prisma.$transaction(async (tx) => {
+    await tx.application.update({
+      where: { id },
+      data: { internalNote: internalNote?.trim() || null },
+    });
+    await audit(
+      {
+        actorId: user.id,
+        action: "application.note_updated",
+        entityType: "application",
+        entityId: id,
+        ip,
+        metadata: { hasNote: !!internalNote?.trim() },
+      },
+      tx,
+    );
+  });
+}
+

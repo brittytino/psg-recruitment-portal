@@ -38,6 +38,8 @@ export const listQuerySchema = z.object({
   departmentId: z.string().uuid().optional().catch(undefined),
   disciplineId: z.string().uuid().optional().catch(undefined),
   vacancyId: z.string().uuid().optional().catch(undefined),
+  recruitmentCategory: z.enum(["FACULTY", "RESEARCH"]).optional().catch(undefined),
+  researchSpecialisationId: z.string().uuid().optional().catch(undefined),
   position: z.enum(["ASSISTANT_PROFESSOR", "ASSOCIATE_PROFESSOR", "PROFESSOR"]).optional().catch(undefined),
   status: z.enum(APPLICATION_STATUSES).optional().catch(undefined),
   processing: z.enum(["NOT_STARTED", "QUEUED", "PROCESSING", "READY", "FAILED"]).optional().catch(undefined),
@@ -72,6 +74,8 @@ const PHD_STATUS: Record<string, string> = {
 
 function filterWhere(q: ListQuery): Prisma.ApplicationWhereInput {
   const and: Prisma.ApplicationWhereInput[] = [];
+  if (q.recruitmentCategory) and.push({ recruitmentCategory: q.recruitmentCategory });
+  if (q.researchSpecialisationId) and.push({ vacancy: { researchSpecialisationId: q.researchSpecialisationId } });
   if (q.cycleId) and.push({ vacancy: { cycleId: q.cycleId } });
   if (q.departmentId) and.push({ vacancy: { departmentId: q.departmentId } });
   if (q.disciplineId) and.push({ vacancy: { disciplineId: q.disciplineId } });
@@ -105,6 +109,9 @@ function filterWhere(q: ListQuery): Prisma.ApplicationWhereInput {
         { referenceNo: { contains: term, mode: "insensitive" } },
         { currentRevision: { candidateName: { contains: term.toUpperCase() } } },
         { candidate: { email: { contains: term.toLowerCase() } } },
+        { vacancy: { researchPositionTitle: { contains: term, mode: "insensitive" } } },
+        { vacancy: { researchSpecialisation: { name: { contains: term, mode: "insensitive" } } } },
+        { internalNote: { contains: term, mode: "insensitive" } },
       ],
     });
   }
@@ -146,6 +153,8 @@ export async function listApplications(user: SessionUser | null, q: ListQuery) {
         id: true,
         referenceNo: true,
         status: true,
+        recruitmentCategory: true,
+        internalNote: true,
         processingStatus: true,
         submittedAt: true,
         appliedPosition: true,
@@ -168,6 +177,10 @@ export async function listApplications(user: SessionUser | null, q: ListQuery) {
             code: true,
             title: true,
             position: true,
+            recruitmentCategory: true,
+            researchPositionTitle: true,
+            researchSpecialisationId: true,
+            researchSpecialisation: { select: { name: true } },
             departmentId: true,
             department: { select: { name: true, code: true } },
             discipline: { select: { name: true } },
@@ -275,7 +288,7 @@ export async function departmentCounts(user: SessionUser | null, q: Partial<List
 }
 
 export async function filterOptions() {
-  const [cycles, departments, vacancies, exams] = await Promise.all([
+  const [cycles, departments, vacancies, exams, researchSpecialisations] = await Promise.all([
     prisma.recruitmentCycle.findMany({
       orderBy: { opensAt: "desc" },
       select: { id: true, code: true, title: true },
@@ -292,9 +305,14 @@ export async function filterOptions() {
     prisma.vacancy.findMany({ orderBy: { code: "asc" }, select: { id: true, code: true, title: true } }),
     prisma.$queryRaw<{ exam: string }[]>`
       SELECT DISTINCT unnest("competitiveExams") AS exam FROM application_revisions ORDER BY 1`,
+    prisma.researchSpecialisation.findMany({
+      where: { active: true },
+      orderBy: [{ sortOrder: "asc" }, { name: "asc" }],
+      select: { id: true, name: true },
+    }),
   ]);
   const examNames = [...new Set(["GATE", "UGC-NET", "CSIR-NET", "SET", "SLET", ...exams.map((e) => e.exam)])];
-  return { cycles, departments, vacancies, exams: examNames };
+  return { cycles, departments, vacancies, exams: examNames, specialisations: researchSpecialisations };
 }
 
 // ------------------------------------------------------------------------------------------------
@@ -306,6 +324,9 @@ const exportInclude = {
     select: {
       code: true,
       position: true,
+      recruitmentCategory: true,
+      researchPositionTitle: true,
+      researchSpecialisation: { select: { name: true } },
       department: { select: { name: true, code: true } },
       cycle: { select: { title: true } },
     },
@@ -365,9 +386,15 @@ export function exportValue(key: ExportColumnKey, r: ExportRecord, sNo: number):
     case "city":
       return [a.presentCity, a.presentDistrict, a.presentState].filter(Boolean).join(", ");
     case "department":
-      return r.vacancy.department.name;
+      return r.vacancy.department?.name ?? r.vacancy.researchSpecialisation?.name ?? "Research";
+    case "specialisation":
+      return r.vacancy.researchSpecialisation?.name ?? "";
+    case "internalNote":
+      return s(r.internalNote);
     case "appliedFor":
-      return POSITION_LABELS[applied] ?? applied;
+      return r.appliedPosition
+        ? (POSITION_LABELS[r.appliedPosition] ?? r.appliedPosition)
+        : (r.vacancy.researchPositionTitle ?? (r.vacancy.position ? (POSITION_LABELS[r.vacancy.position] ?? r.vacancy.position) : "Research Assistant"));
     case "effectivePosition":
       return r.effectivePosition ? POSITION_LABELS[r.effectivePosition]! : "";
     case "vacancyCode":

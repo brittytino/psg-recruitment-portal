@@ -4,9 +4,12 @@ export const EXPORT_COLUMNS = [
   { key: "referenceNo", label: "Reference No.", group: "Summary" },
   { key: "candidateName", label: "Candidate Name", group: "Summary" },
   { key: "department", label: "Department", group: "Summary" },
+  { key: "specialisation", label: "Research Specialisation", group: "Summary" },
   { key: "appliedFor", label: "Applied For", group: "Summary" },
   { key: "status", label: "Status", group: "Summary" },
+  { key: "internalNote", label: "Internal Note", group: "Summary" },
   { key: "submittedAt", label: "Submitted On", group: "Summary" },
+
   { key: "gender", label: "Gender", group: "Personal" },
   { key: "dateOfBirth", label: "Date of Birth", group: "Personal" },
   { key: "age", label: "Age", group: "Personal" },

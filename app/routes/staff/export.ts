@@ -35,11 +35,17 @@ export async function loader({ request, context }: Route.LoaderArgs) {
       rows,
     },
   });
-  const dept = q.departmentId
-    ? referenceDeptCode(
-        (await prisma.department.findUnique({ where: { id: q.departmentId } }))?.code ?? "DEPT",
-      )
-    : "ALL";
+  let dept = "ALL";
+  if (q.departmentId) {
+    dept = referenceDeptCode(
+      (await prisma.department.findUnique({ where: { id: q.departmentId } }))?.code ?? "DEPT",
+    );
+  } else if (q.researchSpecialisationId) {
+    const spec = await prisma.researchSpecialisation.findUnique({ where: { id: q.researchSpecialisationId } });
+    dept = spec ? spec.name.slice(0, 10).toUpperCase().replace(/[^A-Z0-9]/g, "") : "RESEARCH";
+  } else if (q.recruitmentCategory === "RESEARCH") {
+    dept = "RESEARCH";
+  }
   const ist = new Date(Date.now() + 5.5 * 3600_000).toISOString();
   const stamp = `${ist.slice(0, 10).replace(/-/g, "")}-${ist.slice(11, 16).replace(":", "")}`;
   return new Response(csv, {

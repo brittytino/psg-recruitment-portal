@@ -52,3 +52,12 @@ export function hrScope(user: SessionUser): Prisma.ApplicationWhereInput | null 
 export function reviewerDepartments(user: SessionUser): string[] {
   return hodDepartments(user.grants);
 }
+
+/** Scope for research applications: accessible only by HR and Admin (never HODs). */
+export function researchApplicationScope(user: SessionUser): Prisma.ApplicationWhereInput | null {
+  if (!isHr(user)) return null;
+  const hr = hrScope(user);
+  if (!hr) return null;
+  return { AND: [hr, { recruitmentCategory: "RESEARCH" }] };
+}
+

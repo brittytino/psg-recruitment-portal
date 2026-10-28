@@ -141,7 +141,7 @@ export default function Account({ loaderData, actionData }: Route.ComponentProps
               return (
                 <li key={a.id} className="card flex flex-col gap-4">
                   <div className="flex items-start justify-between gap-3">
-                    <div className="flex items-start gap-3">
+                    <div className="flex items-start gap-3 min-w-0">
                       <span
                         aria-hidden="true"
                         className="grid h-12 w-12 shrink-0 place-items-center rounded-2xl bg-soft text-2xl"
@@ -149,9 +149,13 @@ export default function Account({ loaderData, actionData }: Route.ComponentProps
                         {STATUS_EMOJI[a.status] ?? "📄"}
                       </span>
                       <div className="min-w-0">
-                        <p className="text-xs font-medium text-muted">{a.vacancy.department.name}</p>
+                        <p className="text-xs font-medium text-muted">
+                          {a.vacancy.department?.name ?? a.vacancy.researchSpecialisation?.name ?? "Research"}
+                        </p>
                         <h3 className="font-semibold leading-snug">{a.vacancy.title}</h3>
-                        <p className="mt-0.5 text-xs text-muted">{POSITION_LABELS[a.vacancy.position]}</p>
+                        <p className="mt-0.5 text-xs text-muted">
+                          {a.vacancy.researchPositionTitle ?? (a.vacancy.position ? POSITION_LABELS[a.vacancy.position] : "Research Assistant")}
+                        </p>
                       </div>
                     </div>
                     <Badge tone={statusTone(a.status)}>{STATUS_LABELS[a.status as AppStatus]}</Badge>

@@ -45,6 +45,26 @@ const TEMPLATES = [
     title: "APPLICATION for the post of PROFESSOR / ASSOCIATE PROFESSOR (2026-27)",
     templatePath: "builtin:faculty-v2",
   },
+  // Research Assistant / Associate form drawn directly to PDF
+  {
+    code: "RESEARCH_APPLICATION" as const,
+    version: 1,
+    title: "Application for Research Position",
+    templatePath: "builtin:research-v1",
+  },
+];
+
+const INITIAL_SPECIALISATIONS = [
+  { name: "Artificial Intelligence & Machine Learning", description: "Deep learning, NLP, computer vision, genAI" },
+  { name: "Electric Mobility & Smart Energy Systems", description: "EV powertrains, BMS, charging infrastructure" },
+  { name: "Advanced Materials & Nanotechnology", description: "Smart polymers, functional coatings, nanomaterials" },
+  { name: "Robotics & Automation", description: "Autonomous systems, industrial robotics, control systems" },
+  { name: "Internet of Things & Embedded Systems", description: "Edge computing, sensor networks, firmware" },
+  { name: "Biomedical Devices & Healthcare Technologies", description: "Medical instrumentation, biosensors, imaging" },
+  { name: "VLSI & Semiconductor Technologies", description: "IC design, ASIC/FPGA, microelectronics" },
+  { name: "Cyber Security & Cloud Computing", description: "Network security, cryptography, distributed systems" },
+  { name: "Sustainable Manufacturing & Industry 4.0", description: "Additive manufacturing, digital twins, smart factory" },
+  { name: "Renewable Energy & Battery Storage", description: "Solar PV, green hydrogen, supercapacitors" },
 ];
 
 const STAFF: { email: string; name: string; role: Role; departmentCode?: string }[] = [
@@ -73,9 +93,25 @@ async function registerTemplates() {
     await prisma.formTemplate.create({ data: { ...t, sha256 } });
     console.log(`registered template ${t.code} v${t.version}`);
   }
-  // New vacancies use the latest version; v1 stays registered so existing applications still render.
-  await prisma.formTemplate.updateMany({ where: { version: 1 }, data: { active: false } });
+  // New faculty vacancies use v2; v1 stays registered so existing applications still render.
+  await prisma.formTemplate.updateMany({
+    where: { version: 1, code: { in: ["ASSISTANT_PROFESSOR", "ASSOCIATE_PROFESSOR"] } },
+    data: { active: false },
+  });
 }
+
+async function ensureSpecialisations() {
+  for (let i = 0; i < INITIAL_SPECIALISATIONS.length; i++) {
+    const s = INITIAL_SPECIALISATIONS[i]!;
+    await prisma.researchSpecialisation.upsert({
+      where: { name: s.name },
+      update: { description: s.description, sortOrder: i + 1, active: true },
+      create: { name: s.name, description: s.description, sortOrder: i + 1, active: true },
+    });
+  }
+  console.log(`ensured ${INITIAL_SPECIALISATIONS.length} research specialisations`);
+}
+
 
 async function ensureDepartments() {
   const cse = await prisma.department.upsert({
@@ -145,8 +181,10 @@ async function ensureStaff() {
 
 async function main() {
   await registerTemplates();
+  await ensureSpecialisations();
   await ensureStaff();
 }
+
 
 main()
   .then(() => prisma.$disconnect())

@@ -1,6 +1,7 @@
 import { assistantProfessorV1 } from "./definitions/assistant-professor";
 import { associateProfessorV1 } from "./definitions/associate-professor";
 import { assistantProfessorV2, associateProfessorV2 } from "./definitions/faculty-v2";
+import { researchApplicationV1 } from "./definitions/research-application";
 import type { FieldDef, FormCode, FormDefinition, ScalarField } from "./types";
 
 const definitions: FormDefinition[] = [
@@ -8,7 +9,9 @@ const definitions: FormDefinition[] = [
   associateProfessorV1,
   assistantProfessorV2,
   associateProfessorV2,
+  researchApplicationV1,
 ];
+
 
 export function getFormDefinition(code: FormCode, version: number): FormDefinition {
   const def = definitions.find((d) => d.code === code && d.version === version);

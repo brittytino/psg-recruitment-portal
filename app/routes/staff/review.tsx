@@ -108,7 +108,7 @@ export async function loader({ request, context }: Route.LoaderArgs) {
       effectivePosition: true,
       hodDecision: true,
       assignedAt: true,
-      vacancy: { select: { position: true, department: { select: { name: true } } } },
+      vacancy: { select: { position: true, researchPositionTitle: true, department: { select: { name: true } } } },
       currentRevision: {
         select: {
           candidateName: true,
@@ -354,7 +354,9 @@ export default function HodReview({ loaderData }: Route.ComponentProps) {
                   <tr key={a.id}>
                     <td className="whitespace-nowrap font-mono text-sm">{a.referenceNo}</td>
                     <td className="font-semibold">{r?.candidateName}</td>
-                    <td className="whitespace-nowrap">{POSITION_LABELS[applied]}</td>
+                    <td className="whitespace-nowrap">
+                      {applied ? (POSITION_LABELS[applied] ?? applied) : (a.vacancy.researchPositionTitle ?? "Research Assistant")}
+                    </td>
                     <td>{r?.qualifications[0]?.degree ?? "—"}</td>
                     <td>{r?.phdStatus ?? "—"}</td>
                     <td className="whitespace-nowrap text-right">

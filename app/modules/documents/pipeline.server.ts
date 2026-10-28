@@ -132,7 +132,19 @@ export async function generateBundle(
 ): Promise<"done" | "skipped"> {
   const gen = await prisma.generatedDocument.findUnique({
     where: { id: generatedDocumentId },
-    include: { revision: true, application: { include: { vacancy: { include: { department: true } } } } },
+    include: {
+      revision: true,
+      application: {
+        include: {
+          vacancy: {
+            include: {
+              department: true,
+              researchSpecialisation: true,
+            },
+          },
+        },
+      },
+    },
   });
   if (!gen) throw new PipelineError("Generated document record not found");
   if (gen.status === "READY") return "skipped";
@@ -202,13 +214,16 @@ export async function generateBundle(
     formPdfBytes = await convertDocxToPdf(r.docx);
   } else {
     const app = gen.application;
-    const position = app.appliedPosition ?? app.vacancy.position;
+    const position = app.appliedPosition
+      ? (POSITION_LABELS[app.appliedPosition] ?? app.appliedPosition)
+      : (app.vacancy.researchPositionTitle ?? (app.vacancy.position ? (POSITION_LABELS[app.vacancy.position] ?? app.vacancy.position) : "Research Assistant"));
+    const department = app.vacancy.department?.name ?? app.vacancy.researchSpecialisation?.name ?? "Research";
     formPdfBytes = await renderFormPdf({
       formCode: code,
       formVersion: rev.formVersion,
       answers: rev.answers as Answers,
-      department: app.vacancy.department.name,
-      position: POSITION_LABELS[position] ?? position,
+      department,
+      position,
       referenceNo: app.referenceNo,
       revisionNo: rev.revisionNo,
       submittedAt: rev.createdAt,

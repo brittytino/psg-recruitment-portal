@@ -20,6 +20,8 @@ export const APPLICATION_STATUSES = [
 ] as const;
 export type AppStatus = (typeof APPLICATION_STATUSES)[number];
 
+export type RecruitmentCategory = "FACULTY" | "RESEARCH";
+
 export type Actor = "candidate" | "hr";
 
 export interface Transition {
@@ -28,6 +30,7 @@ export interface Transition {
   actor: Actor;
   label: string;
   reasonRequired: boolean;
+  category?: RecruitmentCategory;
   /** Extra precondition, evaluated by the service. */
   requires?: "documentsReady" | "departmentReview" | "positionDecided";
 }
@@ -90,6 +93,7 @@ export const TRANSITIONS: readonly Transition[] = [
     label: "Forward to department review",
     reasonRequired: false,
     requires: "documentsReady",
+    category: "FACULTY",
   },
   {
     from: "UNDER_HR_REVIEW",
@@ -104,6 +108,7 @@ export const TRANSITIONS: readonly Transition[] = [
     actor: "hr",
     label: "Return to HR screening",
     reasonRequired: true,
+    category: "FACULTY",
   },
   {
     from: "UNDER_DEPARTMENT_REVIEW",
@@ -112,6 +117,7 @@ export const TRANSITIONS: readonly Transition[] = [
     label: "Shortlist",
     reasonRequired: false,
     requires: "departmentReview",
+    category: "FACULTY",
   },
   {
     from: "UNDER_DEPARTMENT_REVIEW",
@@ -120,6 +126,7 @@ export const TRANSITIONS: readonly Transition[] = [
     label: "Reject after department review",
     reasonRequired: true,
     requires: "departmentReview",
+    category: "FACULTY",
   },
   {
     from: "SHORTLISTED",
@@ -129,6 +136,25 @@ export const TRANSITIONS: readonly Transition[] = [
     reasonRequired: true,
   },
   { from: "SHORTLISTED", to: "REJECTED", actor: "hr", label: "Record rejection", reasonRequired: true },
+
+  // Research recruitment direct transitions (HR screening to shortlist/reject, no HOD)
+  {
+    from: "UNDER_HR_REVIEW",
+    to: "SHORTLISTED",
+    actor: "hr",
+    label: "Shortlist",
+    reasonRequired: false,
+    category: "RESEARCH",
+  },
+  {
+    from: "SUBMITTED",
+    to: "SHORTLISTED",
+    actor: "hr",
+    label: "Shortlist",
+    reasonRequired: false,
+    category: "RESEARCH",
+  },
+
   // After the HOD's decision (department-wise review). Assignment to a HOD and the HOD's decision
   // itself are recorded by the review service, not by these transitions.
   {
@@ -144,6 +170,7 @@ export const TRANSITIONS: readonly Transition[] = [
     actor: "hr",
     label: "Shortlist",
     reasonRequired: false,
+    category: "FACULTY",
   },
   {
     from: "HOD_RECOMMENDED_CHANGE",
@@ -152,6 +179,7 @@ export const TRANSITIONS: readonly Transition[] = [
     label: "Shortlist",
     reasonRequired: false,
     requires: "positionDecided",
+    category: "FACULTY",
   },
   {
     from: "HOD_ACCEPTED",
@@ -159,6 +187,7 @@ export const TRANSITIONS: readonly Transition[] = [
     actor: "hr",
     label: "Record rejection",
     reasonRequired: true,
+    category: "FACULTY",
   },
   {
     from: "HOD_RECOMMENDED_CHANGE",
@@ -166,6 +195,7 @@ export const TRANSITIONS: readonly Transition[] = [
     actor: "hr",
     label: "Record rejection",
     reasonRequired: true,
+    category: "FACULTY",
   },
   {
     from: "HOD_REJECTED",
@@ -173,18 +203,33 @@ export const TRANSITIONS: readonly Transition[] = [
     actor: "hr",
     label: "Confirm rejection",
     reasonRequired: false,
+    category: "FACULTY",
   },
 ];
 
 export const TERMINAL: readonly AppStatus[] = ["REJECTED", "APPROVED", "WITHDRAWN"];
 
-export function findTransition(from: AppStatus, to: AppStatus, actor: Actor): Transition | undefined {
-  return TRANSITIONS.find((t) => t.from === from && t.to === to && t.actor === actor);
+export function findTransition(
+  from: AppStatus,
+  to: AppStatus,
+  actor: Actor,
+  category: RecruitmentCategory = "FACULTY"
+): Transition | undefined {
+  return TRANSITIONS.find(
+    (t) => t.from === from && t.to === to && t.actor === actor && (!t.category || t.category === category)
+  );
 }
 
-export function availableTransitions(from: AppStatus, actor: Actor): Transition[] {
-  return TRANSITIONS.filter((t) => t.from === from && t.actor === actor);
+export function availableTransitions(
+  from: AppStatus,
+  actor: Actor,
+  category: RecruitmentCategory = "FACULTY"
+): Transition[] {
+  return TRANSITIONS.filter(
+    (t) => t.from === from && t.actor === actor && (!t.category || t.category === category)
+  );
 }
+
 
 /** Statuses in which the candidate may edit answers and documents. */
 export const EDITABLE: readonly AppStatus[] = ["DRAFT", "NEEDS_CLARIFICATION"];

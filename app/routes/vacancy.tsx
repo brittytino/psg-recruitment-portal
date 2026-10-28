@@ -29,10 +29,15 @@ export async function loader({ params, context }: Route.LoaderArgs) {
 
 export default function Vacancy({ loaderData }: Route.ComponentProps) {
   const { vacancy: v, open, signedIn, isCandidate, verified, existing } = loaderData;
+
   const days = daysLeft(v.closesAt);
+  const isResearch = v.recruitmentCategory === "RESEARCH" || !v.department;
+  const deptOrSpec = v.department?.name ?? v.researchSpecialisation?.name ?? "Research Appointment";
+  const posTitle =
+    v.researchPositionTitle ?? (v.position ? (POSITION_LABELS[v.position] ?? v.position) : "Research Assistant");
   const tiles: [string, string, string, string][] = [
-    ["bg-tile-green", "Position", POSITION_LABELS[v.position] ?? v.position, "🎓"],
-    ["bg-tile-blue", "Department", v.department.name, "🏛️"],
+    ["bg-tile-green", isResearch ? "Role" : "Position", posTitle, isResearch ? "🔬" : "🎓"],
+    ["bg-tile-blue", isResearch ? "Specialisation" : "Department", deptOrSpec, isResearch ? "🧪" : "🏛️"],
     ["bg-tile-orange", "Closes", formatDate(v.closesAt), "⏳"],
     ["bg-tile-purple", "Time left", open ? `${days} day${days === 1 ? "" : "s"}` : "Closed", "🗓️"],
   ];
@@ -55,16 +60,17 @@ export default function Vacancy({ loaderData }: Route.ComponentProps) {
                 aria-hidden="true"
                 className="grid h-12 w-12 sm:h-16 sm:w-16 shrink-0 place-items-center rounded-2xl bg-gradient-to-br from-pink-200 to-violet-200 text-2xl sm:text-3xl shadow-xs"
               >
-                🏛️
+                {isResearch ? "🔬" : "🏛️"}
               </span>
               <div className="min-w-0 flex-1">
                 <p className="text-xs sm:text-sm font-bold uppercase tracking-wider text-muted truncate">
-                  {v.department.name}
+                  {deptOrSpec}
                   {v.discipline ? ` · ${v.discipline.name}` : ""}
                 </p>
                 <h1 className="mt-1 text-xl sm:text-3xl lg:text-4xl font-extrabold text-ink leading-tight">
                   {v.title}
                 </h1>
+
                 <p className="mt-2 text-xs sm:text-sm text-muted">
                   Ref. <code className="font-semibold text-ink">{v.code}</code> · {v.cycle.title}
                 </p>

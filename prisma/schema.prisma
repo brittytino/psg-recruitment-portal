@@ -55,15 +55,23 @@ enum VacancyStatus {
   CLOSED
 }
 
+/// Faculty positions (Professor cadre). Research positions use a configurable title stored on the vacancy.
 enum Position {
   ASSISTANT_PROFESSOR
   ASSOCIATE_PROFESSOR
   PROFESSOR
 }
 
+/// Distinguishes the two recruitment workflows. Enforced in backend services, not just UI.
+enum RecruitmentCategory {
+  FACULTY
+  RESEARCH
+}
+
 enum FormCode {
   ASSISTANT_PROFESSOR
   ASSOCIATE_PROFESSOR
+  RESEARCH_APPLICATION
 }
 
 enum ApplicationStatus {
@@ -306,6 +314,22 @@ model Discipline {
   @@map("disciplines")
 }
 
+/// Configurable research specialisations managed by N4 HR through the admin interface.
+/// The initial set matches the official poster; HR can add, edit, activate and deactivate.
+model ResearchSpecialisation {
+  id          String    @id @default(uuid()) @db.Uuid
+  name        String    @unique
+  description String?
+  active      Boolean   @default(true)
+  sortOrder   Int       @default(0)
+  createdAt   DateTime  @default(now()) @db.Timestamptz(3)
+  updatedAt   DateTime  @updatedAt @db.Timestamptz(3)
+  vacancies   Vacancy[]
+
+  @@index([active, sortOrder])
+  @@map("research_specialisations")
+}
+
 model RecruitmentCycle {
   id           String      @id @default(uuid()) @db.Uuid
   code         String      @unique
@@ -343,33 +367,42 @@ model FormTemplate {
 }
 
 model Vacancy {
-  id                String                 @id @default(uuid()) @db.Uuid
-  /// Human-readable vacancy code shown publicly, e.g. "2026-CSE-AP".
-  code              String                 @unique
-  cycleId           String                 @db.Uuid
-  departmentId      String                 @db.Uuid
-  disciplineId      String?                @db.Uuid
-  position          Position
-  formTemplateId    String                 @db.Uuid
-  title             String
-  description       String
-  numberOfPosts     Int?
-  opensAt           DateTime               @db.Timestamptz(3)
-  closesAt          DateTime               @db.Timestamptz(3)
-  status            VacancyStatus          @default(DRAFT)
-  publishedAt       DateTime?              @db.Timestamptz(3)
-  createdAt         DateTime               @default(now()) @db.Timestamptz(3)
-  updatedAt         DateTime               @updatedAt @db.Timestamptz(3)
-  cycle             RecruitmentCycle       @relation(fields: [cycleId], references: [id])
-  department        Department             @relation(fields: [departmentId], references: [id])
-  discipline        Discipline?            @relation(fields: [disciplineId], references: [id])
-  formTemplate      FormTemplate           @relation(fields: [formTemplateId], references: [id])
-  eligibility       EligibilityCriterion[]
-  requiredDocuments RequiredDocument[]
-  applications      Application[]
+  id                       String                  @id @default(uuid()) @db.Uuid
+  /// Human-readable vacancy code shown publicly, e.g. "2026-CSE-AP" or "2026-RA-EV".
+  code                     String                  @unique
+  cycleId                  String                  @db.Uuid
+  /// Faculty vacancies require a department; research vacancies may leave this null.
+  departmentId             String?                 @db.Uuid
+  disciplineId             String?                 @db.Uuid
+  /// Faculty cadre position (null for research vacancies).
+  position                 Position?
+  formTemplateId           String                  @db.Uuid
+  title                    String
+  description              String
+  numberOfPosts            Int?
+  opensAt                  DateTime                @db.Timestamptz(3)
+  closesAt                 DateTime                @db.Timestamptz(3)
+  status                   VacancyStatus           @default(DRAFT)
+  publishedAt              DateTime?               @db.Timestamptz(3)
+  /// Determines which workflow applies (faculty with HOD review, or research with HR-only review).
+  recruitmentCategory      RecruitmentCategory     @default(FACULTY)
+  /// Configurable position title for research vacancies (e.g. "Research Assistant" or "Research Associate").
+  researchPositionTitle    String?
+  researchSpecialisationId String?                 @db.Uuid
+  createdAt                DateTime                @default(now()) @db.Timestamptz(3)
+  updatedAt                DateTime                @updatedAt @db.Timestamptz(3)
+  cycle                    RecruitmentCycle        @relation(fields: [cycleId], references: [id])
+  department               Department?             @relation(fields: [departmentId], references: [id])
+  discipline               Discipline?             @relation(fields: [disciplineId], references: [id])
+  formTemplate             FormTemplate            @relation(fields: [formTemplateId], references: [id])
+  researchSpecialisation   ResearchSpecialisation?  @relation(fields: [researchSpecialisationId], references: [id])
+  eligibility              EligibilityCriterion[]
+  requiredDocuments        RequiredDocument[]
+  applications             Application[]
 
   @@index([status, closesAt])
   @@index([departmentId])
+  @@index([recruitmentCategory, status])
   @@map("vacancies")
 }
 
@@ -397,48 +430,52 @@ model RequiredDocument {
 }
 
 model Application {
-  id                String                     @id @default(uuid()) @db.Uuid
-  /// Assigned atomically at first submission, e.g. "PSGCT2026-27CSE_0001".
-  referenceNo       String?                    @unique
-  candidateId       String                     @db.Uuid
-  vacancyId         String                     @db.Uuid
-  formTemplateId    String                     @db.Uuid
-  status            ApplicationStatus          @default(DRAFT)
-  processingStatus  ProcessingStatus           @default(NOT_STARTED)
+  id                    String                     @id @default(uuid()) @db.Uuid
+  /// Assigned atomically at first submission, e.g. "PSGCT2026-27CSE_0001" or "PSGCT2026-27RA_0001".
+  referenceNo           String?                    @unique
+  candidateId           String                     @db.Uuid
+  vacancyId             String                     @db.Uuid
+  formTemplateId        String                     @db.Uuid
+  status                ApplicationStatus          @default(DRAFT)
+  processingStatus      ProcessingStatus           @default(NOT_STARTED)
   /// Current editable answers (only meaningful while DRAFT / NEEDS_CLARIFICATION).
-  draftAnswers      Json                       @default("{}")
+  draftAnswers          Json                       @default("{}")
   /// Optimistic concurrency token, incremented on every draft save.
-  draftVersion      Int                        @default(0)
-  lastSavedAt       DateTime?                  @db.Timestamptz(3)
-  submittedAt       DateTime?                  @db.Timestamptz(3)
-  currentRevisionId String?                    @unique @db.Uuid
+  draftVersion          Int                        @default(0)
+  lastSavedAt           DateTime?                  @db.Timestamptz(3)
+  submittedAt           DateTime?                  @db.Timestamptz(3)
+  currentRevisionId     String?                    @unique @db.Uuid
   /// Denormalised from the vacancy for department-scoped queries.
-  departmentId      String?                    @db.Uuid
-  /// What the candidate applied for. Never changed after creation.
-  appliedPosition   Position?
+  departmentId          String?                    @db.Uuid
+  /// Denormalised recruitment category for explicit workflow routing.
+  recruitmentCategory   RecruitmentCategory        @default(FACULTY)
+  /// What the candidate applied for. Never changed after creation. Null for research applications.
+  appliedPosition       Position?
   /// Set only when Admin approves a HOD's position-change recommendation.
-  effectivePosition Position?
-  assignedHodId     String?                    @db.Uuid
-  assignedAt        DateTime?                  @db.Timestamptz(3)
-  hodDecision       HodDecision?
-  hodDecisionReason String?
-  hodRemarks        String?
-  hodDecidedAt      DateTime?                  @db.Timestamptz(3)
-  createdAt         DateTime                   @default(now()) @db.Timestamptz(3)
-  updatedAt         DateTime                   @updatedAt @db.Timestamptz(3)
-  department        Department?                @relation(fields: [departmentId], references: [id])
-  assignedHod       User?                      @relation("AssignedHod", fields: [assignedHodId], references: [id])
-  positionChanges   PositionChangeRequest[]
-  candidate         User                       @relation("CandidateApplications", fields: [candidateId], references: [id])
-  vacancy           Vacancy                    @relation(fields: [vacancyId], references: [id])
-  formTemplate      FormTemplate               @relation(fields: [formTemplateId], references: [id])
-  currentRevision   ApplicationRevision?       @relation("CurrentRevision", fields: [currentRevisionId], references: [id])
-  revisions         ApplicationRevision[]      @relation("Revisions")
-  documents         ApplicationDocument[]
-  generated         GeneratedDocument[]
-  statusHistory     ApplicationStatusHistory[]
-  assignments       ReviewAssignment[]
-  reviews           Review[]
+  effectivePosition     Position?
+  assignedHodId         String?                    @db.Uuid
+  assignedAt            DateTime?                  @db.Timestamptz(3)
+  hodDecision           HodDecision?
+  hodDecisionReason     String?
+  hodRemarks            String?
+  hodDecidedAt          DateTime?                  @db.Timestamptz(3)
+  /// Internal review note recorded by N4 HR (never visible to candidates).
+  internalNote          String?
+  createdAt             DateTime                   @default(now()) @db.Timestamptz(3)
+  updatedAt             DateTime                   @updatedAt @db.Timestamptz(3)
+  department            Department?                @relation(fields: [departmentId], references: [id])
+  assignedHod           User?                      @relation("AssignedHod", fields: [assignedHodId], references: [id])
+  positionChanges       PositionChangeRequest[]
+  candidate             User                       @relation("CandidateApplications", fields: [candidateId], references: [id])
+  vacancy               Vacancy                    @relation(fields: [vacancyId], references: [id])
+  formTemplate          FormTemplate               @relation(fields: [formTemplateId], references: [id])
+  currentRevision       ApplicationRevision?       @relation("CurrentRevision", fields: [currentRevisionId], references: [id])
+  revisions             ApplicationRevision[]      @relation("Revisions")
+  documents             ApplicationDocument[]
+  generated             GeneratedDocument[]
+  statusHistory         ApplicationStatusHistory[]
+  assignments           ReviewAssignment[]
+  reviews               Review[]
 
   /// Policy (pending confirmation): one application per candidate per vacancy.
   @@unique([candidateId, vacancyId])
@@ -447,6 +484,7 @@ model Application {
   @@index([submittedAt])
   @@index([departmentId, status])
   @@index([assignedHodId, status])
+  @@index([recruitmentCategory, status])
   @@map("applications")
 }
 
@@ -696,6 +734,14 @@ model DepartmentReferenceCounter {
 
   @@id([academicYear, departmentCode])
   @@map("department_reference_counters")
+}
+
+/// Running number per academic year for research application references: "PSGCT<year>RA_<NNNN>".
+model ResearchReferenceCounter {
+  academicYear String @id
+  value        Int    @default(0)
+
+  @@map("research_reference_counters")
 }
 
 /// A HOD's recommendation to consider an application for a different position. The submitted

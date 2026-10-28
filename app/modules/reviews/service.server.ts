@@ -59,12 +59,12 @@ export async function assignToHod(user: SessionUser | null, input: unknown, ip?:
   const hodDepts = new Set(hod.roles.filter((r) => r.role === "HOD").map((r) => r.departmentId));
   const apps = await prisma.application.findMany({
     where: { AND: [{ id: { in: applicationIds } }, scope] },
-    include: { vacancy: { select: { departmentId: true } } },
+    include: { vacancy: { select: { departmentId: true, recruitmentCategory: true } } },
   });
   if (apps.length !== applicationIds.length) throw new NotFoundError("Application");
   for (const a of apps) {
-    if (!hodDepts.has(a.vacancy.departmentId))
-      throw new ValidationError(`${a.referenceNo} belongs to a department this HOD does not review`);
+    if (a.vacancy.recruitmentCategory === "RESEARCH" || !a.vacancy.departmentId || !hodDepts.has(a.vacancy.departmentId))
+      throw new ValidationError(`${a.referenceNo} is a research application or belongs to a department this HOD does not review`);
     if (!ASSIGNABLE.includes(a.status as AppStatus))
       throw new ConflictError(
         `${a.referenceNo} is “${STATUS_LABELS[a.status as AppStatus]}” and cannot be moved to a HOD`,
@@ -173,7 +173,8 @@ const decisionSchema = z
   });
 
 /** True when the application is part of the department's current approved summary sheet. */
-async function lockedBySummary(tx: Tx, applicationId: string, departmentId: string) {
+async function lockedBySummary(tx: Tx, applicationId: string, departmentId: string | null) {
+  if (!departmentId) return false;
   const sheet = await tx.summarySheet.findFirst({
     where: { departmentId, status: "APPROVED" },
     orderBy: { version: "desc" },

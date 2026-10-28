@@ -23,13 +23,17 @@ export async function loader({ request, params, context }: Route.LoaderArgs) {
     const d = docs.find((x) => x.documentType === t && x.scanStatus !== "INFECTED");
     return d ? { bytes: await getFile(d.storageKey), mime: d.mimeType } : null;
   };
-  const position = app.appliedPosition ?? app.vacancy.position;
+  const position = app.appliedPosition
+    ? (POSITION_LABELS[app.appliedPosition] ?? app.appliedPosition)
+    : (app.vacancy.researchPositionTitle ?? (app.vacancy.position ? (POSITION_LABELS[app.vacancy.position] ?? app.vacancy.position) : "Research Assistant"));
+  const department = app.vacancy.department?.name ?? app.vacancy.researchSpecialisation?.name ?? "Research";
   const pdf = await renderFormPdf({
     formCode: def.code,
     formVersion: def.version,
     answers: withDerived(def, app.draftAnswers as Answers, derivedContext(app)),
-    department: app.vacancy.department.name,
-    position: POSITION_LABELS[position] ?? position,
+    department,
+    position,
+
     referenceNo: app.referenceNo,
     revisionNo: null,
     submittedAt: null,

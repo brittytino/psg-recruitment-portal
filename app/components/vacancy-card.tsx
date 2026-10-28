@@ -7,21 +7,28 @@ const POSITION_EMOJI: Record<string, string> = {
   ASSISTANT_PROFESSOR: "🎓",
   ASSOCIATE_PROFESSOR: "📚",
   PROFESSOR: "🏛️",
+  RESEARCH_ASSISTANT: "🔬",
+  RESEARCH_ASSOCIATE: "🧪",
 };
 const POSITION_TILE: Record<string, string> = {
   ASSISTANT_PROFESSOR: "bg-tile-pink",
   ASSOCIATE_PROFESSOR: "bg-tile-purple",
   PROFESSOR: "bg-tile-blue",
+  RESEARCH_ASSISTANT: "bg-emerald-50 text-emerald-800 border border-emerald-200/50",
+  RESEARCH_ASSOCIATE: "bg-teal-50 text-teal-800 border border-teal-200/50",
 };
 
 export interface VacancyCardData {
   code: string;
   title: string;
-  position: string;
+  position?: string | null;
+  recruitmentCategory?: string;
+  researchPositionTitle?: string | null;
+  researchSpecialisation?: { name: string } | null;
   closesAt: Date | string;
   numberOfPosts: number | null;
-  department: { name: string };
-  discipline: { name: string } | null;
+  department?: { name: string } | null;
+  discipline?: { name: string } | null;
 }
 
 export function daysLeft(closesAt: Date | string): number {
@@ -31,6 +38,15 @@ export function daysLeft(closesAt: Date | string): number {
 /** Vacancy card in modern executive style with smooth Framer Motion interactions and responsive layout. */
 export function VacancyCard({ v }: { v: VacancyCardData }) {
   const days = daysLeft(v.closesAt);
+  const isResearch = v.recruitmentCategory === "RESEARCH" || !v.department;
+  const deptOrSpec = v.department?.name ?? v.researchSpecialisation?.name ?? "Research Appointment";
+  const posTitle =
+    v.researchPositionTitle ?? (v.position ? (POSITION_LABELS[v.position] ?? v.position) : "Research Assistant");
+  const tileClass = isResearch
+    ? "bg-emerald-50 text-emerald-800 border border-emerald-200/60"
+    : (POSITION_TILE[v.position ?? ""] ?? "bg-soft");
+  const emoji = isResearch ? "🔬" : (POSITION_EMOJI[v.position ?? ""] ?? "💼");
+
   return (
     <motion.article
       whileHover={{ y: -4, transition: { duration: 0.22, ease: "easeOut" } }}
@@ -41,13 +57,13 @@ export function VacancyCard({ v }: { v: VacancyCardData }) {
         <div className="flex items-start gap-3 sm:gap-3.5">
           <span
             aria-hidden="true"
-            className={`grid h-12 w-12 sm:h-13 sm:w-13 shrink-0 place-items-center rounded-2xl text-xl sm:text-2xl shadow-xs transition-transform duration-300 group-hover:scale-105 ${POSITION_TILE[v.position] ?? "bg-soft"}`}
+            className={`grid h-12 w-12 sm:h-13 sm:w-13 shrink-0 place-items-center rounded-2xl text-xl sm:text-2xl shadow-xs transition-transform duration-300 group-hover:scale-105 ${tileClass}`}
           >
-            {POSITION_EMOJI[v.position] ?? "💼"}
+            {emoji}
           </span>
           <div className="min-w-0 flex-1">
             <p className="truncate text-xs font-bold uppercase tracking-wider text-muted">
-              {v.department.name}
+              {deptOrSpec}
             </p>
             <h3 className="mt-1 text-base sm:text-lg font-bold leading-snug">
               <Link
@@ -61,10 +77,19 @@ export function VacancyCard({ v }: { v: VacancyCardData }) {
         </div>
 
         <ul className="flex flex-wrap gap-1.5 sm:gap-2" aria-label="Details">
-          <li className="chip font-medium text-ink bg-soft/70 border-line">{POSITION_LABELS[v.position]}</li>
+          {isResearch && (
+            <li className="chip font-semibold text-emerald-800 bg-emerald-100/80 border border-emerald-300/70">
+              Research
+            </li>
+          )}
+          <li className="chip font-medium text-ink bg-soft/70 border-line">{posTitle}</li>
           {v.discipline && <li className="chip text-muted">{v.discipline.name}</li>}
+          {isResearch && v.researchSpecialisation && (
+            <li className="chip text-muted bg-soft/50">{v.researchSpecialisation.name}</li>
+          )}
         </ul>
       </div>
+
 
       <div className="flex flex-wrap items-center justify-between gap-2.5 sm:gap-3 border-t border-line/70 pt-4 text-sm">
         <span className="text-xs sm:text-sm text-muted">

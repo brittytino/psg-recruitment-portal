@@ -41,7 +41,10 @@ export async function loader({ request, params, context }: Route.LoaderArgs) {
       })
     : null;
 
-  const appliedPos = app.appliedPosition ?? app.vacancy.position;
+  const appliedPos = app.appliedPosition
+    ? (POSITION_LABELS[app.appliedPosition] ?? app.appliedPosition)
+    : (app.vacancy.researchPositionTitle ?? (app.vacancy.position ? (POSITION_LABELS[app.vacancy.position] ?? app.vacancy.position) : "Research Assistant"));
+  const departmentName = app.vacancy.department?.name ?? app.vacancy.researchSpecialisation?.name ?? "Research";
 
   return {
     id: app.id,
@@ -51,8 +54,9 @@ export async function loader({ request, params, context }: Route.LoaderArgs) {
     submittedAt: app.submittedAt,
     revisionNo: app.currentRevision?.revisionNo ?? null,
     title: app.vacancy.title,
-    department: app.vacancy.department.name,
-    position: POSITION_LABELS[appliedPos] ?? appliedPos,
+    department: departmentName,
+    position: appliedPos,
+
     history: app.statusHistory.map((h) => ({
       to: h.toStatus as AppStatus,
       at: h.createdAt,

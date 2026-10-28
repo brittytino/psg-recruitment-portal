@@ -594,6 +594,9 @@ function bindAssociate(b: Binder) {
 const BINDERS: Record<FormCode, (b: Binder) => void> = {
   ASSISTANT_PROFESSOR: bindAssistant,
   ASSOCIATE_PROFESSOR: bindAssociate,
+  RESEARCH_APPLICATION: () => {
+    throw new Error("RESEARCH_APPLICATION uses the PDF renderer and does not have a DOCX template");
+  },
 };
 
 const IMAGE_CT: Record<string, string> = { png: "image/png", jpeg: "image/jpeg" };

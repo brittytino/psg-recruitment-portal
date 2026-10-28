@@ -21,3 +21,18 @@ export function referenceDeptCode(code: string): string {
 export function formatReference(academicYear: string, deptCode: string, n: number): string {
   return `PSGCT${academicYear}${referenceDeptCode(deptCode)}_${String(n).padStart(4, "0")}`;
 }
+
+/** Research appointment reference number: PSGCT<year>RA_<NNNN> */
+export function formatResearchReference(academicYear: string, n: number): string {
+  return `PSGCT${academicYear}RA_${String(n).padStart(4, "0")}`;
+}
+
+export const RESEARCH_REFERENCE = /^PSGCT\d{4}-\d{2}RA_\d{4}$/;
+
+export function parseResearchReference(ref: string): { academicYear: string; sequence: number } | null {
+  const match = ref.match(/^PSGCT(\d{4}-\d{2})RA_(\d{4})$/);
+  if (!match || !match[1] || !match[2]) return null;
+  return { academicYear: match[1], sequence: parseInt(match[2], 10) };
+}
+
+

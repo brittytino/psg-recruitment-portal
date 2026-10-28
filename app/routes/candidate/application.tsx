@@ -40,7 +40,10 @@ export async function loader({ request, params, context }: Route.LoaderArgs) {
     app.status === "NEEDS_CLARIFICATION"
       ? [...app.statusHistory].reverse().find((h) => h.toStatus === "NEEDS_CLARIFICATION")?.reason
       : null;
-  const position = app.appliedPosition ?? app.vacancy.position;
+  const position = app.appliedPosition
+    ? (POSITION_LABELS[app.appliedPosition] ?? app.appliedPosition)
+    : (app.vacancy.researchPositionTitle ?? (app.vacancy.position ? (POSITION_LABELS[app.vacancy.position] ?? app.vacancy.position) : "Research Assistant"));
+  const department = app.vacancy.department?.name ?? app.vacancy.researchSpecialisation?.name ?? "Research";
   return {
     id: app.id,
     status: app.status,
@@ -49,10 +52,11 @@ export async function loader({ request, params, context }: Route.LoaderArgs) {
     vacancy: {
       title: app.vacancy.title,
       code: app.vacancy.code,
-      department: app.vacancy.department.name,
-      position: POSITION_LABELS[position] ?? position,
+      department,
+      position,
       closesAt: app.vacancy.closesAt,
     },
+
     answers: app.draftAnswers as Answers,
     version: app.draftVersion,
     lastSavedAt: app.lastSavedAt,
@@ -137,8 +141,10 @@ export default function ApplicationEditor({ loaderData }: Route.ComponentProps) 
       computeDerived(def, answers, {
         department: L.vacancy.department,
         position: L.vacancy.position,
+        specialisation: L.vacancy.department,
         asOf: today,
       }),
+
     [def, answers, L.vacancy.department, L.vacancy.position, today],
   );
   const allIssues = useMemo(() => validateAnswers(def, answers, "submit"), [def, answers]);

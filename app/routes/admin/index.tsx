@@ -19,6 +19,8 @@ import {
   adminOverview,
   createCycle,
   createDepartment,
+  createResearchSpecialisation,
+  updateResearchSpecialisation,
   setCycleStatus,
   setVacancyStatus,
 } from "~/modules/recruitment/service.server";
@@ -42,6 +44,14 @@ export async function action({ request, context }: Route.ActionArgs) {
       case "discipline":
         await addDiscipline(user, String(f.departmentId), f.name);
         return { message: "Discipline added." };
+      case "specialisation":
+        await createResearchSpecialisation(user, f);
+        return { message: "Research specialisation created." };
+      case "specialisation-toggle":
+        await updateResearchSpecialisation(user, String(f.id), { active: f.active === "true" });
+        return {
+          message: `Research specialisation ${f.active === "true" ? "activated" : "deactivated"}.`,
+        };
       case "cycle":
         await createCycle(user, f);
         return { message: "Recruitment cycle created as a draft. Publish it when the notification is out." };
@@ -61,10 +71,11 @@ const TABS = [
   ["vacancies", "Job profiles"],
   ["cycles", "Recruitment cycles"],
   ["departments", "Departments"],
+  ["specialisations", "Research specialisations"],
 ] as const;
 
 export default function AdminIndex({ loaderData, actionData }: Route.ComponentProps) {
-  const { departments, cycles, vacancies, canManageDepartments } = loaderData;
+  const { departments, cycles, vacancies, researchSpecialisations, canManageDepartments } = loaderData;
   const [params] = useSearchParams();
   const tab = TABS.find(([k]) => k === params.get("tab"))?.[0] ?? "vacancies";
   const fe = actionData && "fieldErrors" in actionData ? actionData.fieldErrors : undefined;
@@ -91,7 +102,14 @@ export default function AdminIndex({ loaderData, actionData }: Route.ComponentPr
           to: `?tab=${k}`,
           label: l,
           active: k === tab,
-          count: k === "vacancies" ? vacancies.length : k === "cycles" ? cycles.length : departments.length,
+          count:
+            k === "vacancies"
+              ? vacancies.length
+              : k === "cycles"
+                ? cycles.length
+                : k === "departments"
+                  ? departments.length
+                  : (researchSpecialisations?.length ?? 0),
         }))}
       />
 
@@ -111,7 +129,7 @@ export default function AdminIndex({ loaderData, actionData }: Route.ComponentPr
                 <thead>
                   <tr>
                     <th scope="col">Job profile</th>
-                    <th scope="col">Department</th>
+                    <th scope="col">Department / Specialisation</th>
                     <th scope="col">Posts</th>
                     <th scope="col">Open</th>
                     <th scope="col">Status</th>
@@ -129,15 +147,27 @@ export default function AdminIndex({ loaderData, actionData }: Route.ComponentPr
                       <td>
                         <span className="font-semibold">{v.title}</span>
                         <span className="block text-sm text-muted">
-                          {v.code} · {POSITION_LABELS[v.position]} · {FORM_LABELS[v.formTemplate.code]} (v
+                          {v.code} ·{" "}
+                          {v.position
+                            ? POSITION_LABELS[v.position] ?? v.position
+                            : (v.researchPositionTitle ?? "Research Assistant")}{" "}
+                          · {FORM_LABELS[v.formTemplate.code] ?? v.formTemplate.title} (v
                           {v.formTemplate.version})
                         </span>
                       </td>
                       <td>
-                        {v.department.name}
-                        {v.discipline ? (
-                          <span className="block text-sm text-muted">{v.discipline.name}</span>
-                        ) : null}
+                        {v.department ? (
+                          <>
+                            {v.department.name}
+                            {v.discipline ? (
+                              <span className="block text-sm text-muted">{v.discipline.name}</span>
+                            ) : null}
+                          </>
+                        ) : (
+                          <span className="inline-flex items-center gap-1 font-medium text-emerald-800">
+                            🔬 {v.researchSpecialisation?.name ?? "Research Project"}
+                          </span>
+                        )}
                       </td>
                       <td className="tabular-nums">{v.numberOfPosts ?? "—"}</td>
                       <td className="whitespace-nowrap text-sm">
@@ -353,6 +383,106 @@ export default function AdminIndex({ loaderData, actionData }: Route.ComponentPr
               </button>
             </Form>
           )}
+        </section>
+      )}
+
+      {tab === "specialisations" && (
+        <section className="card space-y-5" aria-label="Research specialisations">
+          <div className="flex flex-col gap-1 sm:flex-row sm:items-center sm:justify-between">
+            <div>
+              <h2 className="text-lg font-semibold">Research Specialisations</h2>
+              <p className="text-sm text-muted">
+                Specialisations categorise funded research projects, labs, and Research Assistant positions.
+              </p>
+            </div>
+          </div>
+          {!researchSpecialisations || researchSpecialisations.length === 0 ? (
+            <EmptyState title="No research specialisations yet">
+              Add the first research specialisation below to begin posting Research Assistant job openings.
+            </EmptyState>
+          ) : (
+            <div className="overflow-x-auto">
+              <table className="table">
+                <caption className="sr-only">Research Specialisations</caption>
+                <thead>
+                  <tr>
+                    <th scope="col">Specialisation Name</th>
+                    <th scope="col">Description</th>
+                    <th scope="col">Job profiles</th>
+                    <th scope="col">Status</th>
+                    <th scope="col" className="text-right">
+                      <span className="sr-only">Actions</span>
+                    </th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {researchSpecialisations.map((s) => (
+                    <tr key={s.id}>
+                      <td>
+                        <span className="font-semibold">{s.name}</span>
+                        {s.sortOrder !== 0 && (
+                          <span className="ml-2 rounded bg-soft px-1.5 py-0.5 text-xs text-muted">
+                            Order: {s.sortOrder}
+                          </span>
+                        )}
+                      </td>
+                      <td className="max-w-md text-sm text-muted">{s.description ?? "—"}</td>
+                      <td className="tabular-nums">{s._count.vacancies}</td>
+                      <td>
+                        <Badge tone={s.active ? "success" : "neutral"}>
+                          {s.active ? "Active" : "Inactive"}
+                        </Badge>
+                      </td>
+                      <td className="text-right">
+                        <Form method="post" className="inline-block">
+                          <CsrfInput />
+                          <input type="hidden" name="intent" value="specialisation-toggle" />
+                          <input type="hidden" name="id" value={s.id} />
+                          <input type="hidden" name="active" value={s.active ? "false" : "true"} />
+                          <button type="submit" className="btn-secondary px-3 py-1.5 text-sm">
+                            {s.active ? "Deactivate" : "Activate"}
+                          </button>
+                        </Form>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+
+          <Form
+            method="post"
+            className="grid gap-4 rounded-2xl bg-soft p-5 md:grid-cols-[1fr_1fr_6rem_auto] md:items-end"
+          >
+            <CsrfInput />
+            <input type="hidden" name="intent" value="specialisation" />
+            <h3 className="text-base font-semibold md:col-span-4">Add new specialisation</h3>
+            <TextInput
+              label="Specialisation name"
+              name="name"
+              required
+              hint="e.g. Artificial Intelligence & Machine Learning"
+              error={fe?.name?.[0]}
+            />
+            <TextInput
+              label="Description (optional)"
+              name="description"
+              hint="e.g. Deep learning, computer vision, and NLP"
+              error={fe?.description?.[0]}
+            />
+            <TextInput
+              label="Sort order"
+              name="sortOrder"
+              type="number"
+              defaultValue="0"
+              hint="Priority order"
+              error={fe?.sortOrder?.[0]}
+            />
+            <button type="submit" className="btn-primary">
+              Add specialisation
+            </button>
+          </Form>
         </section>
       )}
     </div>

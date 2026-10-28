@@ -5,7 +5,7 @@ import { AnswerView } from "~/components/application-form";
 import { Alert, Badge, ConfirmDialog, CsrfInput, formatDateTime, statusTone } from "~/components/forms";
 import { clientIp, handleAction, readForm, requireStaff } from "~/lib/http.server";
 import { FORM_LABELS, POSITION_LABELS } from "~/lib/labels";
-import { getStaffApplication, transition } from "~/modules/applications/service.server";
+import { getStaffApplication, transition, updateInternalNote } from "~/modules/applications/service.server";
 import {
   APPLICATION_STATUSES,
   ASSIGNABLE,
@@ -48,14 +48,20 @@ export async function loader({ request, params, context }: Route.LoaderArgs) {
   });
   const isOffice = !!hrScope(user);
   const isAssignedHod =
-    app.assignedHodId === user.id && hodDepartments(user.grants).includes(app.vacancy.departmentId);
-  const applied = app.appliedPosition ?? app.vacancy.position;
+    app.assignedHodId === user.id &&
+    !!app.vacancy.departmentId &&
+    hodDepartments(user.grants).includes(app.vacancy.departmentId);
+  const applied = app.appliedPosition
+    ? (POSITION_LABELS[app.appliedPosition] ?? app.appliedPosition)
+    : (app.vacancy.researchPositionTitle ?? (app.vacancy.position ? (POSITION_LABELS[app.vacancy.position] ?? app.vacancy.position) : "Research Assistant"));
   const current = app.generated.filter((g) => g.revisionId === app.currentRevisionId && g.status === "READY");
   return {
     app: {
       id: app.id,
       referenceNo: app.referenceNo,
       status: app.status as AppStatus,
+      recruitmentCategory: app.recruitmentCategory,
+      internalNote: app.internalNote,
       processingStatus: app.processingStatus,
       submittedAt: app.submittedAt,
       applied,
@@ -63,8 +69,9 @@ export async function loader({ request, params, context }: Route.LoaderArgs) {
       vacancy: {
         code: app.vacancy.code,
         title: app.vacancy.title,
-        department: app.vacancy.department.name,
+        department: app.vacancy.department?.name ?? app.vacancy.researchSpecialisation?.name ?? "Research",
         departmentId: app.vacancy.departmentId,
+        specialisation: app.vacancy.researchSpecialisation?.name ?? null,
         cycle: app.vacancy.cycle.title,
       },
       formCode: app.formTemplate.code as FormCode,
@@ -107,7 +114,7 @@ export async function loader({ request, params, context }: Route.LoaderArgs) {
     canRegenerate: isOffice && hasPermission(user.grants, "document:regenerate"),
     canApprove: await canApprovePositionChange(user),
     canAssign: isOffice && hasPermission(user.grants, "application:assign"),
-    hods: isOffice ? await hodsForDepartment(app.vacancy.departmentId) : [],
+    hods: isOffice && app.vacancy.departmentId ? await hodsForDepartment(app.vacancy.departmentId) : [],
     changeOptions: allowedChanges(applied),
   };
 }
@@ -118,6 +125,9 @@ export async function action({ request, params, context }: Route.ActionArgs) {
   const ip = clientIp(request);
   return handleAction(async () => {
     switch (form.get("intent")) {
+      case "internal-note":
+        await updateInternalNote(user, params.id, form.get("note") ? String(form.get("note")) : null, ip);
+        return { message: "Internal review note saved." };
       case "decision":
         await recordHodDecision(user, params.id, Object.fromEntries(form), ip);
         return { message: "Your decision has been recorded." };
@@ -172,7 +182,9 @@ export default function StaffApplication({ loaderData, actionData }: Route.Compo
   const busy = nav.state !== "idle";
   const back = (location.state as { back?: string } | null)?.back ?? (isOffice ? "/staff" : "/staff/review");
   const def = getFormDefinition(app.formCode, app.formVersion);
-  const transitions = isOffice ? availableTransitions(app.status, "hr") : [];
+  const transitions = isOffice
+    ? availableTransitions(app.status, "hr", app.recruitmentCategory as never)
+    : [];
   const pending = app.positionChanges.find((p) => p.status === "PENDING");
   const fe = actionData && "fieldErrors" in actionData ? actionData.fieldErrors : undefined;
   const [decision, setDecision] = useState<string>(app.hodDecision ?? "");
@@ -497,7 +509,7 @@ export default function StaffApplication({ loaderData, actionData }: Route.Compo
             </section>
           )}
 
-          {canAssign && (ASSIGNABLE.includes(app.status) || app.status === "ASSIGNED_TO_HOD") && (
+          {canAssign && app.recruitmentCategory !== "RESEARCH" && (ASSIGNABLE.includes(app.status) || app.status === "ASSIGNED_TO_HOD") && (
             <section className="card space-y-3" aria-labelledby="assign">
               <h2 id="assign" className="text-xl">
                 HOD assignment
@@ -541,9 +553,38 @@ export default function StaffApplication({ loaderData, actionData }: Route.Compo
             </section>
           )}
 
+          {isOffice && (
+            <section className="card space-y-3" aria-labelledby="internal-note">
+              <div className="flex items-center justify-between">
+                <h2 id="internal-note" className="text-xl">
+                  Internal review note
+                </h2>
+                <Badge tone="neutral">HR / Office</Badge>
+              </div>
+              <p className="text-xs text-muted">
+                Confidential remarks, committee observations, or screening notes. Never visible to candidates.
+              </p>
+              <Form method="post" className="space-y-3">
+                <CsrfInput />
+                <input type="hidden" name="intent" value="internal-note" />
+                <textarea
+                  name="note"
+                  defaultValue={app.internalNote ?? ""}
+                  rows={3}
+                  placeholder="Enter confidential notes, eligibility remarks, interview recommendations..."
+                  className="field-input w-full"
+                />
+                <button type="submit" className="btn-secondary text-sm font-semibold" disabled={busy}>
+                  Save internal note
+                </button>
+              </Form>
+            </section>
+          )}
+
           {transitions.length > 0 && (
             <section className="card space-y-3" aria-labelledby="status">
               <h2 id="status" className="text-xl">
+
                 Status
               </h2>
               {transitions.map((t) => (

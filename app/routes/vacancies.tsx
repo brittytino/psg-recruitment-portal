@@ -3,7 +3,7 @@ import { motion } from "framer-motion";
 import type { Route } from "./+types/vacancies";
 import { VacancyCard } from "~/components/vacancy-card";
 import { POSITION_LABELS } from "~/lib/labels";
-import { listDepartments, listPublishedVacancies } from "~/modules/recruitment/service.server";
+import { listDepartments, listPublishedVacancies, listResearchSpecialisations } from "~/modules/recruitment/service.server";
 
 export const meta: Route.MetaFunction = () => [{ title: "Open vacancies — PSG Tech Careers" }];
 
@@ -11,21 +11,32 @@ export async function loader({ request }: Route.LoaderArgs) {
   const url = new URL(request.url);
   const departmentId = url.searchParams.get("department") || undefined;
   const position = url.searchParams.get("position") || undefined;
+  const category = url.searchParams.get("category") || undefined;
   const q = url.searchParams.get("q")?.trim().slice(0, 100) || undefined;
-  const [vacancies, departments] = await Promise.all([
+  const [vacancies, departments, specialisations] = await Promise.all([
     listPublishedVacancies({
       departmentId: departmentId && /^[0-9a-f-]{36}$/.test(departmentId) ? departmentId : undefined,
       position: position && position in POSITION_LABELS ? position : undefined,
+      recruitmentCategory: category === "FACULTY" || category === "RESEARCH" ? category : undefined,
       q,
     }),
     listDepartments(),
+    listResearchSpecialisations(),
   ]);
-  return { vacancies, departments, departmentId: departmentId ?? "", position: position ?? "", q: q ?? "" };
+  return {
+    vacancies,
+    departments,
+    specialisations,
+    departmentId: departmentId ?? "",
+    position: position ?? "",
+    category: category ?? "",
+    q: q ?? "",
+  };
 }
 
 export default function Vacancies({ loaderData }: Route.ComponentProps) {
-  const { vacancies, departments, departmentId, position, q } = loaderData;
-  const filtered = !!(departmentId || position || q);
+  const { vacancies, departments, specialisations, departmentId, position, category, q } = loaderData;
+  const filtered = !!(departmentId || position || category || q);
   return (
     <div className="space-y-8 sm:space-y-10">
       <motion.section
@@ -36,19 +47,41 @@ export default function Vacancies({ loaderData }: Route.ComponentProps) {
       >
         <p className="eyebrow">PSG Tech Careers</p>
         <h1 className="mt-2 text-2xl sm:text-4xl lg:text-5xl font-extrabold text-ink">
-          Find your faculty position 🔎
+          Find your next academic or research position 🔎
         </h1>
         <p className="mt-2.5 sm:mt-3 max-w-2xl text-sm sm:text-lg text-muted leading-relaxed">
-          Explore faculty openings across engineering, science, and humanities departments. Apply directly
-          online with automatic draft saving.
+          Explore faculty openings and research assistant positions across engineering, technology, applied sciences, and advanced research centres. Apply directly online.
         </p>
+
+        {/* Category Pill Filters */}
+        <div className="mt-6 flex flex-wrap items-center gap-2">
+          <Link
+            to={`/vacancies${q ? `?q=${encodeURIComponent(q)}` : ""}`}
+            className={`chip font-semibold transition-colors ${!category ? "bg-brand-600 text-white" : "bg-white/80 text-muted hover:text-ink hover:bg-white"}`}
+          >
+            All Openings
+          </Link>
+          <Link
+            to={`/vacancies?category=FACULTY${q ? `&q=${encodeURIComponent(q)}` : ""}`}
+            className={`chip font-semibold transition-colors ${category === "FACULTY" ? "bg-brand-600 text-white" : "bg-white/80 text-muted hover:text-ink hover:bg-white"}`}
+          >
+            🎓 Faculty Positions
+          </Link>
+          <Link
+            to={`/vacancies?category=RESEARCH${q ? `&q=${encodeURIComponent(q)}` : ""}`}
+            className={`chip font-semibold transition-colors ${category === "RESEARCH" ? "bg-emerald-600 text-white" : "bg-white/80 text-muted hover:text-ink hover:bg-white"}`}
+          >
+            🔬 Research Appointments
+          </Link>
+        </div>
 
         <Form
           method="get"
           role="search"
           aria-label="Filter vacancies"
-          className="mt-6 sm:mt-8 grid gap-3 rounded-2xl sm:rounded-3xl bg-white p-3 sm:p-4 shadow-[var(--shadow-float)] border border-line/70 sm:grid-cols-2 lg:grid-cols-[2fr_1.3fr_1.2fr_auto]"
+          className="mt-4 grid gap-3 rounded-2xl sm:rounded-3xl bg-white p-3 sm:p-4 shadow-[var(--shadow-float)] border border-line/70 sm:grid-cols-2 lg:grid-cols-[2fr_1.3fr_1.2fr_auto]"
         >
+          {category && <input type="hidden" name="category" value={category} />}
           <div>
             <label htmlFor="q" className="sr-only">
               Keyword
@@ -58,7 +91,7 @@ export default function Vacancies({ loaderData }: Route.ComponentProps) {
               name="q"
               type="search"
               defaultValue={q}
-              placeholder="🔍  Search position, department, discipline..."
+              placeholder="🔍  Search position, research area, department..."
               className="field-input h-11 w-full"
             />
           </div>
@@ -101,6 +134,7 @@ export default function Vacancies({ loaderData }: Route.ComponentProps) {
           </button>
         </Form>
       </motion.section>
+
 
       <div className="flex flex-wrap items-center justify-between gap-3 border-b border-line/70 pb-4">
         <p className="text-xs sm:text-sm text-muted" role="status">

@@ -32,7 +32,13 @@ function uniqueViolation(e: unknown, message: string): never {
 // Public queries
 // ------------------------------------------------------------------------------------------------
 export async function listPublishedVacancies(
-  filter: { departmentId?: string; position?: string; q?: string } = {},
+  filter: {
+    departmentId?: string;
+    position?: string;
+    recruitmentCategory?: "FACULTY" | "RESEARCH";
+    researchSpecialisationId?: string;
+    q?: string;
+  } = {},
 ) {
   const now = new Date();
   return prisma.vacancy.findMany({
@@ -41,20 +47,24 @@ export async function listPublishedVacancies(
       cycle: { status: "PUBLISHED" },
       closesAt: { gt: now },
       opensAt: { lte: now },
+      ...(filter.recruitmentCategory ? { recruitmentCategory: filter.recruitmentCategory } : {}),
       ...(filter.departmentId ? { departmentId: filter.departmentId } : {}),
+      ...(filter.researchSpecialisationId ? { researchSpecialisationId: filter.researchSpecialisationId } : {}),
       ...(filter.position ? { position: filter.position as never } : {}),
       ...(filter.q
         ? {
             OR: [
               { title: { contains: filter.q, mode: "insensitive" as const } },
               { code: { contains: filter.q, mode: "insensitive" as const } },
+              { researchPositionTitle: { contains: filter.q, mode: "insensitive" as const } },
               { department: { name: { contains: filter.q, mode: "insensitive" as const } } },
               { discipline: { name: { contains: filter.q, mode: "insensitive" as const } } },
+              { researchSpecialisation: { name: { contains: filter.q, mode: "insensitive" as const } } },
             ],
           }
         : {}),
     },
-    include: { department: true, discipline: true, cycle: true },
+    include: { department: true, discipline: true, cycle: true, researchSpecialisation: true },
     orderBy: [{ closesAt: "asc" }, { title: "asc" }],
   });
 }
@@ -71,6 +81,7 @@ export async function getPublishedVacancy(code: string) {
       discipline: true,
       cycle: true,
       formTemplate: true,
+      researchSpecialisation: true,
       eligibility: { orderBy: { sortOrder: "asc" } },
       requiredDocuments: { orderBy: { sortOrder: "asc" } },
     },
@@ -85,6 +96,13 @@ export const listDepartments = (activeOnly = true) =>
     orderBy: { name: "asc" },
     include: { disciplines: { orderBy: { name: "asc" } } },
   });
+
+export const listResearchSpecialisations = (activeOnly = true) =>
+  prisma.researchSpecialisation.findMany({
+    where: activeOnly ? { active: true } : {},
+    orderBy: [{ sortOrder: "asc" }, { name: "asc" }],
+  });
+
 
 // ------------------------------------------------------------------------------------------------
 // Administration (recruitment:manage)
@@ -382,9 +400,168 @@ export async function setVacancyStatus(user: SessionUser | null, id: string, sta
   });
 }
 
+export const researchSpecialisationSchema = z.object({
+  name: z.string().trim().min(3, "Enter the specialisation name").max(150),
+  description: z
+    .string()
+    .trim()
+    .max(1000)
+    .optional()
+    .transform((v) => v || null),
+  sortOrder: z.coerce.number().int().min(0).default(0),
+  active: z.boolean().default(true),
+});
+
+export async function createResearchSpecialisation(user: SessionUser | null, input: unknown) {
+  const u = requirePermission(user, "recruitment:manage");
+  const p = researchSpecialisationSchema.safeParse(input);
+  if (!p.success) throw new ValidationError("Please correct the highlighted fields", fieldErrors(p.error));
+  try {
+    return await prisma.$transaction(async (tx) => {
+      const s = await tx.researchSpecialisation.create({ data: p.data });
+      await audit(
+        {
+          actorId: u.id,
+          action: "research_specialisation.created",
+          entityType: "research_specialisation",
+          entityId: s.id,
+          metadata: { name: s.name },
+        },
+        tx,
+      );
+      return s;
+    });
+  } catch (e) {
+    uniqueViolation(e, "A research specialisation with this name already exists");
+  }
+}
+
+export async function updateResearchSpecialisation(
+  user: SessionUser | null,
+  id: string,
+  input: unknown,
+) {
+  const u = requirePermission(user, "recruitment:manage");
+  const p = researchSpecialisationSchema.partial().safeParse(input);
+  if (!p.success) throw new ValidationError("Please correct the highlighted fields", fieldErrors(p.error));
+  try {
+    return await prisma.$transaction(async (tx) => {
+      const s = await tx.researchSpecialisation.update({ where: { id }, data: p.data });
+      await audit(
+        {
+          actorId: u.id,
+          action: "research_specialisation.updated",
+          entityType: "research_specialisation",
+          entityId: s.id,
+          metadata: { name: s.name },
+        },
+        tx,
+      );
+      return s;
+    });
+  } catch (e) {
+    uniqueViolation(e, "A research specialisation with this name already exists");
+  }
+}
+
+const researchVacancySchema = z
+  .object({
+    code: z
+      .string()
+      .trim()
+      .toUpperCase()
+      .regex(/^[A-Z0-9-]{4,40}$/, "4-40 letters, digits or hyphens"),
+    cycleId: z.string().uuid("Choose a recruitment cycle"),
+    researchSpecialisationId: z.string().uuid("Choose a research specialisation"),
+    positionTitle: z.string().trim().min(3).max(100).default("Research Assistant"),
+    departmentId: z
+      .string()
+      .uuid()
+      .optional()
+      .or(z.literal("").transform(() => undefined)),
+    title: z.string().trim().min(5).max(200),
+    description: z.string().trim().min(10).max(10000),
+    numberOfPosts: z
+      .union([z.literal(""), z.coerce.number().int().min(1).max(500)])
+      .transform((v) => (v === "" ? null : v)),
+    opensAt: dateTime,
+    closesAt: dateTime,
+    eligibility: z.string().max(10000).default(""),
+    requiredDocuments: z.array(z.enum(DOCUMENT_TYPES)).default([]),
+  })
+  .refine((v) => v.closesAt > v.opensAt, {
+    path: ["closesAt"],
+    message: "Closing date must be after the opening date",
+  });
+
+export async function createResearchVacancy(user: SessionUser | null, input: unknown) {
+  const u = requirePermission(user, "recruitment:manage");
+  const p = researchVacancySchema.safeParse(input);
+  if (!p.success) throw new ValidationError("Please correct the highlighted fields", fieldErrors(p.error));
+  const v = p.data;
+  const form = await prisma.formTemplate.findFirst({
+    where: { code: "RESEARCH_APPLICATION", active: true },
+    orderBy: { version: "desc" },
+  });
+  if (!form) throw new ConflictError("No active research application form template is registered");
+  const spec = await prisma.researchSpecialisation.findUnique({ where: { id: v.researchSpecialisationId } });
+  if (!spec) throw new ValidationError("Selected research specialisation does not exist");
+
+  const criteria = v.eligibility
+    .split(/\r?\n/)
+    .map((s) => s.trim())
+    .filter(Boolean);
+
+  try {
+    return await prisma.$transaction(async (tx) => {
+      const created = await tx.vacancy.create({
+        data: {
+          code: v.code,
+          cycleId: v.cycleId,
+          recruitmentCategory: "RESEARCH",
+          researchSpecialisationId: v.researchSpecialisationId,
+          researchPositionTitle: v.positionTitle,
+          departmentId: v.departmentId ?? null,
+          position: null,
+          formTemplateId: form.id,
+          title: v.title,
+          description: v.description,
+          numberOfPosts: v.numberOfPosts,
+          opensAt: v.opensAt,
+          closesAt: v.closesAt,
+          eligibility: { create: criteria.map((description, sortOrder) => ({ description, sortOrder })) },
+          requiredDocuments: {
+            create: [...new Set(v.requiredDocuments)]
+              .filter((t) => t !== "PHOTOGRAPH" && t !== "SIGNATURE")
+              .map((t, sortOrder) => ({
+                documentType: t,
+                label: DOCUMENT_TYPE_LABELS[t],
+                required: true,
+                sortOrder,
+              })),
+          },
+        },
+      });
+      await audit(
+        {
+          actorId: u.id,
+          action: "vacancy.created",
+          entityType: "vacancy",
+          entityId: created.id,
+          metadata: { code: created.code, recruitmentCategory: "RESEARCH", formTemplate: `${form.code}@${form.version}` },
+        },
+        tx,
+      );
+      return created;
+    });
+  } catch (e) {
+    uniqueViolation(e, "A vacancy with this code already exists");
+  }
+}
+
 export async function adminOverview(user: SessionUser | null) {
   requirePermission(user, "recruitment:manage");
-  const [departments, cycles, vacancies, templates] = await Promise.all([
+  const [departments, cycles, vacancies, templates, researchSpecialisations] = await Promise.all([
     prisma.department.findMany({
       orderBy: { name: "asc" },
       include: {
@@ -405,12 +582,18 @@ export async function adminOverview(user: SessionUser | null) {
       include: {
         department: true,
         discipline: true,
+        researchSpecialisation: true,
         cycle: true,
         formTemplate: true,
         _count: { select: { applications: true } },
       },
     }),
     prisma.formTemplate.findMany({ orderBy: [{ code: "asc" }, { version: "desc" }] }),
+    prisma.researchSpecialisation.findMany({
+      orderBy: [{ sortOrder: "asc" }, { name: "asc" }],
+      include: { _count: { select: { vacancies: true } } },
+    }),
   ]);
-  return { departments, cycles, vacancies, templates };
+  return { departments, cycles, vacancies, templates, researchSpecialisations };
 }
+

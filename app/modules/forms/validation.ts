@@ -316,6 +316,7 @@ export function pgCompletion(a: Answers): string | undefined {
 export interface DerivedContext {
   department: string;
   position?: string;
+  specialisation?: string;
   asOf: string;
 }
 
@@ -323,10 +324,13 @@ export interface DerivedContext {
 export function derivedValue(derivedFrom: string, a: Answers, ctx: DerivedContext): string | number | null {
   switch (derivedFrom) {
     case "vacancy.department":
-      return ctx.department;
+      return ctx.department || (ctx.specialisation ?? "");
     case "vacancy.position":
       return ctx.position ?? null;
+    case "vacancy.specialisation":
+      return ctx.specialisation ?? null;
     case "dateOfBirth":
+
       return typeof a.dateOfBirth === "string" ? ageOn(a.dateOfBirth, ctx.asOf) : null;
     case "today":
       return ctx.asOf;

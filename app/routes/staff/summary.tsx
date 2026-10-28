@@ -200,8 +200,8 @@ export default function Summary({ loaderData, actionData }: Route.ComponentProps
                           {p.application.referenceNo} — {p.application.currentRevision?.candidateName}
                         </Link>
                         <p className="text-sm">
-                          {p.application.vacancy.department.name}: {POSITION_LABELS[p.fromPosition]} →{" "}
-                          <strong>{POSITION_LABELS[p.toPosition]}</strong>
+                          {p.application.vacancy.department?.name ?? "Research"}: {POSITION_LABELS[p.fromPosition] ?? p.fromPosition} →{" "}
+                          <strong>{POSITION_LABELS[p.toPosition] ?? p.toPosition}</strong>
                         </p>
                         <p className="mt-1 whitespace-pre-line text-sm text-muted">{p.reason}</p>
                       </div>
@@ -352,11 +352,28 @@ function OfficeSummary({ L }: { L: OfficeData }) {
           </div>
           <Form method="get" className="flex flex-wrap items-end gap-3">
             <FilterSelect
+              name="recruitmentCategory"
+              label="Stream"
+              value={L.q.recruitmentCategory}
+              options={[
+                ["FACULTY", "Faculty"],
+                ["RESEARCH", "Research"],
+              ]}
+            />
+            <FilterSelect
               name="departmentId"
               label="Department"
               value={L.q.departmentId}
               options={L.options.departments.map((d) => [d.id, d.name])}
             />
+            {L.options.specialisations?.length > 0 && (
+              <FilterSelect
+                name="researchSpecialisationId"
+                label="Specialisation"
+                value={L.q.researchSpecialisationId}
+                options={L.options.specialisations.map((s: { id: string; name: string }) => [s.id, s.name])}
+              />
+            )}
             <FilterSelect
               name="position"
               label="Applied for"
@@ -442,12 +459,24 @@ function OfficeSummary({ L }: { L: OfficeData }) {
                       </Link>
                       <span className="block font-mono text-xs text-muted">{r.referenceNo}</span>
                     </td>
-                    <td>{r.vacancy.department.name}</td>
                     <td>
-                      {POSITION_LABELS[r.appliedPosition ?? r.vacancy.position]}
+                      {r.vacancy.department ? (
+                        r.vacancy.department.name
+                      ) : (
+                        <span className="inline-flex items-center gap-1 font-medium text-emerald-800">
+                          🔬 {r.vacancy.researchSpecialisation?.name ?? "Research"}
+                        </span>
+                      )}
+                    </td>
+                    <td>
+                      {r.appliedPosition
+                        ? (POSITION_LABELS[r.appliedPosition] ?? r.appliedPosition)
+                        : r.vacancy.position
+                          ? (POSITION_LABELS[r.vacancy.position] ?? r.vacancy.position)
+                          : (r.vacancy.researchPositionTitle ?? "Research Assistant")}
                       {r.effectivePosition && (
                         <span className="block text-xs text-brand-700">
-                          → {POSITION_LABELS[r.effectivePosition]}
+                          → {POSITION_LABELS[r.effectivePosition] ?? r.effectivePosition}
                         </span>
                       )}
                     </td>
@@ -584,9 +613,13 @@ function OfficeSummary({ L }: { L: OfficeData }) {
                             if (c.key === "sNo") val = i + 1;
                             else if (c.key === "referenceNo") val = r.referenceNo ?? "—";
                             else if (c.key === "candidateName") val = r.currentRevision?.candidateName ?? "";
-                            else if (c.key === "department") val = r.vacancy.department.name;
+                            else if (c.key === "department")
+                              val = r.vacancy.department?.name ?? r.vacancy.researchSpecialisation?.name ?? "Research";
                             else if (c.key === "appliedFor")
-                              val = POSITION_LABELS[r.appliedPosition ?? r.vacancy.position] ?? "";
+                              val =
+                                (r.appliedPosition && POSITION_LABELS[r.appliedPosition]) ??
+                                (r.vacancy.position && POSITION_LABELS[r.vacancy.position]) ??
+                                (r.vacancy.researchPositionTitle ?? "Research Assistant");
                             else if (c.key === "status") val = STATUS_LABELS[r.status as AppStatus];
                             else if (c.key === "phdStatus") val = r.currentRevision?.phdStatus ?? "None";
                             else val = "—";

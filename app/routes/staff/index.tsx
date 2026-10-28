@@ -136,18 +136,40 @@ export default function StaffIndex({ loaderData, actionData }: Route.ComponentPr
       <PageHeader
         eyebrow={admin ? "Admin" : "HR – N4 Section"}
         title="Applications"
-        description="All submitted applications, department-wise. Filter, open a candidate, or move applications of a department to its HOD."
+        description="All submitted applications, department-wise and research appointments. Filter, review candidates, or transition statuses."
         actions={
-          <>
+          <div className="flex flex-wrap items-center gap-2">
             <Link to="/staff/summary" className="btn-secondary">
               Summary &amp; export
             </Link>
             <Link to="/admin/vacancies/new" className="btn-primary">
               + New job profile
             </Link>
-          </>
+          </div>
         }
       />
+
+      <div className="flex items-center gap-2 border-b border-line pb-3">
+        <Link
+          to={withParams({ recruitmentCategory: null, page: 1 })}
+          className={`chip font-semibold transition-colors ${!q.recruitmentCategory ? "bg-brand-600 text-white" : "bg-soft text-muted hover:text-ink"}`}
+        >
+          All Applications
+        </Link>
+        <Link
+          to={withParams({ recruitmentCategory: "FACULTY", page: 1 })}
+          className={`chip font-semibold transition-colors ${q.recruitmentCategory === "FACULTY" ? "bg-brand-600 text-white" : "bg-soft text-muted hover:text-ink"}`}
+        >
+          🎓 Faculty
+        </Link>
+        <Link
+          to={withParams({ recruitmentCategory: "RESEARCH", page: 1 })}
+          className={`chip font-semibold transition-colors ${q.recruitmentCategory === "RESEARCH" ? "bg-emerald-600 text-white" : "bg-soft text-muted hover:text-ink"}`}
+        >
+          🔬 Research Assistant
+        </Link>
+      </div>
+
 
       {actionData && "message" in actionData && actionData.message && (
         <Alert tone="success">{actionData.message}</Alert>
@@ -514,13 +536,16 @@ export default function StaffIndex({ loaderData, actionData }: Route.ComponentPr
               </thead>
               <tbody>
                 {list.rows.map((r) => {
-                  const applied = r.appliedPosition ?? r.vacancy.position;
+                  const isResearch = r.recruitmentCategory === "RESEARCH" || !r.vacancy.department;
+                  const applied = r.appliedPosition
+                    ? (POSITION_LABELS[r.appliedPosition] ?? r.appliedPosition)
+                    : (r.vacancy.researchPositionTitle ?? (r.vacancy.position ? (POSITION_LABELS[r.vacancy.position] ?? r.vacancy.position) : "Research Assistant"));
                   const rev = r.currentRevision;
                   return (
                     <tr key={r.id}>
                       {canAssign && q.departmentId && (
                         <td>
-                          {ASSIGNABLE.includes(r.status as AppStatus) && (
+                          {!isResearch && ASSIGNABLE.includes(r.status as AppStatus) && (
                             <input
                               type="checkbox"
                               className="h-4 w-4"
@@ -541,15 +566,24 @@ export default function StaffIndex({ loaderData, actionData }: Route.ComponentPr
                         </Link>
                       </td>
                       <td className="font-medium">{rev?.candidateName}</td>
-                      <td>{r.vacancy.department.code}</td>
+                      <td>
+                        {r.vacancy.department?.code ? (
+                          <span title={r.vacancy.department.name}>{r.vacancy.department.code}</span>
+                        ) : (
+                          <span className="badge bg-emerald-100 text-emerald-800 text-xs font-semibold px-2 py-0.5 rounded">
+                            RA
+                          </span>
+                        )}
+                      </td>
                       <td className="whitespace-nowrap">
-                        {POSITION_LABELS[applied]}
+                        {applied}
                         {r.effectivePosition && (
                           <span className="block text-xs text-brand-700">
                             → {POSITION_LABELS[r.effectivePosition]}
                           </span>
                         )}
                       </td>
+
                       <td>{rev?.phdStatus ?? "—"}</td>
                       <td>{rev?.competitiveExams.length ? rev.competitiveExams.join(", ") : "—"}</td>
                       <td className="whitespace-nowrap">
