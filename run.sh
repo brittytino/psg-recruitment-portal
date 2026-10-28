@@ -242,27 +242,31 @@ do_start() {
     check_prerequisites
     ensure_env_file
 
+    # If first deployment has not been executed yet, trigger start.sh
+    if [ ! -f .deployed ]; then
+        echo -e "${CYAN}[INFO] First-time deployment detected. Initializing stack via ./start.sh...${NC}"
+        exec ./start.sh "$@"
+    fi
+
     echo -e "${BOLD}${CYAN}================================================================================${NC}"
-    echo -e "${BOLD}${CYAN}   PSG TECH STAFF RECRUITMENT PORTAL - DOCKER RUNNER${NC}"
+    echo -e "${BOLD}${CYAN}   PSG TECH STAFF RECRUITMENT PORTAL — STARTING SYSTEM${NC}"
     echo -e "${BOLD}${CYAN}================================================================================${NC}"
     echo ""
 
-    echo -e "${CYAN}[1/3] Building Docker images...${NC}"
-    $COMPOSE "${COMPOSE_ARGS[@]}" build app worker migrate converter
-
-    echo ""
-    echo -e "${CYAN}[2/3] Starting Docker stack...${NC}"
+    echo -e "${CYAN}[1/2] Bringing up containers...${NC}"
     ensure_storage_permissions
-    $COMPOSE "${COMPOSE_ARGS[@]}" up -d --remove-orphans --force-recreate
+    $COMPOSE "${COMPOSE_ARGS[@]}" up -d
 
     echo ""
+    echo -e "${CYAN}[2/2] Checking health...${NC}"
     wait_for_health
     show_summary
 
     # Open browser on desktop Linux if display server and xdg-open exist
     if [ -n "${DISPLAY:-}" ] || [ -n "${WAYLAND_DISPLAY:-}" ]; then
         if command -v xdg-open >/dev/null 2>&1; then
-            xdg-open "http://localhost:${port:-6969}" >/dev/null 2>&1 &
+            local port="${APP_HOST_PORT:-6969}"
+            xdg-open "http://localhost:${port}" >/dev/null 2>&1 &
         fi
     fi
 }

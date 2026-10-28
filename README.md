@@ -253,28 +253,33 @@ The portal provides an auditable, Excel-compatible CSV export engine:
 
 ### Quick Start with Docker
 
+**First Deployment (Initial Setup, Build & DB Seed):**
+
+```sh
+# Make executable
+chmod +x ./start.sh ./run.sh ./dev.sh ./prod.sh
+
+# Run first-time deployment (builds images, prepares storage, migrates DB & seeds accounts)
+./start.sh
+# Or for first-time production deployment:
+./start.sh prod
+```
+
+**Subsequent System Runs (Fast Uptime & Management):**
+
+```sh
+# Bring up the running system
+./run.sh
+
+# Or start in background (headless/CI):
+./run.sh start
+```
+
 **Windows (cmd / PowerShell):**
 
 ```bat
-REM Interactive runner:
+REM First time automatically builds and migrates; subsequent runs quickly bring up the system:
 .\run.bat
-
-REM Or headless / background start:
-.\run.bat start
-```
-
-**Linux Server / macOS (bash / sh):**
-
-```sh
-# Make executable (first time only)
-chmod +x ./run.sh ./start.sh
-
-# Interactive runner (auto-detects server IP and health)
-./run.sh
-
-# Or start in background / non-interactive (e.g. over SSH, systemd, or CI)
-./run.sh start
-# or ./start.sh
 ```
 
 Or via Docker Compose commands manually:

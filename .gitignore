@@ -2,12 +2,7 @@ node_modules/
 build/
 build-worker/
 .react-router/
-.env
-.env.*
-.env*.local
-!.env.example
-!.env.production
-!.env.development
+
 storage/
 backups/
 playwright-report/

@@ -59,21 +59,25 @@ if not exist .env (
     echo [OK] Successfully copied .env.example -^> .env
 )
 
-echo [1/3] Building Docker images...
-docker compose -f compose.yaml -f compose.dev.yaml build app worker migrate converter
-if errorlevel 1 (
-    echo [ERROR] Docker build failed.
-    pause
-    exit /b 1
-)
-
-echo.
-echo [2/3] Starting Docker stack...
-docker compose -f compose.yaml -f compose.dev.yaml up -d --remove-orphans --force-recreate
-if errorlevel 1 (
-    echo [ERROR] Failed to start Docker containers.
-    pause
-    exit /b 1
+if not exist .deployed (
+    echo [INFO] First-time deployment detected. Running initial build and migrations...
+    echo.
+    echo [1/3] Building Docker images...
+    docker compose -f compose.yaml -f compose.dev.yaml build app worker migrate converter
+    if errorlevel 1 (
+        echo [ERROR] Docker build failed.
+        pause
+        exit /b 1
+    )
+    echo.
+    echo [2/3] Initializing database and bootstrapping institutional accounts...
+    docker compose -f compose.yaml -f compose.dev.yaml up -d db redis
+    docker compose -f compose.yaml -f compose.dev.yaml run --rm migrate
+    docker compose -f compose.yaml -f compose.dev.yaml up -d --remove-orphans
+    echo deployed > .deployed
+) else (
+    echo [INFO] Bringing up recruitment portal stack...
+    docker compose -f compose.yaml -f compose.dev.yaml up -d
 )
 
 echo.
