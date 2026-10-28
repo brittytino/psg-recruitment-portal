@@ -29,7 +29,7 @@ describe("Research Application Form (V1)", () => {
         specialisation: "Robotics & Autonomous Systems",
         position: "Research Assistant",
         asOf: "2026-10-28",
-      }
+      },
     );
 
     expect(derived.specialisation).toBe("Robotics & Autonomous Systems");
@@ -60,18 +60,14 @@ describe("Research Application Form (V1)", () => {
       relationship: "Guide",
     };
 
-    const emptyRefIssues = validateAnswers(
-      researchApplicationV1,
-      { references: [] },
-      "submit"
-    ).filter((i) => i.path === "references");
+    const emptyRefIssues = validateAnswers(researchApplicationV1, { references: [] }, "submit").filter(
+      (i) => i.path === "references",
+    );
     expect(emptyRefIssues.length).toBeGreaterThan(0);
 
-    const oneRefIssues = validateAnswers(
-      researchApplicationV1,
-      { references: [validRef] },
-      "submit"
-    ).filter((i) => i.path.startsWith("references"));
+    const oneRefIssues = validateAnswers(researchApplicationV1, { references: [validRef] }, "submit").filter(
+      (i) => i.path.startsWith("references"),
+    );
     expect(oneRefIssues.length).toBe(0);
 
     const invalidMobileRef = {
@@ -81,7 +77,7 @@ describe("Research Application Form (V1)", () => {
     const badMobileIssues = validateAnswers(
       researchApplicationV1,
       { references: [invalidMobileRef] },
-      "submit"
+      "submit",
     ).filter((i) => i.path.startsWith("references"));
     expect(badMobileIssues.some((i) => i.path.includes("mobile"))).toBe(true);
   });

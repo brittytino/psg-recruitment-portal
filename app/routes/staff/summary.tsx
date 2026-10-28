@@ -200,7 +200,8 @@ export default function Summary({ loaderData, actionData }: Route.ComponentProps
                           {p.application.referenceNo} — {p.application.currentRevision?.candidateName}
                         </Link>
                         <p className="text-sm">
-                          {p.application.vacancy.department?.name ?? "Research"}: {POSITION_LABELS[p.fromPosition] ?? p.fromPosition} →{" "}
+                          {p.application.vacancy.department?.name ?? "Research"}:{" "}
+                          {POSITION_LABELS[p.fromPosition] ?? p.fromPosition} →{" "}
                           <strong>{POSITION_LABELS[p.toPosition] ?? p.toPosition}</strong>
                         </p>
                         <p className="mt-1 whitespace-pre-line text-sm text-muted">{p.reason}</p>
@@ -389,11 +390,7 @@ function OfficeSummary({ L }: { L: OfficeData }) {
         {L.list.rows.length > 0 && (
           <div className="flex flex-wrap items-center justify-between gap-2 rounded-xl bg-soft p-3 text-sm">
             <div className="flex items-center gap-3">
-              <button
-                type="button"
-                onClick={toggleSelectAllVisible}
-                className="btn-secondary py-1 text-xs"
-              >
+              <button type="button" onClick={toggleSelectAllVisible} className="btn-secondary py-1 text-xs">
                 {allVisibleSelected ? "Deselect all visible" : "Select all on page"}
               </button>
               {selectedRows.size > 0 && (
@@ -504,8 +501,9 @@ function OfficeSummary({ L }: { L: OfficeData }) {
               Export to Excel (CSV)
             </h2>
             <p className="mt-1 text-[15px] text-muted">
-              Choose the columns and export either selected rows ({selectedRows.size > 0 ? selectedRows.size : "all"})
-              or all matching filters ({L.list.total}). Safe from spreadsheet formula injection.
+              Choose the columns and export either selected rows (
+              {selectedRows.size > 0 ? selectedRows.size : "all"}) or all matching filters ({L.list.total}).
+              Safe from spreadsheet formula injection.
             </p>
           </div>
           <Form method="get" action="/staff/export.csv" reloadDocument className="space-y-5">
@@ -614,12 +612,16 @@ function OfficeSummary({ L }: { L: OfficeData }) {
                             else if (c.key === "referenceNo") val = r.referenceNo ?? "—";
                             else if (c.key === "candidateName") val = r.currentRevision?.candidateName ?? "";
                             else if (c.key === "department")
-                              val = r.vacancy.department?.name ?? r.vacancy.researchSpecialisation?.name ?? "Research";
+                              val =
+                                r.vacancy.department?.name ??
+                                r.vacancy.researchSpecialisation?.name ??
+                                "Research";
                             else if (c.key === "appliedFor")
                               val =
                                 (r.appliedPosition && POSITION_LABELS[r.appliedPosition]) ??
                                 (r.vacancy.position && POSITION_LABELS[r.vacancy.position]) ??
-                                (r.vacancy.researchPositionTitle ?? "Research Assistant");
+                                r.vacancy.researchPositionTitle ??
+                                "Research Assistant";
                             else if (c.key === "status") val = STATUS_LABELS[r.status as AppStatus];
                             else if (c.key === "phdStatus") val = r.currentRevision?.phdStatus ?? "None";
                             else val = "—";

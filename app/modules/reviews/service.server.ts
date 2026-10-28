@@ -63,8 +63,14 @@ export async function assignToHod(user: SessionUser | null, input: unknown, ip?:
   });
   if (apps.length !== applicationIds.length) throw new NotFoundError("Application");
   for (const a of apps) {
-    if (a.vacancy.recruitmentCategory === "RESEARCH" || !a.vacancy.departmentId || !hodDepts.has(a.vacancy.departmentId))
-      throw new ValidationError(`${a.referenceNo} is a research application or belongs to a department this HOD does not review`);
+    if (
+      a.vacancy.recruitmentCategory === "RESEARCH" ||
+      !a.vacancy.departmentId ||
+      !hodDepts.has(a.vacancy.departmentId)
+    )
+      throw new ValidationError(
+        `${a.referenceNo} is a research application or belongs to a department this HOD does not review`,
+      );
     if (!ASSIGNABLE.includes(a.status as AppStatus))
       throw new ConflictError(
         `${a.referenceNo} is “${STATUS_LABELS[a.status as AppStatus]}” and cannot be moved to a HOD`,

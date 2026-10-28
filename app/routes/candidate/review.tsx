@@ -164,7 +164,8 @@ export default function Review({ loaderData: L, actionData }: Route.ComponentPro
           className="h-[75vh] min-h-[480px] w-full rounded-2xl border border-line bg-soft"
         />
         <p className="text-sm text-muted">
-          Cannot view the embedded PDF? <a href={`/applications/${L.id}/preview.pdf`}>Download the preview PDF</a>.
+          Cannot view the embedded PDF?{" "}
+          <a href={`/applications/${L.id}/preview.pdf`}>Download the preview PDF</a>.
         </p>
       </section>
 

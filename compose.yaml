@@ -19,12 +19,23 @@ x-app-env: &app-env
   MALWARE_SCAN: ${MALWARE_SCAN:-clamav}
   CLAMAV_HOST: clamav
   CLAMAV_PORT: 3310
+  EMAIL_PROVIDER: ${EMAIL_PROVIDER:-mailpit}
   SMTP_HOST: ${SMTP_HOST:-mailpit}
   SMTP_PORT: ${SMTP_PORT:-1025}
   SMTP_SECURE: ${SMTP_SECURE:-false}
   SMTP_USER: ${SMTP_USER:-}
   SMTP_PASSWORD: ${SMTP_PASSWORD:-}
-  MAIL_FROM: ${MAIL_FROM}
+  SMTP_FROM_NAME: ${SMTP_FROM_NAME:-PSG College of Technology Recruitment}
+  SMTP_FROM_EMAIL: ${SMTP_FROM_EMAIL:-recruitments@psgtech.ac.in}
+  MAIL_FROM: ${MAIL_FROM:-PSG College of Technology Recruitment <recruitments@psgtech.ac.in>}
+  SMTP_CONNECTION_TIMEOUT_MS: ${SMTP_CONNECTION_TIMEOUT_MS:-10000}
+  SMTP_GREETING_TIMEOUT_MS: ${SMTP_GREETING_TIMEOUT_MS:-10000}
+  SMTP_SOCKET_TIMEOUT_MS: ${SMTP_SOCKET_TIMEOUT_MS:-20000}
+  OTP_LENGTH: ${OTP_LENGTH:-6}
+  OTP_EXPIRY_MINUTES: ${OTP_EXPIRY_MINUTES:-5}
+  OTP_RESEND_COOLDOWN_SECONDS: ${OTP_RESEND_COOLDOWN_SECONDS:-60}
+  OTP_MAX_ATTEMPTS: ${OTP_MAX_ATTEMPTS:-5}
+  OTP_MAX_SENDS_PER_HOUR: ${OTP_MAX_SENDS_PER_HOUR:-5}
   LOG_LEVEL: ${LOG_LEVEL:-info}
 
 services:
@@ -74,7 +85,13 @@ services:
     read_only: true
     tmpfs: ["/tmp:size=512m"]
     healthcheck:
-      test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:3100/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"]
+      test:
+        [
+          "CMD",
+          "node",
+          "-e",
+          "fetch('http://127.0.0.1:3100/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))",
+        ]
       interval: 10s
       timeout: 5s
       retries: 6
@@ -105,6 +122,11 @@ services:
     restart: unless-stopped
     ports:
       - "${MAILPIT_UI_HOST_PORT:-8025}:8025"
+    healthcheck:
+      test: ["CMD-SHELL", "wget -q --spider http://127.0.0.1:8025/api/v1/info || exit 1"]
+      interval: 10s
+      timeout: 3s
+      retries: 5
     networks: [backend, frontend]
 
   # Visual database management tool (Adminer) accessible at http://localhost:6981
@@ -148,7 +170,13 @@ services:
       migrate: { condition: service_completed_successfully }
       redis: { condition: service_healthy }
     healthcheck:
-      test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:3000/healthz/ready').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"]
+      test:
+        [
+          "CMD",
+          "node",
+          "-e",
+          "fetch('http://127.0.0.1:3000/healthz/ready').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))",
+        ]
       interval: 10s
       timeout: 5s
       retries: 6

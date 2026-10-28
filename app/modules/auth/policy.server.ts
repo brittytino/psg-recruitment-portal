@@ -60,4 +60,3 @@ export function researchApplicationScope(user: SessionUser): Prisma.ApplicationW
   if (!hr) return null;
   return { AND: [hr, { recruitmentCategory: "RESEARCH" }] };
 }
-

@@ -68,10 +68,7 @@ export async function loader({ request, context }: Route.LoaderArgs) {
   if (pos && (pos === "ASSISTANT_PROFESSOR" || pos === "ASSOCIATE_PROFESSOR" || pos === "PROFESSOR")) {
     const positionEnum = pos as Position;
     andClauses.push({
-      OR: [
-        { appliedPosition: positionEnum },
-        { appliedPosition: null, vacancy: { position: positionEnum } },
-      ],
+      OR: [{ appliedPosition: positionEnum }, { appliedPosition: null, vacancy: { position: positionEnum } }],
     });
   }
 
@@ -108,7 +105,9 @@ export async function loader({ request, context }: Route.LoaderArgs) {
       effectivePosition: true,
       hodDecision: true,
       assignedAt: true,
-      vacancy: { select: { position: true, researchPositionTitle: true, department: { select: { name: true } } } },
+      vacancy: {
+        select: { position: true, researchPositionTitle: true, department: { select: { name: true } } },
+      },
       currentRevision: {
         select: {
           candidateName: true,
@@ -192,11 +191,7 @@ export default function HodReview({ loaderData }: Route.ComponentProps) {
         <StatTile label="Assigned to you" value={counts.total} />
         <StatTile label="Waiting for decision" value={counts.pending} tone="bg-tile-orange/40" />
         <StatTile label="Accepted" value={counts.accepted} tone="bg-tile-green/50" />
-        <StatTile
-          label="Position change / rejected"
-          value={counts.otherDecided}
-          tone="bg-tile-purple/50"
-        />
+        <StatTile label="Position change / rejected" value={counts.otherDecided} tone="bg-tile-purple/50" />
       </section>
 
       {counts.pending === 0 && counts.total > 0 && (
@@ -204,7 +199,8 @@ export default function HodReview({ loaderData }: Route.ComponentProps) {
           All applications are decided.{" "}
           <Link to="/staff/summary" className="font-semibold text-brand-700 underline">
             Generate and approve your summary sheet
-          </Link>.
+          </Link>
+          .
         </div>
       )}
 
@@ -355,7 +351,9 @@ export default function HodReview({ loaderData }: Route.ComponentProps) {
                     <td className="whitespace-nowrap font-mono text-sm">{a.referenceNo}</td>
                     <td className="font-semibold">{r?.candidateName}</td>
                     <td className="whitespace-nowrap">
-                      {applied ? (POSITION_LABELS[applied] ?? applied) : (a.vacancy.researchPositionTitle ?? "Research Assistant")}
+                      {applied
+                        ? (POSITION_LABELS[applied] ?? applied)
+                        : (a.vacancy.researchPositionTitle ?? "Research Assistant")}
                     </td>
                     <td>{r?.qualifications[0]?.degree ?? "—"}</td>
                     <td>{r?.phdStatus ?? "—"}</td>

@@ -330,7 +330,6 @@ export function derivedValue(derivedFrom: string, a: Answers, ctx: DerivedContex
     case "vacancy.specialisation":
       return ctx.specialisation ?? null;
     case "dateOfBirth":
-
       return typeof a.dateOfBirth === "string" ? ageOn(a.dateOfBirth, ctx.asOf) : null;
     case "today":
       return ctx.asOf;

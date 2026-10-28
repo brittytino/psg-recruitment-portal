@@ -53,7 +53,10 @@ export async function loader({ request, params, context }: Route.LoaderArgs) {
     hodDepartments(user.grants).includes(app.vacancy.departmentId);
   const applied = app.appliedPosition
     ? (POSITION_LABELS[app.appliedPosition] ?? app.appliedPosition)
-    : (app.vacancy.researchPositionTitle ?? (app.vacancy.position ? (POSITION_LABELS[app.vacancy.position] ?? app.vacancy.position) : "Research Assistant"));
+    : (app.vacancy.researchPositionTitle ??
+      (app.vacancy.position
+        ? (POSITION_LABELS[app.vacancy.position] ?? app.vacancy.position)
+        : "Research Assistant"));
   const current = app.generated.filter((g) => g.revisionId === app.currentRevisionId && g.status === "READY");
   return {
     app: {
@@ -509,49 +512,51 @@ export default function StaffApplication({ loaderData, actionData }: Route.Compo
             </section>
           )}
 
-          {canAssign && app.recruitmentCategory !== "RESEARCH" && (ASSIGNABLE.includes(app.status) || app.status === "ASSIGNED_TO_HOD") && (
-            <section className="card space-y-3" aria-labelledby="assign">
-              <h2 id="assign" className="text-xl">
-                HOD assignment
-              </h2>
-              {ASSIGNABLE.includes(app.status) && (
-                <Form method="post" className="space-y-2">
-                  <CsrfInput />
-                  <input type="hidden" name="intent" value="assign" />
-                  <label htmlFor="hodId" className="block text-sm font-semibold">
-                    {app.hod ? "Move to another HOD" : `Move to a HOD of ${app.vacancy.department}`}
-                  </label>
-                  <select id="hodId" name="hodId" required className="field-input">
-                    <option value="">Choose…</option>
-                    {hods.map((h) => (
-                      <option key={h.id} value={h.id}>
-                        {h.profile?.fullName ?? h.email}
-                      </option>
-                    ))}
-                  </select>
-                  {!hods.length && (
-                    <p className="text-sm text-warning">No HOD is set up for this department.</p>
-                  )}
-                  <button type="submit" className="btn-secondary w-full" disabled={busy || !hods.length}>
-                    Move to HOD
-                  </button>
-                </Form>
-              )}
-              {app.status === "ASSIGNED_TO_HOD" && (
-                <Form method="post" className="space-y-2 border-t border-line pt-3">
-                  <CsrfInput />
-                  <input type="hidden" name="intent" value="unassign" />
-                  <label htmlFor="ureason" className="block text-sm font-semibold">
-                    Take back from the HOD — reason
-                  </label>
-                  <input id="ureason" name="reason" required minLength={5} className="field-input" />
-                  <button type="submit" className="btn-secondary w-full" disabled={busy}>
-                    Take back
-                  </button>
-                </Form>
-              )}
-            </section>
-          )}
+          {canAssign &&
+            app.recruitmentCategory !== "RESEARCH" &&
+            (ASSIGNABLE.includes(app.status) || app.status === "ASSIGNED_TO_HOD") && (
+              <section className="card space-y-3" aria-labelledby="assign">
+                <h2 id="assign" className="text-xl">
+                  HOD assignment
+                </h2>
+                {ASSIGNABLE.includes(app.status) && (
+                  <Form method="post" className="space-y-2">
+                    <CsrfInput />
+                    <input type="hidden" name="intent" value="assign" />
+                    <label htmlFor="hodId" className="block text-sm font-semibold">
+                      {app.hod ? "Move to another HOD" : `Move to a HOD of ${app.vacancy.department}`}
+                    </label>
+                    <select id="hodId" name="hodId" required className="field-input">
+                      <option value="">Choose…</option>
+                      {hods.map((h) => (
+                        <option key={h.id} value={h.id}>
+                          {h.profile?.fullName ?? h.email}
+                        </option>
+                      ))}
+                    </select>
+                    {!hods.length && (
+                      <p className="text-sm text-warning">No HOD is set up for this department.</p>
+                    )}
+                    <button type="submit" className="btn-secondary w-full" disabled={busy || !hods.length}>
+                      Move to HOD
+                    </button>
+                  </Form>
+                )}
+                {app.status === "ASSIGNED_TO_HOD" && (
+                  <Form method="post" className="space-y-2 border-t border-line pt-3">
+                    <CsrfInput />
+                    <input type="hidden" name="intent" value="unassign" />
+                    <label htmlFor="ureason" className="block text-sm font-semibold">
+                      Take back from the HOD — reason
+                    </label>
+                    <input id="ureason" name="reason" required minLength={5} className="field-input" />
+                    <button type="submit" className="btn-secondary w-full" disabled={busy}>
+                      Take back
+                    </button>
+                  </Form>
+                )}
+              </section>
+            )}
 
           {isOffice && (
             <section className="card space-y-3" aria-labelledby="internal-note">
@@ -584,7 +589,6 @@ export default function StaffApplication({ loaderData, actionData }: Route.Compo
           {transitions.length > 0 && (
             <section className="card space-y-3" aria-labelledby="status">
               <h2 id="status" className="text-xl">
-
                 Status
               </h2>
               {transitions.map((t) => (

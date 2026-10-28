@@ -25,16 +25,16 @@ Mailpit (captured e-mails): http://localhost:6980.
 
 ## Ports
 
-| Service                       |    Host port | Container port | Published                                              |
-| ----------------------------- | -----------: | -------------: | ------------------------------------------------------ |
-| Application                   |         6969 |           3000 | always (local stack)                                   |
-| PostgreSQL                    |         6543 |           5432 | dev override only, 127.0.0.1                           |
-| Redis                         |        63879 |           6379 | dev override only, 127.0.0.1                           |
-| Converter                     |        63100 |           3100 | dev override only, 127.0.0.1                           |
-| ClamAV                        |        63310 |           3310 | dev override only, 127.0.0.1                           |
-| Mailpit UI / SMTP             |  8025 / 2525 |    8025 / 1025 | dev override only                                      |
-| Adminer DB Viewer             |         6981 |           8080 | dev override only, 127.0.0.1                           |
-| Blue-green simulation (Nginx) |         6970 |             80 | `compose.production.yaml` with local `.env.production` |
+| Service                       |   Host port | Container port | Published                                              |
+| ----------------------------- | ----------: | -------------: | ------------------------------------------------------ |
+| Application                   |        6969 |           3000 | always (local stack)                                   |
+| PostgreSQL                    |        6543 |           5432 | dev override only, 127.0.0.1                           |
+| Redis                         |       63879 |           6379 | dev override only, 127.0.0.1                           |
+| Converter                     |       63100 |           3100 | dev override only, 127.0.0.1                           |
+| ClamAV                        |       63310 |           3310 | dev override only, 127.0.0.1                           |
+| Mailpit UI / SMTP             | 8025 / 2525 |    8025 / 1025 | dev override only                                      |
+| Adminer DB Viewer             |        6981 |           8080 | dev override only, 127.0.0.1                           |
+| Blue-green simulation (Nginx) |        6970 |             80 | `compose.production.yaml` with local `.env.production` |
 
 All host ports are variables in `.env`. Check conflicts first: `netstat -ano | findstr :6969` (Windows) or `ss -ltnp | grep 6969` (Linux).
 

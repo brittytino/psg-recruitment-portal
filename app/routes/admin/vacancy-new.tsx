@@ -88,7 +88,9 @@ export default function VacancyNew({ loaderData, actionData }: Route.ComponentPr
             >
               <span className="text-xl block mb-1">🎓</span>
               <span className="block text-sm">Faculty Recruitment</span>
-              <span className="block text-xs font-normal text-muted mt-0.5">Professor cadre with HOD review</span>
+              <span className="block text-xs font-normal text-muted mt-0.5">
+                Professor cadre with HOD review
+              </span>
             </button>
             <button
               type="button"
@@ -101,7 +103,9 @@ export default function VacancyNew({ loaderData, actionData }: Route.ComponentPr
             >
               <span className="text-xl block mb-1">🔬</span>
               <span className="block text-sm">Research Appointment</span>
-              <span className="block text-xs font-normal text-muted mt-0.5">Research Assistant / Associate (HR review)</span>
+              <span className="block text-xs font-normal text-muted mt-0.5">
+                Research Assistant / Associate (HR review)
+              </span>
             </button>
           </div>
           <input type="hidden" name="recruitmentCategory" value={category} />
@@ -111,7 +115,11 @@ export default function VacancyNew({ loaderData, actionData }: Route.ComponentPr
           label="Vacancy code"
           name="code"
           required
-          hint={category === "FACULTY" ? "Public reference, e.g. 2026-CSE-AP" : "Public reference, e.g. 2026-RA-AIML"}
+          hint={
+            category === "FACULTY"
+              ? "Public reference, e.g. 2026-CSE-AP"
+              : "Public reference, e.g. 2026-RA-AIML"
+          }
           error={fe?.code?.[0]}
         />
         <TextInput label="Title" name="title" required error={fe?.title?.[0]} />
@@ -132,7 +140,8 @@ export default function VacancyNew({ loaderData, actionData }: Route.ComponentPr
                   ))}
               </select>
               <p className="mt-1 text-xs text-muted">
-                Professor and Associate Professor vacancies use the official “PROFESSOR / ASSOCIATE PROFESSOR” form.
+                Professor and Associate Professor vacancies use the official “PROFESSOR / ASSOCIATE PROFESSOR”
+                form.
               </p>
             </div>
           ) : (

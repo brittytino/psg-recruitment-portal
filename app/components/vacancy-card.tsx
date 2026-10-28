@@ -41,7 +41,8 @@ export function VacancyCard({ v }: { v: VacancyCardData }) {
   const isResearch = v.recruitmentCategory === "RESEARCH" || !v.department;
   const deptOrSpec = v.department?.name ?? v.researchSpecialisation?.name ?? "Research Appointment";
   const posTitle =
-    v.researchPositionTitle ?? (v.position ? (POSITION_LABELS[v.position] ?? v.position) : "Research Assistant");
+    v.researchPositionTitle ??
+    (v.position ? (POSITION_LABELS[v.position] ?? v.position) : "Research Assistant");
   const tileClass = isResearch
     ? "bg-emerald-50 text-emerald-800 border border-emerald-200/60"
     : (POSITION_TILE[v.position ?? ""] ?? "bg-soft");
@@ -62,9 +63,7 @@ export function VacancyCard({ v }: { v: VacancyCardData }) {
             {emoji}
           </span>
           <div className="min-w-0 flex-1">
-            <p className="truncate text-xs font-bold uppercase tracking-wider text-muted">
-              {deptOrSpec}
-            </p>
+            <p className="truncate text-xs font-bold uppercase tracking-wider text-muted">{deptOrSpec}</p>
             <h3 className="mt-1 text-base sm:text-lg font-bold leading-snug">
               <Link
                 to={`/vacancies/${v.code}`}
@@ -89,7 +88,6 @@ export function VacancyCard({ v }: { v: VacancyCardData }) {
           )}
         </ul>
       </div>
-
 
       <div className="flex flex-wrap items-center justify-between gap-2.5 sm:gap-3 border-t border-line/70 pt-4 text-sm">
         <span className="text-xs sm:text-sm text-muted">

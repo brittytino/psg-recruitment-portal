@@ -11,7 +11,6 @@ import type { DocType } from "~/modules/documents/policy";
 
 export type FormCode = "ASSISTANT_PROFESSOR" | "ASSOCIATE_PROFESSOR" | "RESEARCH_APPLICATION";
 
-
 /** Requirement status. `policy` = awaiting institutional confirmation; treated as optional. */
 export type Requirement = "required" | "optional" | "policy";
 

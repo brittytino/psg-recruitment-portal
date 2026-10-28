@@ -1,9 +1,5 @@
 import { describe, expect, it } from "vitest";
-import {
-  availableTransitions,
-  findTransition,
-  type AppStatus,
-} from "~/modules/applications/workflow";
+import { availableTransitions, findTransition } from "~/modules/applications/workflow";
 
 describe("Research recruitment workflow state machine", () => {
   describe("Research category transitions", () => {

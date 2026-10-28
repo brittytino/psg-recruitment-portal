@@ -34,5 +34,3 @@ export function parseResearchReference(ref: string): { academicYear: string; seq
   if (!match || !match[1] || !match[2]) return null;
   return { academicYear: match[1], sequence: parseInt(match[2], 10) };
 }
-
-

@@ -22,8 +22,13 @@ import { DOCUMENT_TYPE_LABELS, INLINE_ENTRY_DOC_TYPES } from "~/modules/document
 import { POSITION_LABELS } from "~/lib/labels";
 import { academicYearOf, ACADEMIC_YEAR, formatReference, formatResearchReference } from "./reference";
 import { enqueueOutbox, notify } from "~/modules/notifications/outbox.server";
-import { EDITABLE, findTransition, STATUS_LABELS, type AppStatus, type RecruitmentCategory } from "./workflow";
-
+import {
+  EDITABLE,
+  findTransition,
+  STATUS_LABELS,
+  type AppStatus,
+  type RecruitmentCategory,
+} from "./workflow";
 
 const today = () => new Date().toISOString().slice(0, 10);
 
@@ -142,7 +147,6 @@ export async function listOwnApplications(user: SessionUser) {
   });
 }
 
-
 export interface SaveResult {
   version: number;
   savedAt: Date;
@@ -206,7 +210,9 @@ export function derivedContext(app: {
   const spec = app.vacancy.researchSpecialisation?.name;
   const pos =
     app.vacancy.researchPositionTitle ??
-    (app.vacancy.position ? (POSITION_LABELS[app.vacancy.position] ?? app.vacancy.position) : "Research Assistant");
+    (app.vacancy.position
+      ? (POSITION_LABELS[app.vacancy.position] ?? app.vacancy.position)
+      : "Research Assistant");
   return {
     department: dept,
     position: pos,
@@ -627,12 +633,7 @@ export async function transition(
     },
   });
   if (!app) throw new NotFoundError("Application");
-  const t = findTransition(
-    app.status as AppStatus,
-    to,
-    "hr",
-    app.recruitmentCategory as RecruitmentCategory,
-  );
+  const t = findTransition(app.status as AppStatus, to, "hr", app.recruitmentCategory as RecruitmentCategory);
   if (!t)
     throw new ConflictError(
       `Cannot move from "${STATUS_LABELS[app.status as AppStatus]}" to "${STATUS_LABELS[to]}"`,
@@ -718,4 +719,3 @@ export async function updateInternalNote(
     );
   });
 }
-

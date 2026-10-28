@@ -139,8 +139,7 @@ export type LoginResult =
   | { ok: false; message: string };
 
 export type RequestOtpResult =
-  | { ok: true; challengeId: string; email: string }
-  | { ok: false; message: string };
+  { ok: true; challengeId: string; email: string } | { ok: false; message: string };
 
 /**
  * Initiates passwordless e-mail OTP login for all users (candidates and staff).
@@ -157,7 +156,8 @@ export async function requestLoginOtp(emailRaw: string, ip: string): Promise<Req
   if (!user) {
     return {
       ok: false,
-      message: "No account found with this e-mail address. If you are an applicant, please create an account first.",
+      message:
+        "No account found with this e-mail address. If you are an applicant, please create an account first.",
     };
   }
 

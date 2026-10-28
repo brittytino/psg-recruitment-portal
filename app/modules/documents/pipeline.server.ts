@@ -216,7 +216,10 @@ export async function generateBundle(
     const app = gen.application;
     const position = app.appliedPosition
       ? (POSITION_LABELS[app.appliedPosition] ?? app.appliedPosition)
-      : (app.vacancy.researchPositionTitle ?? (app.vacancy.position ? (POSITION_LABELS[app.vacancy.position] ?? app.vacancy.position) : "Research Assistant"));
+      : (app.vacancy.researchPositionTitle ??
+        (app.vacancy.position
+          ? (POSITION_LABELS[app.vacancy.position] ?? app.vacancy.position)
+          : "Research Assistant"));
     const department = app.vacancy.department?.name ?? app.vacancy.researchSpecialisation?.name ?? "Research";
     formPdfBytes = await renderFormPdf({
       formCode: code,

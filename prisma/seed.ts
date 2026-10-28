@@ -55,15 +55,33 @@ const TEMPLATES = [
 ];
 
 const INITIAL_SPECIALISATIONS = [
-  { name: "Artificial Intelligence & Machine Learning", description: "Deep learning, NLP, computer vision, genAI" },
-  { name: "Electric Mobility & Smart Energy Systems", description: "EV powertrains, BMS, charging infrastructure" },
-  { name: "Advanced Materials & Nanotechnology", description: "Smart polymers, functional coatings, nanomaterials" },
+  {
+    name: "Artificial Intelligence & Machine Learning",
+    description: "Deep learning, NLP, computer vision, genAI",
+  },
+  {
+    name: "Electric Mobility & Smart Energy Systems",
+    description: "EV powertrains, BMS, charging infrastructure",
+  },
+  {
+    name: "Advanced Materials & Nanotechnology",
+    description: "Smart polymers, functional coatings, nanomaterials",
+  },
   { name: "Robotics & Automation", description: "Autonomous systems, industrial robotics, control systems" },
   { name: "Internet of Things & Embedded Systems", description: "Edge computing, sensor networks, firmware" },
-  { name: "Biomedical Devices & Healthcare Technologies", description: "Medical instrumentation, biosensors, imaging" },
+  {
+    name: "Biomedical Devices & Healthcare Technologies",
+    description: "Medical instrumentation, biosensors, imaging",
+  },
   { name: "VLSI & Semiconductor Technologies", description: "IC design, ASIC/FPGA, microelectronics" },
-  { name: "Cyber Security & Cloud Computing", description: "Network security, cryptography, distributed systems" },
-  { name: "Sustainable Manufacturing & Industry 4.0", description: "Additive manufacturing, digital twins, smart factory" },
+  {
+    name: "Cyber Security & Cloud Computing",
+    description: "Network security, cryptography, distributed systems",
+  },
+  {
+    name: "Sustainable Manufacturing & Industry 4.0",
+    description: "Additive manufacturing, digital twins, smart factory",
+  },
   { name: "Renewable Energy & Battery Storage", description: "Solar PV, green hydrogen, supercapacitors" },
 ];
 
@@ -72,7 +90,12 @@ const STAFF: { email: string; name: string; role: Role; departmentCode?: string 
   { email: "dean.admn@psgtech.ac.in", name: "Dr. S. Saravanan (Dean)", role: "ADMIN" },
   { email: "principal@psgtech.ac.in", name: "Dr. G. Thilagavathi (Principal)", role: "ADMIN" },
   { email: "admin.n4@psgtech.ac.in", name: "HR – N4 Section", role: "HR" },
-  { email: "hod.cse@psgtech.ac.in", name: "HOD Computer Science and Engineering", role: "HOD", departmentCode: "CSE" },
+  {
+    email: "hod.cse@psgtech.ac.in",
+    name: "HOD Computer Science and Engineering",
+    role: "HOD",
+    departmentCode: "CSE",
+  },
 ];
 
 async function registerTemplates() {
@@ -112,7 +135,6 @@ async function ensureSpecialisations() {
   console.log(`ensured ${INITIAL_SPECIALISATIONS.length} research specialisations`);
 }
 
-
 async function ensureDepartments() {
   const cse = await prisma.department.upsert({
     where: { code: "CSE" },
@@ -148,7 +170,12 @@ async function ensureStaff() {
       if (existing.profile?.fullName !== s.name) {
         await prisma.candidateProfile.upsert({
           where: { userId: existing.id },
-          create: { userId: existing.id, fullName: s.name, privacyVersion: "staff", privacyAcceptedAt: new Date() },
+          create: {
+            userId: existing.id,
+            fullName: s.name,
+            privacyVersion: "staff",
+            privacyAcceptedAt: new Date(),
+          },
           update: { fullName: s.name },
         });
       }
@@ -184,7 +211,6 @@ async function main() {
   await ensureSpecialisations();
   await ensureStaff();
 }
-
 
 main()
   .then(() => prisma.$disconnect())

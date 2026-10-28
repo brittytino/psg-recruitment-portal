@@ -154,7 +154,8 @@ export default function Account({ loaderData, actionData }: Route.ComponentProps
                         </p>
                         <h3 className="font-semibold leading-snug">{a.vacancy.title}</h3>
                         <p className="mt-0.5 text-xs text-muted">
-                          {a.vacancy.researchPositionTitle ?? (a.vacancy.position ? POSITION_LABELS[a.vacancy.position] : "Research Assistant")}
+                          {a.vacancy.researchPositionTitle ??
+                            (a.vacancy.position ? POSITION_LABELS[a.vacancy.position] : "Research Assistant")}
                         </p>
                       </div>
                     </div>

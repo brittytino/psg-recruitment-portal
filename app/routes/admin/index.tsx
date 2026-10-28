@@ -149,7 +149,7 @@ export default function AdminIndex({ loaderData, actionData }: Route.ComponentPr
                         <span className="block text-sm text-muted">
                           {v.code} ·{" "}
                           {v.position
-                            ? POSITION_LABELS[v.position] ?? v.position
+                            ? (POSITION_LABELS[v.position] ?? v.position)
                             : (v.researchPositionTitle ?? "Research Assistant")}{" "}
                           · {FORM_LABELS[v.formTemplate.code] ?? v.formTemplate.title} (v
                           {v.formTemplate.version})

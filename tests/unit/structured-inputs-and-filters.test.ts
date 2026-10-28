@@ -196,7 +196,7 @@ describe("Structured Form Field Definitions in Faculty V2", () => {
 describe("Candidate Filtering and Query Parsing", () => {
   it("correctly parses multi-criteria filter parameters", () => {
     const url = new URL(
-      "http://localhost:3000/staff?q=sharma&position=ASSISTANT_PROFESSOR&status=SUBMITTED&phd=awarded&exam=GATE&minExp=3&page=2&size=50&sort=-submittedAt"
+      "http://localhost:3000/staff?q=sharma&position=ASSISTANT_PROFESSOR&status=SUBMITTED&phd=awarded&exam=GATE&minExp=3&page=2&size=50&sort=-submittedAt",
     );
     const q = parseListQuery(url);
     expect(q.q).toBe("sharma");
@@ -227,19 +227,35 @@ describe("Candidate Filtering and Query Parsing", () => {
 
 describe("CSV Export and Formula Injection Defense", () => {
   it("escapes special characters and prevents CSV injection", () => {
-    expect(csvCell("=1+1")).toBe("\"'=1+1\"");
-    expect(csvCell("+919876543210")).toBe("\"'+919876543210\"");
-    expect(csvCell("-100")).toBe("\"'-100\"");
-    expect(csvCell("@username")).toBe("\"'@username\"");
-    expect(csvCell("\tcmd")).toBe("\"'\tcmd\"");
-    expect(csvCell("\rcmd")).toBe("\"'\rcmd\"");
+    expect(csvCell("=1+1")).toBe('"\'=1+1"');
+    expect(csvCell("+919876543210")).toBe('"\'+919876543210"');
+    expect(csvCell("-100")).toBe('"\'-100"');
+    expect(csvCell("@username")).toBe('"\'@username"');
+    expect(csvCell("\tcmd")).toBe('"\'\tcmd"');
+    expect(csvCell("\rcmd")).toBe('"\'\rcmd"');
     expect(csvCell("John Doe")).toBe('"John Doe"');
     expect(csvCell('He said "Hello"')).toBe('"He said ""Hello"""');
   });
 
   it("permits selection of valid export columns and ignores unknown columns", () => {
-    const valid = parseColumns(["sNo", "candidateName", "department", "appliedFor", "status", "phdStatus", "hIndex"]);
-    expect(valid).toEqual(["sNo", "candidateName", "department", "appliedFor", "status", "phdStatus", "hIndex"]);
+    const valid = parseColumns([
+      "sNo",
+      "candidateName",
+      "department",
+      "appliedFor",
+      "status",
+      "phdStatus",
+      "hIndex",
+    ]);
+    expect(valid).toEqual([
+      "sNo",
+      "candidateName",
+      "department",
+      "appliedFor",
+      "status",
+      "phdStatus",
+      "hIndex",
+    ]);
 
     const withMalicious = parseColumns(["candidateName", "hackCol", "password"]);
     expect(withMalicious).toEqual(["candidateName"]);

@@ -34,7 +34,8 @@ export default function Vacancy({ loaderData }: Route.ComponentProps) {
   const isResearch = v.recruitmentCategory === "RESEARCH" || !v.department;
   const deptOrSpec = v.department?.name ?? v.researchSpecialisation?.name ?? "Research Appointment";
   const posTitle =
-    v.researchPositionTitle ?? (v.position ? (POSITION_LABELS[v.position] ?? v.position) : "Research Assistant");
+    v.researchPositionTitle ??
+    (v.position ? (POSITION_LABELS[v.position] ?? v.position) : "Research Assistant");
   const tiles: [string, string, string, string][] = [
     ["bg-tile-green", isResearch ? "Role" : "Position", posTitle, isResearch ? "🔬" : "🎓"],
     ["bg-tile-blue", isResearch ? "Specialisation" : "Department", deptOrSpec, isResearch ? "🧪" : "🏛️"],

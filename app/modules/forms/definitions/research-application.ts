@@ -5,7 +5,6 @@ import {
   COMPETITIVE_EXAMINATIONS,
   CONFERENCE_INDEXING,
   CONFERENCE_LEVELS,
-  EMPLOYMENT_NATURE,
   EMPLOYMENT_TYPES,
   HSC_MAJOR_STREAMS,
   INDIAN_RELIGIONS,
@@ -73,11 +72,16 @@ const SECTIONS: SectionDef[] = [
     id: "post",
     title: "Position and research area",
     pages: [1],
-    description:
-      "These details are populated from the research vacancy you are applying for.",
+    description: "These details are populated from the research vacancy you are applying for.",
     fields: [
       derived("appliedPost", "Post applied for", 1, "Post", "vacancy.position"),
-      derived("specialisation", "Research specialisation / Area", 1, "Specialisation", "vacancy.specialisation"),
+      derived(
+        "specialisation",
+        "Research specialisation / Area",
+        1,
+        "Specialisation",
+        "vacancy.specialisation",
+      ),
     ],
   },
   {
@@ -254,14 +258,7 @@ const SECTIONS: SectionDef[] = [
         5,
         "UG / PG / Others",
         [
-          select(
-            "level",
-            "Level",
-            5,
-            "Level",
-            [...QUALIFICATION_LEVELS],
-            { requirement: "required" },
-          ),
+          select("level", "Level", 5, "Level", [...QUALIFICATION_LEVELS], { requirement: "required" }),
           select("degree", "Degree", 5, "Degree", [...ACADEMIC_DEGREES], {
             requirement: "required",
             allowOther: true,
@@ -269,12 +266,19 @@ const SECTIONS: SectionDef[] = [
             otherLabel: "Specify degree (e.g. B.Tech., M.Tech., M.Sc.)",
             otherMaxLength: 100,
           }),
-          select("specialisation", "Branch / specialisation", 5, "Specialisation", [...ACADEMIC_DISCIPLINES], {
-            allowOther: true,
-            otherOptionValue: "Other",
-            otherLabel: "Specify branch / specialisation",
-            otherMaxLength: 150,
-          }),
+          select(
+            "specialisation",
+            "Branch / specialisation",
+            5,
+            "Specialisation",
+            [...ACADEMIC_DISCIPLINES],
+            {
+              allowOther: true,
+              otherOptionValue: "Other",
+              otherLabel: "Specify branch / specialisation",
+              otherMaxLength: 150,
+            },
+          ),
           text("college", "College / Institute", 5, "College", { requirement: "required", maxLength: 200 }),
           text("university", "University", 5, "University", { requirement: "required", maxLength: 200 }),
           monthYear("monthYear", "Month & year of completion", 5, "Year of completion", {
@@ -365,13 +369,19 @@ const SECTIONS: SectionDef[] = [
     description:
       "Highlight your research interests, hands-on technical proficiencies, and past research project experience.",
     fields: [
-      textarea("statementOfPurpose", "Statement of purpose / Research motivation", 6, "Statement of purpose", {
-        requirement: "required",
-        maxLength: 2500,
-        rows: 5,
-        wide: true,
-        help: "Describe your research background, areas of interest, and why you are applying for this research appointment (up to 2,500 characters).",
-      }),
+      textarea(
+        "statementOfPurpose",
+        "Statement of purpose / Research motivation",
+        6,
+        "Statement of purpose",
+        {
+          requirement: "required",
+          maxLength: 2500,
+          rows: 5,
+          wide: true,
+          help: "Describe your research background, areas of interest, and why you are applying for this research appointment (up to 2,500 characters).",
+        },
+      ),
       textarea(
         "technicalSkills",
         "Technical & laboratory skills / Software proficiencies",
@@ -575,7 +585,8 @@ const SECTIONS: SectionDef[] = [
     id: "references",
     title: "Referees",
     pages: [9],
-    description: "Provide at least one academic or professional referee (preferably project guides or faculty).",
+    description:
+      "Provide at least one academic or professional referee (preferably project guides or faculty).",
     fields: [
       table(
         "references",
@@ -602,12 +613,19 @@ const SECTIONS: SectionDef[] = [
             maxLength: 200,
             pattern: EMAIL,
           }),
-          select("relationship", "Professional relationship", 9, "Relationship", [...REFERENCE_RELATIONSHIPS], {
-            allowOther: true,
-            otherOptionValue: "Other",
-            otherLabel: "Specify relationship",
-            otherMaxLength: 100,
-          }),
+          select(
+            "relationship",
+            "Professional relationship",
+            9,
+            "Relationship",
+            [...REFERENCE_RELATIONSHIPS],
+            {
+              allowOther: true,
+              otherOptionValue: "Other",
+              otherLabel: "Specify relationship",
+              otherMaxLength: 100,
+            },
+          ),
         ],
         {
           templateRows: 0,

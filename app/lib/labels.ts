@@ -17,7 +17,6 @@ export const FORM_LABELS: Record<string, string> = {
   RESEARCH_APPLICATION: "Application for Research Position",
 };
 
-
 export const RECOMMENDATION_LABELS: Record<string, string> = {
   SHORTLIST: "Recommend shortlisting",
   REJECT: "Recommend rejection",

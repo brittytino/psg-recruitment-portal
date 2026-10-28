@@ -43,8 +43,12 @@ export async function loader({ request, params, context }: Route.LoaderArgs) {
 
   const appliedPos = app.appliedPosition
     ? (POSITION_LABELS[app.appliedPosition] ?? app.appliedPosition)
-    : (app.vacancy.researchPositionTitle ?? (app.vacancy.position ? (POSITION_LABELS[app.vacancy.position] ?? app.vacancy.position) : "Research Assistant"));
-  const departmentName = app.vacancy.department?.name ?? app.vacancy.researchSpecialisation?.name ?? "Research";
+    : (app.vacancy.researchPositionTitle ??
+      (app.vacancy.position
+        ? (POSITION_LABELS[app.vacancy.position] ?? app.vacancy.position)
+        : "Research Assistant"));
+  const departmentName =
+    app.vacancy.department?.name ?? app.vacancy.researchSpecialisation?.name ?? "Research";
 
   return {
     id: app.id,

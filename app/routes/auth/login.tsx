@@ -68,8 +68,8 @@ export default function Login({ actionData }: Route.ComponentProps) {
           <div className="rounded-xl border border-line bg-soft p-4 text-sm text-muted space-y-1.5">
             <p className="font-semibold text-ink">Passwordless Email Authentication</p>
             <p>
-              A 6-digit one-time password (OTP) will be delivered to your official or verified mailbox.
-              All users (Applicants, HODs, HR, Dean, Principal, Super Admin) authenticate securely via email OTP.
+              A 6-digit one-time password (OTP) will be delivered to your official or verified mailbox. All
+              users (Applicants, HODs, HR, Dean, Principal, Super Admin) authenticate securely via email OTP.
             </p>
           </div>
         </Form>

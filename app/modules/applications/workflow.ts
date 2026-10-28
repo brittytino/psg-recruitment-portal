@@ -213,23 +213,22 @@ export function findTransition(
   from: AppStatus,
   to: AppStatus,
   actor: Actor,
-  category: RecruitmentCategory = "FACULTY"
+  category: RecruitmentCategory = "FACULTY",
 ): Transition | undefined {
   return TRANSITIONS.find(
-    (t) => t.from === from && t.to === to && t.actor === actor && (!t.category || t.category === category)
+    (t) => t.from === from && t.to === to && t.actor === actor && (!t.category || t.category === category),
   );
 }
 
 export function availableTransitions(
   from: AppStatus,
   actor: Actor,
-  category: RecruitmentCategory = "FACULTY"
+  category: RecruitmentCategory = "FACULTY",
 ): Transition[] {
   return TRANSITIONS.filter(
-    (t) => t.from === from && t.actor === actor && (!t.category || t.category === category)
+    (t) => t.from === from && t.actor === actor && (!t.category || t.category === category),
   );
 }
-
 
 /** Statuses in which the candidate may edit answers and documents. */
 export const EDITABLE: readonly AppStatus[] = ["DRAFT", "NEEDS_CLARIFICATION"];

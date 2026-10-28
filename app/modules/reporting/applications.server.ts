@@ -75,7 +75,8 @@ const PHD_STATUS: Record<string, string> = {
 function filterWhere(q: ListQuery): Prisma.ApplicationWhereInput {
   const and: Prisma.ApplicationWhereInput[] = [];
   if (q.recruitmentCategory) and.push({ recruitmentCategory: q.recruitmentCategory });
-  if (q.researchSpecialisationId) and.push({ vacancy: { researchSpecialisationId: q.researchSpecialisationId } });
+  if (q.researchSpecialisationId)
+    and.push({ vacancy: { researchSpecialisationId: q.researchSpecialisationId } });
   if (q.cycleId) and.push({ vacancy: { cycleId: q.cycleId } });
   if (q.departmentId) and.push({ vacancy: { departmentId: q.departmentId } });
   if (q.disciplineId) and.push({ vacancy: { disciplineId: q.disciplineId } });
@@ -358,7 +359,6 @@ export function exportValue(key: ExportColumnKey, r: ExportRecord, sNo: number):
     const q = rows("collegeQualifications").find((x) => x.level === lvl);
     return q ? `${s(q.score)}${String(q.scoreType ?? "").startsWith("CGPA") ? " CGPA" : "%"}` : "";
   };
-  const applied = r.appliedPosition ?? r.vacancy.position;
   const pc = r.positionChanges[0];
   const months = r.currentRevision?.totalExperienceMonths;
   const nature = (n: string) =>
@@ -394,7 +394,10 @@ export function exportValue(key: ExportColumnKey, r: ExportRecord, sNo: number):
     case "appliedFor":
       return r.appliedPosition
         ? (POSITION_LABELS[r.appliedPosition] ?? r.appliedPosition)
-        : (r.vacancy.researchPositionTitle ?? (r.vacancy.position ? (POSITION_LABELS[r.vacancy.position] ?? r.vacancy.position) : "Research Assistant"));
+        : (r.vacancy.researchPositionTitle ??
+            (r.vacancy.position
+              ? (POSITION_LABELS[r.vacancy.position] ?? r.vacancy.position)
+              : "Research Assistant"));
     case "effectivePosition":
       return r.effectivePosition ? POSITION_LABELS[r.effectivePosition]! : "";
     case "vacancyCode":
@@ -503,9 +506,7 @@ export async function exportCsv(
   const u = requirePermission(user, "application:export");
   const baseWhere = scopedWhere(u, q);
   const where: Prisma.ApplicationWhereInput =
-    selectedIds && selectedIds.length > 0
-      ? { AND: [baseWhere, { id: { in: selectedIds } }] }
-      : baseWhere;
+    selectedIds && selectedIds.length > 0 ? { AND: [baseWhere, { id: { in: selectedIds } }] } : baseWhere;
   const lines: string[] = [];
   const labels = new Map(EXPORT_COLUMNS.map((c) => [c.key, c.label]));
   lines.push(columns.map((c) => csvCell(labels.get(c))).join(","));
@@ -538,9 +539,7 @@ export async function previewExport(
   const u = requirePermission(user, "application:export");
   const baseWhere = scopedWhere(u, q);
   const where: Prisma.ApplicationWhereInput =
-    selectedIds && selectedIds.length > 0
-      ? { AND: [baseWhere, { id: { in: selectedIds } }] }
-      : baseWhere;
+    selectedIds && selectedIds.length > 0 ? { AND: [baseWhere, { id: { in: selectedIds } }] } : baseWhere;
   const labels = new Map(EXPORT_COLUMNS.map((c) => [c.key, c.label]));
   const headers = columns.map((c) => labels.get(c) ?? c);
   const batch = await prisma.application.findMany({

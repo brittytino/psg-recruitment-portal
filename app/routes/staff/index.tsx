@@ -170,7 +170,6 @@ export default function StaffIndex({ loaderData, actionData }: Route.ComponentPr
         </Link>
       </div>
 
-
       {actionData && "message" in actionData && actionData.message && (
         <Alert tone="success">{actionData.message}</Alert>
       )}
@@ -539,7 +538,10 @@ export default function StaffIndex({ loaderData, actionData }: Route.ComponentPr
                   const isResearch = r.recruitmentCategory === "RESEARCH" || !r.vacancy.department;
                   const applied = r.appliedPosition
                     ? (POSITION_LABELS[r.appliedPosition] ?? r.appliedPosition)
-                    : (r.vacancy.researchPositionTitle ?? (r.vacancy.position ? (POSITION_LABELS[r.vacancy.position] ?? r.vacancy.position) : "Research Assistant"));
+                    : (r.vacancy.researchPositionTitle ??
+                      (r.vacancy.position
+                        ? (POSITION_LABELS[r.vacancy.position] ?? r.vacancy.position)
+                        : "Research Assistant"));
                   const rev = r.currentRevision;
                   return (
                     <tr key={r.id}>

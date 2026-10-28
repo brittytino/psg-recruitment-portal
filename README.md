@@ -38,6 +38,7 @@ Institutional recruitment management system for **PSG College of Technology**, s
 ```
 
 The system is architected as a modular monolith:
+
 - **Web Application**: React Router v7 framework mode providing server-side rendering (SSR), typed loaders and actions, session middleware, CSRF nonce protection, and accessible UI components.
 - **Data Tier**: PostgreSQL 17 with normalized entities, transactional reference number allocation, immutable submission revisions, and versioned Prisma migrations.
 - **Worker & Outbox**: Redis 7 with BullMQ and an outbox relay table ensuring reliable, idempotent background tasks for PDF rendering, attachment merging, and transactional OTP email delivery.
@@ -97,16 +98,16 @@ app/
 
 The application and supporting containers run on documented non-default external ports to prevent conflicts on development and shared hosting machines:
 
-| Service | Host Port | Container Port | Protocol / Path | Purpose |
-| :--- | :---: | :---: | :--- | :--- |
-| **Web Portal (App)** | **`6969`** | `3000` | HTTP / `http://localhost:6969` | Main Candidate & Staff Web Application |
-| **PostgreSQL Database** | **`6543`** | `5432` | TCP (Loopback `127.0.0.1`) | PostgreSQL 17 host access for tools/tests |
-| **Mailpit Web UI** | **`8025`** | `8025` | HTTP / `http://localhost:8025` | Local transactional email & OTP inbox |
-| **Mailpit SMTP Server** | **`2525`** | `1025` | SMTP (Loopback `127.0.0.1`) | SMTP transport for sending test emails |
-| **Database Viewer (Adminer)**| **`6981`** | `8080` | HTTP / `http://localhost:6981` | Web database management interface |
-| **Redis Cache / Queue** | `63879` | `6379` | TCP (Loopback `127.0.0.1`) | Redis BullMQ queue (devhost network) |
-| **LibreOffice Converter** | `63100` | `3100` | HTTP (Loopback `127.0.0.1`) | Internal document conversion service |
-| **ClamAV Antivirus** | `63310` | `3310` | TCP (Loopback `127.0.0.1`) | Antivirus daemon service |
+| Service                       | Host Port  | Container Port | Protocol / Path                | Purpose                                   |
+| :---------------------------- | :--------: | :------------: | :----------------------------- | :---------------------------------------- |
+| **Web Portal (App)**          | **`6969`** |     `3000`     | HTTP / `http://localhost:6969` | Main Candidate & Staff Web Application    |
+| **PostgreSQL Database**       | **`6543`** |     `5432`     | TCP (Loopback `127.0.0.1`)     | PostgreSQL 17 host access for tools/tests |
+| **Mailpit Web UI**            | **`8025`** |     `8025`     | HTTP / `http://localhost:8025` | Local transactional email & OTP inbox     |
+| **Mailpit SMTP Server**       | **`2525`** |     `1025`     | SMTP (Loopback `127.0.0.1`)    | SMTP transport for sending test emails    |
+| **Database Viewer (Adminer)** | **`6981`** |     `8080`     | HTTP / `http://localhost:6981` | Web database management interface         |
+| **Redis Cache / Queue**       |  `63879`   |     `6379`     | TCP (Loopback `127.0.0.1`)     | Redis BullMQ queue (devhost network)      |
+| **LibreOffice Converter**     |  `63100`   |     `3100`     | HTTP (Loopback `127.0.0.1`)    | Internal document conversion service      |
+| **ClamAV Antivirus**          |  `63310`   |     `3310`     | TCP (Loopback `127.0.0.1`)     | Antivirus daemon service                  |
 
 ---
 
@@ -114,36 +115,64 @@ The application and supporting containers run on documented non-default external
 
 The production database bootstraps with **only** the approved institutional accounts. There are **zero** dummy candidates, fake vacancies, or sample recruitment applications created:
 
-| Identity / Name | Official Email | System Role | Operational Scope & Permissions |
-| :--- | :--- | :--- | :--- |
-| **Tino** | `brittytino08@gmail.com` | `SUPER_ADMIN` | **Super Admin**: Highest system privileges, user & role management, system settings, department management, full audit log access, security configuration, and full recruitment oversight. |
-| **Dr. S. Saravanan** | `dean.admn@psgtech.ac.in` | `ADMIN` | **Dean**: Recruitment administration, institution-wide application monitoring, bulk HOD assignment, summary review, and position-change oversight. *(No unrestricted system log or user administration)* |
-| **Dr. G. Thilagavathi** | `principal@psgtech.ac.in` | `ADMIN` | **Principal**: Recruitment administration, institution-wide application monitoring, bulk HOD assignment, summary review, and position-change oversight. *(No unrestricted system log or user administration)* |
-| **HR / N4 Section** | `admin.n4@psgtech.ac.in` | `HR` | **HR / N4 Section**: Vacancy and job profile creation/publishing, applicant qualification screening, complete PDF bundle downloads, approved summary review, and selective CSV export. |
-| **CSE HOD** | `hod.cse@psgtech.ac.in` | `HOD` | **CSE Department HOD**: Department-scoped applicant reviews, recommendation recording (Accept, Reject with reason, Recommend Assoc to Asst Prof change), and department summary sheet generation and approval. |
+| Identity / Name         | Official Email            | System Role   | Operational Scope & Permissions                                                                                                                                                                                |
+| :---------------------- | :------------------------ | :------------ | :------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Tino**                | `brittytino08@gmail.com`  | `SUPER_ADMIN` | **Super Admin**: Highest system privileges, user & role management, system settings, department management, full audit log access, security configuration, and full recruitment oversight.                     |
+| **Dr. S. Saravanan**    | `dean.admn@psgtech.ac.in` | `ADMIN`       | **Dean**: Recruitment administration, institution-wide application monitoring, bulk HOD assignment, summary review, and position-change oversight. _(No unrestricted system log or user administration)_       |
+| **Dr. G. Thilagavathi** | `principal@psgtech.ac.in` | `ADMIN`       | **Principal**: Recruitment administration, institution-wide application monitoring, bulk HOD assignment, summary review, and position-change oversight. _(No unrestricted system log or user administration)_  |
+| **HR / N4 Section**     | `admin.n4@psgtech.ac.in`  | `HR`          | **HR / N4 Section**: Vacancy and job profile creation/publishing, applicant qualification screening, complete PDF bundle downloads, approved summary review, and selective CSV export.                         |
+| **CSE HOD**             | `hod.cse@psgtech.ac.in`   | `HOD`         | **CSE Department HOD**: Department-scoped applicant reviews, recommendation recording (Accept, Reject with reason, Recommend Assoc to Asst Prof change), and department summary sheet generation and approval. |
 
-*Initial Department Configured*: `CSE` (Computer Science and Engineering, Code: `CSE`). All additional departments and HOD assignments are managed dynamically through the Super Admin interface.
+_Initial Department Configured_: `CSE` (Computer Science and Engineering, Code: `CSE`). All additional departments and HOD assignments are managed dynamically through the Super Admin interface.
 
 ---
 
-## 6. Strict 100% Passwordless Authentication
+## 6. Strict 100% Passwordless Authentication & Email Infrastructure
 
-- **No Passwords or Magic Links**: All users (Candidates, Staff, HODs, Dean, Principal, Super Admin) authenticate strictly via temporary 6-digit email OTPs.
-- **Cryptographic Security**: Six-digit OTPs are generated using Node.js `crypto.randomInt`, salted and hashed with SHA-256 before database storage, valid for 10 minutes, and limited to 5 attempts before automatic challenge invalidation.
-- **Brute-Force & Replay Defence**: Rate limited per IP and email. An OTP is instantly invalidated upon successful consumption.
-- **Secure Server Sessions**: Server-managed HTTP-only, SameSite cookies with session rotation upon login.
+The portal employs a zero-password, zero-magic-link authentication architecture. Every user—including Candidates, HODs, HR, Dean, Principal, and Super Admin—must authenticate using a cryptographically generated 6-digit OTP delivered to their verified or official email address.
+
+### Email Infrastructure Architecture
+
+- **Dual-Provider Architecture**:
+  - **Local Development & Automated Tests**: Uses **Mailpit** (`axllent/mailpit:v1.27.10`) on SMTP port `1025` (published on host at `2525`) and Web UI on port `8025`. Emails sent locally are captured in the Mailpit inbox without hitting real external mailboxes. The test adapter (`EMAIL_PROVIDER=test`) is used for isolated unit and integration test mock transport.
+  - **Production Delivery**: Uses real institutional SMTP (`EMAIL_PROVIDER=smtp`) with the official PSG Tech mailbox `recruitments@psgtech.ac.in`. Requires valid institutional SMTP host, port (587 STARTTLS / 465 SSL), and dedicated mailbox application password stored exclusively in private server environment configuration.
+- **Fail-Fast Production Validation**:
+  - Startup strictly forbids `EMAIL_PROVIDER=mailpit` or `EMAIL_PROVIDER=test` when `NODE_ENV=production`.
+  - Requires non-empty `SMTP_HOST`, `SMTP_USER`, and `SMTP_PASSWORD` in production.
+  - TLS certificate validation (`rejectUnauthorized: true`) is strictly enforced in production.
+- **Dedicated Health Checks**:
+  - `/healthz/live`: Process liveness check, completely independent of external SMTP connectivity.
+  - `/healthz/ready`: Service readiness check (verifying database, Redis, and storage volume).
+  - `/healthz/smtp`: Dedicated SMTP transport connectivity diagnostic (`verifySmtpConnection`). Never exposes passwords, internal IP addresses, or secrets.
+
+### 6-Digit OTP Lifecycle & Security Controls
+
+- **Cryptographic CSPRNG**: Generated using Node.js `node:crypto.randomInt(0, 1_000_000)` with `.padStart(6, '0')` ensuring leading zeros are preserved.
+- **HMAC Token Storage**: Raw OTP values are never stored in plaintext. Stored in `OtpChallenge.codeHash` as an HMAC-SHA256 keyed to `SESSION_SECRET` and bound to the challenge ID (`otp:<challengeId>:<code>`).
+- **5-Minute Expiry**: Challenges expire after `OTP_EXPIRY_MINUTES` (5 minutes by default).
+- **Single-Use Atomic Consumption**: Challenges are consumed atomically with `consumedAt = now()`. Simultaneous verification requests cannot both succeed.
+- **Max Attempt Invalidation**: Limited to `OTP_MAX_ATTEMPTS` (5 attempts). If attempts are exhausted, the challenge is immediately invalidated.
+- **Abuse & Rate Limiting**:
+  - Resend cooldown: Enforced via Redis TTL (`OTP_RESEND_COOLDOWN_SECONDS`, 60 seconds).
+  - Hourly limits: `OTP_MAX_SENDS_PER_HOUR` (5 sends per hour per user).
+  - IP rate limiting: 20 sends per hour per IP.
+- **Delivery Failure Cleanup**: If SMTP transport throws an error, the pending challenge is immediately marked consumed and the Redis cooldown key is deleted so the user is not stranded with an undelivered challenge.
+- **Safe Logging**: Email OTP codes and SMTP passwords are never logged to production logs. Password strings are automatically masked (`password: ***`) in diagnostic log entries.
 
 ---
 
 ## 7. Application Workflow & Official Form Features
 
 ### Permanent Application Reference Number
+
 - **Format**: `PSGCT2026-27<DEPT>_<NNNN>` (e.g., `PSGCT2026-27CSE_0001`).
 - **Transactional Allocation**: Reference numbers are allocated transactionally at the exact moment of formal candidate submission using a department-scoped database counter, guaranteeing strict sequential numbering without duplicates or race conditions.
 - **Permanence**: Once assigned, the reference number is permanently tied to the application revision and appears on the receipt, generated PDF, review queues, summary sheets, CSV exports, and email notifications.
 
 ### Section-by-Section Application Wizard
+
 The candidate application wizard organizes the official requirements into structured, accessible steps:
+
 1. **Vacancy and Post**: Displays the selected department, post, and recruitment cycle.
 2. **Personal Information**: Full name (block letters), title, DOB, calculated age, gender, nationality, religion (with custom option), community category, caste, marital status, spouse details (conditional), present address, permanent address, contact details.
 3. **Academic Qualifications**:
@@ -196,6 +225,7 @@ The candidate application wizard organizes the official requirements into struct
 ## 9. HR / N4 Section CSV Export Workflow
 
 The portal provides an auditable, Excel-compatible CSV export engine:
+
 - **Application Selection**: Checkboxes on each row allow selecting specific applications, with convenient **Select all on page** and **Clear selection** controls, or exporting all matching records.
 - **Column Customization**: Granular column picker with grouping and presets ("Summary columns only", "Select all").
 - **Live Preview**: An interactive **Export Preview** table displays the first records and chosen columns before initiating the file download.
@@ -206,23 +236,25 @@ The portal provides an auditable, Excel-compatible CSV export engine:
 
 ## 10. Team Work Allocation: Tino vs Hari
 
-| Ownership Dimension | Tino (Technical Lead & Super Admin) | Hari (Senior Full-Stack Engineer) |
-| :--- | :--- | :--- |
-| **Core Workstream** | **Workstream A: Foundation, Security & Integration** | **Workstream B: Recruitment Experience & Workflows** |
-| **Primary Modules** | - Authentication & Session Architecture (Passwordless OTP)<br>- RBAC & Scopes (`SUPER_ADMIN`, `ADMIN`, `HR`, `HOD`)<br>- Database Schema, Relations & Prisma Migrations<br>- Account Provisioning & Security Auditing<br>- Department & Vacancy Administrative Interfaces<br>- Bulk HOD Assignment Workflow & Authorization Guards<br>- Docker Multi-Stage Builds, Volumes & Host Ports<br>- Blue-Green Deployment & VPS Production Automation<br>- CI/CD Pipeline & End-to-End System Integration | - Candidate Recruitment Portal & Public Vacancies<br>- Section-based Application Wizard (Steps 1–12)<br>- Academic Qualification & Arrear Form Controls<br>- Work Experience, Overlap Detection & Calculation<br>- Research Metrics, Publications & Patents UI<br>- Document Upload Experience & Validation<br>- Application Review Screen & Watermarked PDF Preview<br>- Candidate Receipt & Consolidated Bundle Downloads<br>- HR & HOD Dashboards & Filter Composability<br>- Department Summary Sheet Approval UI<br>- CSV Export Selection, Live Counts & Preview Table |
-| **Shared Responsibilities** | - Shared TypeScript API contracts and route loaders/actions<br>- Official form field mapping and PDF verification<br>- Automated unit, integration, and security test coverage<br>- WCAG 2.2 AA accessibility verification<br>- Code reviews (mandatory cross-developer pull request review) | - Shared TypeScript API contracts and route loaders/actions<br>- Official form field mapping and PDF verification<br>- Automated unit, integration, and security test coverage<br>- WCAG 2.2 AA accessibility verification<br>- Code reviews (mandatory cross-developer pull request review) |
+| Ownership Dimension         | Tino (Technical Lead & Super Admin)                                                                                                                                                                                                                                                                                                                                                                                                                                                                | Hari (Senior Full-Stack Engineer)                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                            |
+| :-------------------------- | :------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | :--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Core Workstream**         | **Workstream A: Foundation, Security & Integration**                                                                                                                                                                                                                                                                                                                                                                                                                                               | **Workstream B: Recruitment Experience & Workflows**                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                         |
+| **Primary Modules**         | - Authentication & Session Architecture (Passwordless OTP)<br>- RBAC & Scopes (`SUPER_ADMIN`, `ADMIN`, `HR`, `HOD`)<br>- Database Schema, Relations & Prisma Migrations<br>- Account Provisioning & Security Auditing<br>- Department & Vacancy Administrative Interfaces<br>- Bulk HOD Assignment Workflow & Authorization Guards<br>- Docker Multi-Stage Builds, Volumes & Host Ports<br>- Blue-Green Deployment & VPS Production Automation<br>- CI/CD Pipeline & End-to-End System Integration | - Candidate Recruitment Portal & Public Vacancies<br>- Section-based Application Wizard (Steps 1–12)<br>- Academic Qualification & Arrear Form Controls<br>- Work Experience, Overlap Detection & Calculation<br>- Research Metrics, Publications & Patents UI<br>- Document Upload Experience & Validation<br>- Application Review Screen & Watermarked PDF Preview<br>- Candidate Receipt & Consolidated Bundle Downloads<br>- HR & HOD Dashboards & Filter Composability<br>- Department Summary Sheet Approval UI<br>- CSV Export Selection, Live Counts & Preview Table |
+| **Shared Responsibilities** | - Shared TypeScript API contracts and route loaders/actions<br>- Official form field mapping and PDF verification<br>- Automated unit, integration, and security test coverage<br>- WCAG 2.2 AA accessibility verification<br>- Code reviews (mandatory cross-developer pull request review)                                                                                                                                                                                                       | - Shared TypeScript API contracts and route loaders/actions<br>- Official form field mapping and PDF verification<br>- Automated unit, integration, and security test coverage<br>- WCAG 2.2 AA accessibility verification<br>- Code reviews (mandatory cross-developer pull request review)                                                                                                                                                                                                                                                                                 |
 
 ---
 
 ## 11. Developer & Production Runbook
 
 ### Prerequisites
+
 - Node.js ≥ 22.x LTS
 - Docker Desktop or Docker Engine ≥ 24.x with Docker Compose v2
 
 ### Quick Start with Docker
 
 **Windows (cmd / PowerShell):**
+
 ```bat
 REM Interactive runner:
 .\run.bat
@@ -232,6 +264,7 @@ REM Or headless / background start:
 ```
 
 **Linux Server / macOS (bash / sh):**
+
 ```sh
 # Make executable (first time only)
 chmod +x ./run.sh ./start.sh
@@ -245,6 +278,7 @@ chmod +x ./run.sh ./start.sh
 ```
 
 Or via Docker Compose commands manually:
+
 ```sh
 # Copy environment configuration
 cp .env.example .env
@@ -257,6 +291,7 @@ docker compose -f compose.yaml -f compose.dev.yaml run --rm migrate
 ```
 
 ### Local Development on Host Machine
+
 ```sh
 # Install dependencies
 npm install
@@ -276,6 +311,7 @@ npm run dev
 ```
 
 ### Resetting Development Database
+
 ```sh
 # Explicit developer reset command (destructive: requires deliberate execution)
 docker compose -f compose.yaml -f compose.dev.yaml down -v
@@ -309,6 +345,7 @@ ENV_FILE=.env.production ./infrastructure/blue-green/deploy.sh <image-tag>
 ## 13. Verification & Testing Evidence
 
 All quality gates pass cleanly:
+
 - **TypeScript Typecheck**: `npm run typecheck` passes with 0 errors across all routes and modules.
 - **ESLint Code Quality**: `npm run lint` passes with 0 errors and 0 warnings.
 - **Unit & Security Tests**: `npm test` passes all 84 unit tests across 7 test suites covering passwordless OTP expiry, reference number formatting, role permission boundaries (`SUPER_ADMIN` vs `ADMIN`), CSV formula injection protection, arrear calculations, qualification document rules, and structured input master options with department-scoped filtering.

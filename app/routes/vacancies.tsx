@@ -3,7 +3,11 @@ import { motion } from "framer-motion";
 import type { Route } from "./+types/vacancies";
 import { VacancyCard } from "~/components/vacancy-card";
 import { POSITION_LABELS } from "~/lib/labels";
-import { listDepartments, listPublishedVacancies, listResearchSpecialisations } from "~/modules/recruitment/service.server";
+import {
+  listDepartments,
+  listPublishedVacancies,
+  listResearchSpecialisations,
+} from "~/modules/recruitment/service.server";
 
 export const meta: Route.MetaFunction = () => [{ title: "Open vacancies — PSG Tech Careers" }];
 
@@ -35,7 +39,7 @@ export async function loader({ request }: Route.LoaderArgs) {
 }
 
 export default function Vacancies({ loaderData }: Route.ComponentProps) {
-  const { vacancies, departments, specialisations, departmentId, position, category, q } = loaderData;
+  const { vacancies, departments, departmentId, position, category, q } = loaderData;
   const filtered = !!(departmentId || position || category || q);
   return (
     <div className="space-y-8 sm:space-y-10">
@@ -50,7 +54,8 @@ export default function Vacancies({ loaderData }: Route.ComponentProps) {
           Find your next academic or research position 🔎
         </h1>
         <p className="mt-2.5 sm:mt-3 max-w-2xl text-sm sm:text-lg text-muted leading-relaxed">
-          Explore faculty openings and research assistant positions across engineering, technology, applied sciences, and advanced research centres. Apply directly online.
+          Explore faculty openings and research assistant positions across engineering, technology, applied
+          sciences, and advanced research centres. Apply directly online.
         </p>
 
         {/* Category Pill Filters */}
@@ -134,7 +139,6 @@ export default function Vacancies({ loaderData }: Route.ComponentProps) {
           </button>
         </Form>
       </motion.section>
-
 
       <div className="flex flex-wrap items-center justify-between gap-3 border-b border-line/70 pb-4">
         <p className="text-xs sm:text-sm text-muted" role="status">

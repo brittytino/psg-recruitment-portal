@@ -57,8 +57,8 @@ export default function VerifyEmail({ loaderData, actionData }: Route.ComponentP
         <div>
           <h1>Check your e-mail</h1>
           <p className="mt-2 text-muted">
-            We sent a 6-digit code and a verification link to your e-mail address. Enter the code below, or
-            open the link in the e-mail. The code expires in 10 minutes.
+            We sent a 6-digit code to your e-mail address. Enter the code below to verify your e-mail address.
+            The code expires in 5 minutes.
           </p>
         </div>
         {actionData && "formError" in actionData && actionData.formError && (

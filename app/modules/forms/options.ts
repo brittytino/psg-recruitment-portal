@@ -98,11 +98,7 @@ export const HSC_MAJOR_STREAMS = [
   "Other",
 ] as const;
 
-export const MODES_OF_EDUCATION = [
-  "Full-time",
-  "Part-time",
-  "Distance Education",
-] as const;
+export const MODES_OF_EDUCATION = ["Full-time", "Part-time", "Distance Education"] as const;
 
 export const QUALIFICATION_LEVELS = [
   { value: "UG", label: "UG — Under-graduate" },
@@ -181,12 +177,7 @@ export const QUALIFICATION_CLASSES = [
   "Other",
 ] as const;
 
-export const PHD_STATUS_OPTIONS = [
-  "Awarded",
-  "Thesis submitted",
-  "Pursuing",
-  "Not applicable",
-] as const;
+export const PHD_STATUS_OPTIONS = ["Awarded", "Thesis submitted", "Pursuing", "Not applicable"] as const;
 
 export const DESIGNATIONS = [
   "Assistant Professor",
@@ -209,12 +200,7 @@ export const DESIGNATIONS = [
   "Other",
 ] as const;
 
-export const EMPLOYMENT_NATURE = [
-  "Teaching",
-  "Industry",
-  "Research",
-  "Other",
-] as const;
+export const EMPLOYMENT_NATURE = ["Teaching", "Industry", "Research", "Other"] as const;
 
 export const EMPLOYMENT_TYPES = [
   "Regular",
@@ -241,10 +227,7 @@ export const JOURNAL_PUBLICATION_TYPES = [
   "Other",
 ] as const;
 
-export const CONFERENCE_LEVELS = [
-  "International",
-  "National",
-] as const;
+export const CONFERENCE_LEVELS = ["International", "National"] as const;
 
 export const CONFERENCE_INDEXING = [
   "Scopus",
@@ -279,11 +262,7 @@ export const PROJECT_ROLES = [
   "Other",
 ] as const;
 
-export const PROJECT_STATUS = [
-  "Ongoing",
-  "Completed",
-  "Sanctioned",
-] as const;
+export const PROJECT_STATUS = ["Ongoing", "Completed", "Sanctioned"] as const;
 
 export const PATENT_STATUS = [
   "Filed",
@@ -294,14 +273,7 @@ export const PATENT_STATUS = [
   "Other",
 ] as const;
 
-export const COMPETITIVE_EXAMINATIONS = [
-  "GATE",
-  "UGC-NET",
-  "CSIR-NET",
-  "SET",
-  "SLET",
-  "Other",
-] as const;
+export const COMPETITIVE_EXAMINATIONS = ["GATE", "UGC-NET", "CSIR-NET", "SET", "SLET", "Other"] as const;
 
 export const PROFESSIONAL_BODIES = [
   "IEEE",

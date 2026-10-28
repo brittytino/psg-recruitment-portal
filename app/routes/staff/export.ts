@@ -17,12 +17,7 @@ export async function loader({ request, context }: Route.LoaderArgs) {
   const q = parseListQuery(url);
   const columns = parseColumns(url.searchParams.getAll("cols"));
   const selectedIds = url.searchParams.getAll("ids").filter(Boolean);
-  const { csv, rows } = await exportCsv(
-    user,
-    q,
-    columns,
-    selectedIds.length > 0 ? selectedIds : undefined,
-  );
+  const { csv, rows } = await exportCsv(user, q, columns, selectedIds.length > 0 ? selectedIds : undefined);
   await prisma.user.update({ where: { id: user.id }, data: { exportColumns: columns } });
   await audit({
     actorId: user.id,
@@ -41,8 +36,15 @@ export async function loader({ request, context }: Route.LoaderArgs) {
       (await prisma.department.findUnique({ where: { id: q.departmentId } }))?.code ?? "DEPT",
     );
   } else if (q.researchSpecialisationId) {
-    const spec = await prisma.researchSpecialisation.findUnique({ where: { id: q.researchSpecialisationId } });
-    dept = spec ? spec.name.slice(0, 10).toUpperCase().replace(/[^A-Z0-9]/g, "") : "RESEARCH";
+    const spec = await prisma.researchSpecialisation.findUnique({
+      where: { id: q.researchSpecialisationId },
+    });
+    dept = spec
+      ? spec.name
+          .slice(0, 10)
+          .toUpperCase()
+          .replace(/[^A-Z0-9]/g, "")
+      : "RESEARCH";
   } else if (q.recruitmentCategory === "RESEARCH") {
     dept = "RESEARCH";
   }

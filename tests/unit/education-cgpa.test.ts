@@ -35,11 +35,7 @@ describe("Educational qualifications Class, (CGPA/Marks) and Mode of study field
     expect(modeCol.kind).toBe("select");
     expect(modeCol.label).toBe("Mode of study");
     expect(modeCol.requirement).toBe("required");
-    expect(modeCol.options.map((o) => o.value)).toEqual([
-      "Full-Time",
-      "Part-Time",
-      "Distance",
-    ]);
+    expect(modeCol.options.map((o) => o.value)).toEqual(["Full-Time", "Part-Time", "Distance"]);
   });
 
   it("defines dropdown class, cgpaOrMarks, and modeOfStudy in educationalQualifications on Associate Professor form", () => {
@@ -73,11 +69,7 @@ describe("Educational qualifications Class, (CGPA/Marks) and Mode of study field
     expect(modeCol.kind).toBe("select");
     expect(modeCol.label).toBe("Mode of study");
     expect(modeCol.requirement).toBe("required");
-    expect(modeCol.options.map((o) => o.value)).toEqual([
-      "Full-Time",
-      "Part-Time",
-      "Distance",
-    ]);
+    expect(modeCol.options.map((o) => o.value)).toEqual(["Full-Time", "Part-Time", "Distance"]);
   });
 
   describe("validation on submission and draft", () => {
@@ -137,11 +129,7 @@ describe("Educational qualifications Class, (CGPA/Marks) and Mode of study field
         documentId: "doc-sample-123",
       };
 
-      const issuesValid = validateAnswers(
-        def,
-        { academicQualifications: [validRow] },
-        "submit",
-      );
+      const issuesValid = validateAnswers(def, { academicQualifications: [validRow] }, "submit");
       expect(issuesValid.some((i) => i.path.includes("cgpaOrMarks"))).toBe(false);
       expect(issuesValid.some((i) => i.path.includes("class"))).toBe(false);
       expect(issuesValid.some((i) => i.path.includes("modeOfStudy"))).toBe(false);

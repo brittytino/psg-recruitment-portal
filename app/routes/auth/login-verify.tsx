@@ -58,7 +58,8 @@ export default function LoginVerify({ actionData }: Route.ComponentProps) {
         <div>
           <h1>Enter verification code</h1>
           <p className="mt-2 text-muted">
-            We sent a 6-digit one-time password (OTP) to your e-mail address. Enter the code below to complete sign-in. It expires in 10 minutes.
+            We sent a 6-digit one-time password (OTP) to your e-mail address. Enter the code below to complete
+            sign-in. It expires in 5 minutes.
           </p>
         </div>
         {a?.message && <Alert tone="success">{a.message}</Alert>}

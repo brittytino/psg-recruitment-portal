@@ -47,7 +47,14 @@ export const ROLE_PERMISSIONS: Record<RoleName, readonly Permission[]> = {
     "document:regenerate",
     "recruitment:manage",
   ],
-  HOD: ["application:list", "application:read", "review:record", "summary:generate", "summary:read", "document:download"],
+  HOD: [
+    "application:list",
+    "application:read",
+    "review:record",
+    "summary:generate",
+    "summary:read",
+    "document:download",
+  ],
   ADMIN: [
     "application:list",
     "application:read",
@@ -90,8 +97,10 @@ export const ROLE_DESCRIPTIONS: Record<RoleName, string> = {
   CANDIDATE: "Applies for vacancies.",
   HR: "Enters job profiles, views and downloads every application, views approved summary sheets and exports.",
   HOD: "Reviews the applications of their own department that are assigned to them.",
-  ADMIN: "Recruitment oversight: bulk assignment to HODs, progress review, approved summaries, position-change approvals.",
-  SUPER_ADMIN: "Full institutional system control: users, roles, system configuration, audit logs, and recruitment operations.",
+  ADMIN:
+    "Recruitment oversight: bulk assignment to HODs, progress review, approved summaries, position-change approvals.",
+  SUPER_ADMIN:
+    "Full institutional system control: users, roles, system configuration, audit logs, and recruitment operations.",
 };
 
 export interface RoleGrant {

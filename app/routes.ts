@@ -49,4 +49,5 @@ export default [
   // Health
   route("healthz/live", "routes/health/live.ts"),
   route("healthz/ready", "routes/health/ready.ts"),
+  route("healthz/smtp", "routes/health/smtp.ts"),
 ] satisfies RouteConfig;

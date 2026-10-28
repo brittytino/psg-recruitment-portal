@@ -49,7 +49,9 @@ export async function listPublishedVacancies(
       opensAt: { lte: now },
       ...(filter.recruitmentCategory ? { recruitmentCategory: filter.recruitmentCategory } : {}),
       ...(filter.departmentId ? { departmentId: filter.departmentId } : {}),
-      ...(filter.researchSpecialisationId ? { researchSpecialisationId: filter.researchSpecialisationId } : {}),
+      ...(filter.researchSpecialisationId
+        ? { researchSpecialisationId: filter.researchSpecialisationId }
+        : {}),
       ...(filter.position ? { position: filter.position as never } : {}),
       ...(filter.q
         ? {
@@ -102,7 +104,6 @@ export const listResearchSpecialisations = (activeOnly = true) =>
     where: activeOnly ? { active: true } : {},
     orderBy: [{ sortOrder: "asc" }, { name: "asc" }],
   });
-
 
 // ------------------------------------------------------------------------------------------------
 // Administration (recruitment:manage)
@@ -436,11 +437,7 @@ export async function createResearchSpecialisation(user: SessionUser | null, inp
   }
 }
 
-export async function updateResearchSpecialisation(
-  user: SessionUser | null,
-  id: string,
-  input: unknown,
-) {
+export async function updateResearchSpecialisation(user: SessionUser | null, id: string, input: unknown) {
   const u = requirePermission(user, "recruitment:manage");
   const p = researchSpecialisationSchema.partial().safeParse(input);
   if (!p.success) throw new ValidationError("Please correct the highlighted fields", fieldErrors(p.error));
@@ -548,7 +545,11 @@ export async function createResearchVacancy(user: SessionUser | null, input: unk
           action: "vacancy.created",
           entityType: "vacancy",
           entityId: created.id,
-          metadata: { code: created.code, recruitmentCategory: "RESEARCH", formTemplate: `${form.code}@${form.version}` },
+          metadata: {
+            code: created.code,
+            recruitmentCategory: "RESEARCH",
+            formTemplate: `${form.code}@${form.version}`,
+          },
         },
         tx,
       );
@@ -596,4 +597,3 @@ export async function adminOverview(user: SessionUser | null) {
   ]);
   return { departments, cycles, vacancies, templates, researchSpecialisations };
 }
-

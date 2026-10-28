@@ -27,7 +27,6 @@ export async function loader() {
   };
 }
 
-
 const STEPS: [string, string, string][] = [
   ["👤", "Create your account", "Register and verify your e-mail address in a minute."],
   ["🔎", "Pick a vacancy", "Read the position, eligibility and the documents required."],

@@ -111,7 +111,13 @@ describe("roles", () => {
     expect(hasPermission(g("ADMIN"), "settings:manage")).toBe(false);
     expect(hasPermission(g("ADMIN"), "audit:read")).toBe(false);
 
-    for (const p of ["user:manage", "settings:manage", "position:approve", "audit:read", "system:manage"] as const)
+    for (const p of [
+      "user:manage",
+      "settings:manage",
+      "position:approve",
+      "audit:read",
+      "system:manage",
+    ] as const)
       expect(hasPermission(g("SUPER_ADMIN"), p)).toBe(true);
   });
   it("sends each role to its home page", () => {

@@ -12,7 +12,6 @@ const definitions: FormDefinition[] = [
   researchApplicationV1,
 ];
 
-
 export function getFormDefinition(code: FormCode, version: number): FormDefinition {
   const def = definitions.find((d) => d.code === code && d.version === version);
   if (!def) throw new Error(`Unknown form template ${code} v${version}`);
