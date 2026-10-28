@@ -120,12 +120,43 @@ build_containers() {
 
 run_first_deployment_migrations() {
     echo -e "${CYAN}[4/5] Deploying database schema & bootstrapping institutional accounts...${NC}"
-    # Start backing services first
-    $COMPOSE "${COMPOSE_ARGS[@]}" up -d db redis
+    # Start backing services first and clean orphan containers (like renamed adminer)
+    $COMPOSE "${COMPOSE_ARGS[@]}" up -d --remove-orphans db redis
     
+    echo -e "${CYAN}[INFO] Waiting for PostgreSQL readiness...${NC}"
+    local pg_owner="${POSTGRES_USER:-srp_owner}"
+    local pg_pass="${POSTGRES_PASSWORD:-PsgTech_DbOwner_2026!}"
+    local pg_app="${APP_DB_USER:-srp_app}"
+    local pg_app_pass="${APP_DB_PASSWORD:-PsgTech_AppUser_2026!}"
+    local pg_db="${POSTGRES_DB:-srportal}"
+    local db_ready=false
+
+    for _ in $(seq 1 30); do
+        if $COMPOSE "${COMPOSE_ARGS[@]}" exec -T db pg_isready -U "$pg_owner" -d "$pg_db" >/dev/null 2>&1; then
+            db_ready=true
+            break
+        fi
+        sleep 1
+    done
+
+    # Ensure database passwords match .env (handles existing volumes created with old/default passwords)
+    if [ "$db_ready" = true ]; then
+        echo -e "${CYAN}[INFO] Synchronizing database credentials with .env configuration...${NC}"
+        # Sync via trusted local domain socket inside the db container (both as owner and fallback as postgres)
+        $COMPOSE "${COMPOSE_ARGS[@]}" exec -T db psql -U "$pg_owner" -d "$pg_db" -c \
+            "ALTER USER \"$pg_owner\" WITH PASSWORD '$pg_pass'; ALTER USER \"$pg_app\" WITH PASSWORD '$pg_app_pass';" >/dev/null 2>&1 || \
+        $COMPOSE "${COMPOSE_ARGS[@]}" exec -T -u postgres db psql -d "$pg_db" -c \
+            "ALTER USER \"$pg_owner\" WITH PASSWORD '$pg_pass'; ALTER USER \"$pg_app\" WITH PASSWORD '$pg_app_pass';" >/dev/null 2>&1 || true
+    fi
+
     # Run migration runner: executes npx prisma migrate deploy && node build-worker/seed.js
     echo -e "${CYAN}[INFO] Running database migrations and seed runner...${NC}"
-    $COMPOSE "${COMPOSE_ARGS[@]}" run --rm migrate
+    if ! $COMPOSE "${COMPOSE_ARGS[@]}" run --rm migrate; then
+        echo -e "${RED}[ERROR] Migration runner failed to apply schema or authenticate.${NC}"
+        echo -e "If the existing database volume was initialized with mismatched old credentials, reset it cleanly with:"
+        echo -e "  ${YELLOW}docker compose down -v && ./start.sh prod${NC}"
+        exit 1
+    fi
     echo -e "${GREEN}[OK] Database migrated and approved institutional accounts seeded.${NC}"
 }
 

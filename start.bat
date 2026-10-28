@@ -95,7 +95,12 @@ REM ----------------------------------------------------------------------------
 REM Step 4: Database Schema Migration & Account Seeding
 REM ------------------------------------------------------------------------------
 echo [4/5] Deploying database schema and bootstrapping institutional accounts...
-docker compose -f compose.yaml -f compose.dev.yaml up -d db redis
+docker compose -f compose.yaml -f compose.dev.yaml up -d --remove-orphans db redis
+
+echo [INFO] Waiting for PostgreSQL readiness...
+timeout /t 4 /nobreak >nul
+
+docker compose -f compose.yaml -f compose.dev.yaml exec -T db psql -U srp_owner -d srportal -c "ALTER USER srp_owner WITH PASSWORD 'PsgTech_DbOwner_2026!'; ALTER USER srp_app WITH PASSWORD 'PsgTech_AppUser_2026!';" >nul 2>&1
 
 echo [INFO] Running database migrations and seed runner...
 docker compose -f compose.yaml -f compose.dev.yaml run --rm migrate
