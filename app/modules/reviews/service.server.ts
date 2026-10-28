@@ -1,7 +1,7 @@
 import type { Position, Prisma } from "@prisma/client";
 import { z } from "zod";
 import { audit } from "~/modules/audit/audit.server";
-import { hasRole, hodDepartments } from "~/modules/auth/permissions";
+import { hasRole, hodDepartments, isAdmin, isHrOfficer } from "~/modules/auth/permissions";
 import { hrScope, requirePermission } from "~/modules/auth/policy.server";
 import type { SessionUser } from "~/modules/auth/session.server";
 import { prisma, type Tx } from "~/modules/core/db.server";
@@ -300,8 +300,8 @@ export async function recordHodDecision(
 // ------------------------------------------------------------------------------------------------
 
 export async function canApprovePositionChange(user: SessionUser): Promise<boolean> {
-  if (hasRole(user.grants, "ADMIN")) return true;
-  return hasRole(user.grants, "HR") && (await getSetting("hrCanApprovePositionChange"));
+  if (isAdmin(user.grants)) return true;
+  return isHrOfficer(user.grants) && (await getSetting("hrCanApprovePositionChange"));
 }
 
 export async function decidePositionChange(
@@ -458,7 +458,7 @@ export async function approveSummarySheet(user: SessionUser | null, departmentId
       include: { department: true },
     });
     const recipients = await tx.user.findMany({
-      where: { status: "ACTIVE", roles: { some: { role: { in: ["ADMIN", "HR"] } } } },
+      where: { status: "ACTIVE", roles: { some: { role: { in: ["ADMIN", "SUPER_ADMIN", "HR"] } } } },
       select: { id: true },
     });
     for (const r of recipients)
@@ -515,7 +515,7 @@ export async function reopenSummarySheet(
 export async function listSummarySheets(user: SessionUser | null, departmentId?: string) {
   const u = requirePermission(user, "application:list");
   const hodDepts = hodDepartments(u.grants);
-  const fullAccess = hasRole(u.grants, "ADMIN") || hasRole(u.grants, "HR");
+  const fullAccess = isAdmin(u.grants) || isHrOfficer(u.grants);
   if (!fullAccess && !hodDepts.length) throw new ForbiddenError();
   return prisma.summarySheet.findMany({
     where: {

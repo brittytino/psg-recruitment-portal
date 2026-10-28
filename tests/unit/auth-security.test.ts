@@ -11,7 +11,8 @@ import {
   primaryRoleLabel,
   type RoleGrant,
 } from "~/modules/auth/permissions";
-import { cookieName, csrfToken, verifyCsrf } from "~/modules/auth/session.server";
+import { cookieName, csrfToken, verifyCsrf, type SessionUser } from "~/modules/auth/session.server";
+import { staffApplicationScope, hrScope } from "~/modules/auth/policy.server";
 import { loader as smtpHealthLoader } from "~/routes/health/smtp";
 
 describe("Authentication & Authorization Security Controls", () => {
@@ -144,6 +145,42 @@ describe("Authentication & Authorization Security Controls", () => {
       expect(hasPermission(candidateGrants, "application:list")).toBe(false);
       expect(primaryRoleLabel(candidateGrants)).toBe("Applicant");
       expect(homePath(candidateGrants)).toBe("/account");
+    });
+
+    it("evaluates staff application scope correctly for all institutional roles", () => {
+      const mockUser = (grants: RoleGrant[], id = "user-1"): SessionUser => ({
+        id,
+        email: "test@psgtech.ac.in",
+        emailVerified: true,
+        displayName: "Test User",
+        grants,
+        sessionId: "sess-1",
+      });
+
+      // Super Admin (Tino) -> all submitted applications
+      expect(staffApplicationScope(mockUser(superAdminGrants))).toEqual({ status: { not: "DRAFT" } });
+      expect(hrScope(mockUser(superAdminGrants))).toEqual({ status: { not: "DRAFT" } });
+
+      // Admin (Dean / Principal) -> all submitted applications
+      expect(staffApplicationScope(mockUser(adminGrants))).toEqual({ status: { not: "DRAFT" } });
+      expect(hrScope(mockUser(adminGrants))).toEqual({ status: { not: "DRAFT" } });
+
+      // HR (N4 Section, unscoped cycleId) -> all submitted applications
+      expect(staffApplicationScope(mockUser(hrGrants))).toEqual({ status: { not: "DRAFT" } });
+      expect(hrScope(mockUser(hrGrants))).toEqual({ status: { not: "DRAFT" } });
+
+      // HOD -> scoped to assigned department & id
+      expect(staffApplicationScope(mockUser(hodGrants, "hod-user-1"))).toEqual({
+        AND: [
+          { status: { not: "DRAFT" } },
+          { OR: [{ assignedHodId: "hod-user-1", vacancy: { departmentId: { in: ["dept-cse-101"] } } }] },
+        ],
+      });
+      expect(hrScope(mockUser(hodGrants, "hod-user-1"))).toBeNull();
+
+      // Candidate -> no staff scope
+      expect(staffApplicationScope(mockUser(candidateGrants))).toBeNull();
+      expect(hrScope(mockUser(candidateGrants))).toBeNull();
     });
   });
 

@@ -1,6 +1,6 @@
 import type { Prisma } from "@prisma/client";
 import { z } from "zod";
-import { hasRole } from "~/modules/auth/permissions";
+import { hasRole, isAdmin, isHrOfficer } from "~/modules/auth/permissions";
 import { requirePermission, staffApplicationScope } from "~/modules/auth/policy.server";
 import type { SessionUser } from "~/modules/auth/session.server";
 import { prisma } from "~/modules/core/db.server";
@@ -228,7 +228,7 @@ export async function dashboardCounts(user: SessionUser | null, cycleId?: string
   const count = (...s: string[]) =>
     byStatus.filter((b) => s.includes(b.status)).reduce((n, b) => n + b._count._all, 0);
   let drafts: number | null = null;
-  if (hasRole(u.grants, "ADMIN") || hasRole(u.grants, "HR"))
+  if (isAdmin(u.grants) || isHrOfficer(u.grants))
     drafts = await prisma.application.count({ where: { AND: [{ status: "DRAFT" }, cycle] } });
   return {
     total: byStatus.reduce((n, b) => n + b._count._all, 0),

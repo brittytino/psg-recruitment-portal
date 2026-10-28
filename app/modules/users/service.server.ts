@@ -43,7 +43,7 @@ async function activeAdminCount(tx: Tx, excludingUserId?: string) {
   return tx.user.count({
     where: {
       status: "ACTIVE",
-      roles: { some: { role: "ADMIN" } },
+      roles: { some: { role: { in: ["ADMIN", "SUPER_ADMIN"] } } },
       ...(excludingUserId ? { id: { not: excludingUserId } } : {}),
     },
   });
@@ -167,10 +167,10 @@ export async function revokeRole(actor: SessionUser | null, roleId: string) {
   const r = await prisma.userRole.findUnique({ where: { id: roleId } });
   if (!r || r.role === "CANDIDATE") throw new NotFoundError("Role assignment");
   await prisma.$transaction(async (tx) => {
-    if (r.role === "ADMIN") {
+    if (r.role === "ADMIN" || r.role === "SUPER_ADMIN") {
       if (r.userId === a.id) throw new ConflictError("You cannot remove your own Admin role");
       const others = await tx.userRole.count({
-        where: { role: "ADMIN", userId: { not: r.userId }, user: { status: "ACTIVE" } },
+        where: { role: { in: ["ADMIN", "SUPER_ADMIN"] }, userId: { not: r.userId }, user: { status: "ACTIVE" } },
       });
       if (others === 0) throw new ConflictError("At least one active Admin must remain");
     }
@@ -200,7 +200,7 @@ export async function setUserStatus(
     if (!target) throw new NotFoundError("User");
     if (
       status === "DISABLED" &&
-      target.roles.some((r) => r.role === "ADMIN") &&
+      target.roles.some((r) => r.role === "ADMIN" || r.role === "SUPER_ADMIN") &&
       (await activeAdminCount(tx, userId)) === 0
     )
       throw new ConflictError("At least one active Admin must remain");
