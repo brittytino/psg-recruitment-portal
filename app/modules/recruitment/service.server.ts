@@ -121,15 +121,8 @@ const departmentSchema = z.object({
     .regex(/^[A-Z0-9]{2,8}$/, "2–8 capital letters or digits, e.g. CSE"),
   name: z.string().trim().min(3, "Enter the department name").max(150),
   description: optionalText(1000),
-  hodName: optionalText(120),
-  hodEmail: z
-    .string()
-    .trim()
-    .toLowerCase()
-    .max(200)
-    .optional()
-    .transform((v) => v || null)
-    .pipe(z.string().email("Enter a valid e-mail address").nullable()),
+  hodName: z.string().trim().min(2, "Enter the HOD's full name").max(120),
+  hodEmail: z.string().trim().toLowerCase().email("Enter the HOD's official e-mail address").max(200),
 });
 
 /**
@@ -142,9 +135,10 @@ export async function createDepartment(user: SessionUser | null, input: unknown)
   const p = departmentSchema.safeParse(input);
   if (!p.success) throw new ValidationError("Please correct the highlighted fields", fieldErrors(p.error));
   const { hodName, hodEmail, ...dept } = p.data;
-  if (!!hodName !== !!hodEmail)
-    throw new ValidationError("Enter both the HOD's name and e-mail, or leave both empty", {
-      [hodName ? "hodEmail" : "hodName"]: ["Required when adding a HOD"],
+  const taken = await prisma.user.findUnique({ where: { email: hodEmail }, include: { roles: true } });
+  if (taken?.roles.some((r) => r.role === "CANDIDATE"))
+    throw new ValidationError("This e-mail belongs to a candidate account", {
+      hodEmail: ["Use the HOD's official institutional e-mail address"],
     });
   let created;
   try {
@@ -165,8 +159,7 @@ export async function createDepartment(user: SessionUser | null, input: unknown)
   } catch (e) {
     uniqueViolation(e, "A department with this code or name already exists");
   }
-  if (hodName && hodEmail)
-    await inviteHod(u, { departmentId: created.id, fullName: hodName, email: hodEmail });
+  await inviteHod(u, { departmentId: created.id, fullName: hodName, email: hodEmail });
   return created;
 }
 
@@ -530,4 +523,96 @@ export async function adminOverview(user: SessionUser | null) {
     }),
   ]);
   return { departments, vacancies, templates, researchSpecialisations };
+}
+
+// ------------------------------------------------------------------------------------------------
+// Editing a job opening (HR – N4 Section / Admin)
+// ------------------------------------------------------------------------------------------------
+const vacancyEditSchema = z
+  .object({
+    description: vacancyCommon.description,
+    numberOfPosts: vacancyCommon.numberOfPosts,
+    opensAt: dateTime,
+    closesAt: dateTime,
+    eligibility: z.string().max(10000).default(""),
+    disciplineId: optionalUuid,
+    positionTitle: z.string().trim().min(3).max(100).optional(),
+  })
+  .refine((v) => v.closesAt > v.opensAt, closesAfterOpens);
+
+export async function getVacancyForEdit(user: SessionUser | null, id: string) {
+  requirePermission(user, "recruitment:manage");
+  const v = await prisma.vacancy.findUnique({
+    where: { id },
+    include: {
+      department: { include: { disciplines: { where: { active: true }, orderBy: { name: "asc" } } } },
+      researchSpecialisation: true,
+      eligibility: { orderBy: { sortOrder: "asc" } },
+      _count: { select: { applications: true } },
+    },
+  });
+  if (!v) throw new NotFoundError("Vacancy");
+  return v;
+}
+
+/**
+ * Updates the details candidates see. Position, department and form stay fixed once created so that
+ * existing applications keep matching their official form; create a new opening to change those.
+ */
+export async function updateVacancy(user: SessionUser | null, id: string, input: unknown) {
+  const u = requirePermission(user, "recruitment:manage");
+  const p = vacancyEditSchema.safeParse(input);
+  if (!p.success) throw new ValidationError("Please correct the highlighted fields", fieldErrors(p.error));
+  const v = p.data;
+  const current = await prisma.vacancy.findUnique({
+    where: { id },
+    include: { department: true, discipline: true, researchSpecialisation: true },
+  });
+  if (!current) throw new NotFoundError("Vacancy");
+  let discipline = current.discipline;
+  if (current.recruitmentCategory === "FACULTY" && v.disciplineId !== (current.disciplineId ?? undefined)) {
+    discipline = v.disciplineId
+      ? await prisma.discipline.findUnique({ where: { id: v.disciplineId } })
+      : null;
+    if (v.disciplineId && (!discipline || discipline.departmentId !== current.departmentId))
+      throw new ValidationError("The specialisation does not belong to this department", {
+        disciplineId: ["Invalid specialisation"],
+      });
+  }
+  const researchTitle =
+    current.recruitmentCategory === "RESEARCH" ? (v.positionTitle ?? current.researchPositionTitle) : null;
+  const title =
+    current.recruitmentCategory === "RESEARCH"
+      ? `${researchTitle} – ${current.researchSpecialisation?.name ?? "Research"}`
+      : `${POSITION_LABELS[current.position!]} – ${discipline?.name ?? current.department?.name ?? ""}`;
+  await prisma.$transaction(async (tx) => {
+    await tx.eligibilityCriterion.deleteMany({ where: { vacancyId: id } });
+    await tx.vacancy.update({
+      where: { id },
+      data: {
+        title,
+        description: v.description,
+        numberOfPosts: v.numberOfPosts,
+        opensAt: v.opensAt,
+        closesAt: v.closesAt,
+        academicYear: current.academicYear ?? academicYearOf(v.opensAt),
+        ...(current.recruitmentCategory === "FACULTY"
+          ? { disciplineId: v.disciplineId ?? null }
+          : { researchPositionTitle: researchTitle }),
+        eligibility: {
+          create: criteriaOf(v.eligibility).map((description, sortOrder) => ({ description, sortOrder })),
+        },
+      },
+    });
+    await audit(
+      {
+        actorId: u.id,
+        action: "vacancy.updated",
+        entityType: "vacancy",
+        entityId: id,
+        metadata: { code: current.code },
+      },
+      tx,
+    );
+  });
 }

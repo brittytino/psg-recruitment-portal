@@ -52,6 +52,10 @@ export async function loader({ request, params, context }: Route.LoaderArgs) {
 
   return {
     id: app.id,
+    interview:
+      app.interviewInvitedAt && app.status === "SHORTLISTED"
+        ? { at: app.interviewAt, venue: app.interviewVenue, notes: app.interviewNotes }
+        : null,
     referenceNo: app.referenceNo,
     status: app.status as AppStatus,
     processingStatus: app.processingStatus,
@@ -95,6 +99,20 @@ export default function Receipt({ loaderData: L, actionData }: Route.ComponentPr
       )}
       {actionData && "formError" in actionData && actionData.formError && (
         <Alert tone="danger">{actionData.formError}</Alert>
+      )}
+      {L.interview && (
+        <Alert tone="success" title="You are called for interview">
+          <p>
+            <strong>When:</strong> {formatDateTime(L.interview.at)}
+          </p>
+          <p>
+            <strong>Where:</strong> {L.interview.venue}
+          </p>
+          {L.interview.notes && <p className="mt-2 whitespace-pre-line">{L.interview.notes}</p>}
+          <p className="mt-2 text-muted">
+            Bring the originals of all certificates and a printed copy of your application.
+          </p>
+        </Alert>
       )}
       <section className="card" aria-labelledby="rcpt">
         <h1 id="rcpt">Application {L.referenceNo ?? "(not yet submitted)"}</h1>

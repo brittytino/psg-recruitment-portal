@@ -256,25 +256,24 @@ The portal provides an auditable, Excel-compatible CSV export engine:
 One launcher per environment. Each run builds the images, applies database migrations, seeds the
 staff accounts and waits until the portal is healthy.
 
-| | Linux / macOS server | Windows (Docker Desktop) |
-| --- | --- | --- |
-| Development (Mailpit shows e-mails and sign-in codes at http://localhost:8025) | `./dev.sh` | `dev.bat` |
-| Production | `./prod.sh` | `prod.bat` |
+|                                                                                | Linux / macOS server | Windows (Docker Desktop) |
+| ------------------------------------------------------------------------------ | -------------------- | ------------------------ |
+| Development (Mailpit shows e-mails and sign-in codes at http://localhost:8025) | `./dev.sh`           | `dev.bat`                |
+| Production                                                                     | `./prod.sh`          | `prod.bat`               |
 
 Other commands (same for every launcher): `stop`, `down`, `restart`, `logs [service]`, `status`,
 `health`, `seed`, `migrate`, `rebuild`, `shell [service]`, `env`, `help`.
 
-**Production server, first time**
+**Production server (college IT): clone and run**
 
 ```sh
-./prod.sh            # creates .env with generated database passwords and secrets, then stops
-nano .env            # set APP_ORIGIN (https://…) and the SMTP_* settings
-./prod.sh            # builds, migrates, seeds and starts
+git clone https://github.com/brittytino/psg-recruitment-portal.git && cd psg-recruitment-portal
+./prod.sh            # generates all secrets, asks once for the Gmail app password, sets up HTTPS
 ```
 
 Full server guide (DNS, HTTPS, DB viewer): `docs/deployment/production-server.md`. Put Nginx with TLS in front (`infrastructure/nginx/host/setup-nginx.sh`) and keep `APP_BIND=127.0.0.1` so the app port is
-only reachable through the proxy. `.env` is never committed; `.env.example` and `.env.development` are
-the templates.
+only reachable through the proxy. `.env` is generated on the server and never committed; `.env.production` (production settings, no
+secrets) and `.env.development` are the committed templates.
 
 ### Local Development on Host Machine
 

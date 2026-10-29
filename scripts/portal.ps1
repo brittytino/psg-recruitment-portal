@@ -49,19 +49,24 @@ function CreateEnv {
     Ok "Created .env from .env.development"; return
   }
   $owner = Rand 24; $app = Rand 24
-  $t = [IO.File]::ReadAllText((Join-Path (Get-Location) ".env.example"))
-  $t = $t -replace "(?m)^NODE_ENV=.*", "NODE_ENV=production"
+  $t = [IO.File]::ReadAllText((Join-Path (Get-Location) ".env.production"))
+  $t = $t.Replace("__POSTGRES_PASSWORD__", $owner).Replace("__APP_DB_PASSWORD__", $app)
   $t = $t -replace "(?m)^POSTGRES_PASSWORD=.*", "POSTGRES_PASSWORD=$owner"
   $t = $t -replace "(?m)^APP_DB_PASSWORD=.*", "APP_DB_PASSWORD=$app"
-  $t = $t -replace "(?m)^DATABASE_URL=.*", "DATABASE_URL=postgresql://srp_app:$app@db:5432/srportal?schema=public"
-  $t = $t -replace "(?m)^MIGRATION_DATABASE_URL=.*", "MIGRATION_DATABASE_URL=postgresql://srp_owner:$owner@db:5432/srportal?schema=public"
   $t = $t -replace "(?m)^SESSION_SECRET=.*", "SESSION_SECRET=$(Rand 48)"
   $t = $t -replace "(?m)^CONVERTER_TOKEN=.*", "CONVERTER_TOKEN=$(Rand 24)"
   $t = $t -replace "(?m)^DB_VIEWER_PASSWORD=.*", "DB_VIEWER_PASSWORD=$(Rand 18)"
+  $pw = $env:SMTP_PASSWORD
+  if (-not $pw -and (Test-Path secretssmtp_password)) { $pw = (Get-Content secretssmtp_password -Raw).Trim() }
+  if (-not $pw) {
+    $sec = Read-Host -AsSecureString "Gmail app password for recruitments@psgtech.ac.in (one time)"
+    $pw = [Runtime.InteropServices.Marshal]::PtrToStringAuto([Runtime.InteropServices.Marshal]::SecureStringToBSTR($sec))
+  }
+  $pw = $pw.Replace(" ", "")
+  if (-not $pw) { Die "A Gmail app password is required for sign-in e-mails." }
+  $t = $t -replace "(?m)^SMTP_PASSWORD=.*", ("SMTP_PASSWORD=" + $pw)
   Write-Lf ".env" $t
   Ok "Created .env with generated secrets"
-  Warn "Edit .env: set APP_ORIGIN and the SMTP_* mail settings, then run prod.bat again."
-  exit 0
 }
 
 function CheckEnv {

@@ -43,6 +43,13 @@ export default function Login({ actionData }: Route.ComponentProps) {
           Enter your e-mail address and we will send you a 6-digit sign-in code. New candidate?{" "}
           <Link to="/register">Create an account</Link>
         </p>
+        {params.get("invite") === "hod" && (
+          <div className="mt-5">
+            <Alert tone="info" title="Welcome to the recruitment portal">
+              You have been added as a Head of Department. Send the sign-in code to your e-mail to continue.
+            </Alert>
+          </div>
+        )}
         {params.get("verified") === "1" && (
           <div className="mt-5">
             <Alert tone="success" title="E-mail address verified">
@@ -63,6 +70,7 @@ export default function Login({ actionData }: Route.ComponentProps) {
             required
             autoComplete="email"
             placeholder="name@example.com"
+            defaultValue={params.get("email") ?? undefined}
           />
           <button type="submit" className="btn-primary btn-lg w-full" disabled={busy}>
             {busy ? "Sending code…" : "Send sign-in code"}

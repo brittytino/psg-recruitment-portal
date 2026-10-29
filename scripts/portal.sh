@@ -22,6 +22,7 @@
 # ==============================================================================
 set -Eeuo pipefail
 
+ORIG_ARGS=("$@")
 MODE="${1:-}"
 shift || true
 CMD="${1:-up}"
@@ -46,8 +47,27 @@ case "$MODE" in
   *) die "usage: scripts/portal.sh <dev|prod> [command]" ;;
 esac
 
-# ---- Docker / Compose detection ----------------------------------------------
-command -v docker >/dev/null 2>&1 || die "Docker is not installed. See https://docs.docker.com/engine/install/"
+# ---- Root / Docker -------------------------------------------------------------
+is_root() { [ "$(id -u)" -eq 0 ]; }
+
+# Production on Linux: re-run with sudo so Docker, Nginx and certificates can be set up unattended.
+if [ "$MODE" = prod ] && ! is_root && [ "$(uname -s)" = Linux ] && command -v sudo >/dev/null 2>&1; then
+  if ! docker info >/dev/null 2>&1 || ! command -v docker >/dev/null 2>&1; then
+    info "Administrator rights are needed; re-running with sudo…"
+    exec sudo -E bash "$ROOT/scripts/portal.sh" "${ORIG_ARGS[@]}"
+  fi
+fi
+
+if ! command -v docker >/dev/null 2>&1; then
+  if [ "$MODE" = prod ] && is_root && [ "$(uname -s)" = Linux ]; then
+    info "Installing Docker Engine (official script)…"
+    command -v curl >/dev/null 2>&1 || { apt-get update && apt-get install -y curl; }
+    curl -fsSL https://get.docker.com | sh
+    systemctl enable --now docker
+  else
+    die "Docker is not installed. See https://docs.docker.com/engine/install/"
+  fi
+fi
 if docker compose version >/dev/null 2>&1; then
   COMPOSE=(docker compose)
 elif command -v docker-compose >/dev/null 2>&1; then
@@ -78,28 +98,86 @@ rand() { # URL-safe random string
   fi
 }
 
+env_set() { # env_set KEY VALUE -> replace (or append) in .env; VALUE is written literally
+  local tmp
+  tmp="$(mktemp)"
+  KEY="$1" VAL="$2" awk 'BEGIN { k = ENVIRON["KEY"]; v = ENVIRON["VAL"]; done = 0 }
+    index($0, k "=") == 1 { print k "=" v; done = 1; next } { print }
+    END { if (!done) print k "=" v }' .env > "$tmp"
+  cat "$tmp" > .env
+  rm -f "$tmp"
+}
+
+TEMPLATE=.env.production
+
 create_env() {
   if [ "$MODE" = dev ]; then
     cp .env.development .env
     ok "Created .env from .env.development"
     return
   fi
-  [ -f .env.example ] || die ".env.example is missing"
+  [ -f "$TEMPLATE" ] || die "$TEMPLATE is missing (it is part of the repository)"
   local owner app
   owner="$(rand 24)"; app="$(rand 24)"
-  sed -e "s|^NODE_ENV=.*|NODE_ENV=production|" \
-      -e "s|^POSTGRES_PASSWORD=.*|POSTGRES_PASSWORD=$owner|" \
-      -e "s|^APP_DB_PASSWORD=.*|APP_DB_PASSWORD=$app|" \
-      -e "s|^DATABASE_URL=.*|DATABASE_URL=postgresql://srp_app:$app@db:5432/srportal?schema=public|" \
-      -e "s|^MIGRATION_DATABASE_URL=.*|MIGRATION_DATABASE_URL=postgresql://srp_owner:$owner@db:5432/srportal?schema=public|" \
-      -e "s|^SESSION_SECRET=.*|SESSION_SECRET=$(rand 48)|" \
-      -e "s|^CONVERTER_TOKEN=.*|CONVERTER_TOKEN=$(rand 24)|" \
-      -e "s|^DB_VIEWER_PASSWORD=.*|DB_VIEWER_PASSWORD=$(rand 18)|" \
-      .env.example > .env
+  sed -e "s|__POSTGRES_PASSWORD__|$owner|g" -e "s|__APP_DB_PASSWORD__|$app|g" "$TEMPLATE" > .env
   chmod 600 .env
-  ok "Created .env with freshly generated database passwords and secrets"
-  warn "Edit .env now: set APP_ORIGIN (your https:// address) and the SMTP_* mail settings, then run ./prod.sh again."
-  exit 0
+  env_set POSTGRES_PASSWORD "$owner"
+  env_set APP_DB_PASSWORD "$app"
+  env_set SESSION_SECRET "$(rand 48)"
+  env_set CONVERTER_TOKEN "$(rand 24)"
+  env_set DB_VIEWER_PASSWORD "$(rand 18)"
+  ok "Created .env with freshly generated passwords and secrets (kept only on this server)"
+}
+
+# New settings added to the template in later versions are copied into an existing .env.
+sync_env() {
+  [ "$MODE" = prod ] && [ -f "$TEMPLATE" ] || return 0
+  local key line added=0
+  while IFS= read -r line; do
+    case "$line" in ''|'#'*) continue ;; esac
+    key="${line%%=*}"
+    grep -q "^$key=" .env && continue
+    case "$line" in *__GENERATED__*) line="$key=$(rand 24)" ;; esac
+    printf '%s\n' "$line" >> .env
+    added=1
+  done < "$TEMPLATE"
+  [ "$added" = 0 ] || ok "Added new settings from $TEMPLATE to .env"
+}
+
+# The Gmail app password is the only secret that cannot be generated. Sources, in order:
+# SMTP_PASSWORD environment variable, secrets/smtp_password file, then a one-time hidden prompt.
+ensure_smtp_password() {
+  [ "$MODE" = prod ] || return 0
+  [ "$(env_get EMAIL_PROVIDER)" = smtp ] || return 0
+  [ -n "$(env_get SMTP_PASSWORD)" ] && return 0
+  local pw="${SMTP_PASSWORD:-}"
+  if [ -z "$pw" ] && [ -f secrets/smtp_password ]; then pw="$(tr -d '\r\n' < secrets/smtp_password)"; fi
+  if [ -z "$pw" ] && [ -t 0 ]; then
+    echo
+    info "One-time setup: Gmail app password for $(env_get SMTP_USER)"
+    echo "    (Google Account → Security → 2-Step Verification → App passwords; 16 letters)"
+    read -rsp "    App password: " pw
+    echo
+  fi
+  pw="$(printf '%s' "$pw" | tr -d ' ')"
+  [ -n "$pw" ] || die "No Gmail app password. Run again interactively, or: SMTP_PASSWORD='xxxx xxxx xxxx xxxx' ./prod.sh"
+  env_set SMTP_PASSWORD "$pw"
+  ok "Saved the mail password in .env (this server only)"
+}
+
+# HTTPS for the portal and the DB viewer (Nginx + Let's Encrypt), when running as root on Linux.
+setup_https() {
+  [ "$MODE" = prod ] || return 0
+  [ "$(env_get SETUP_NGINX)" != false ] || return 0
+  if ! is_root || [ "$(uname -s)" != Linux ]; then
+    warn "Skipping Nginx/HTTPS set-up (needs root on Linux). Run: sudo infrastructure/nginx/host/setup-nginx.sh"
+    return 0
+  fi
+  local app_domain db_domain
+  app_domain="$(env_get APP_ORIGIN)"; app_domain="${app_domain#https://}"; app_domain="${app_domain#http://}"; app_domain="${app_domain%%/*}"
+  db_domain="$(env_get DB_VIEWER_DOMAIN)"
+  bash infrastructure/nginx/host/setup-nginx.sh "$app_domain" "${db_domain:-db.$app_domain}" "$(env_get LETSENCRYPT_EMAIL)" ||
+    warn "HTTPS set-up did not finish (usually DNS not pointing here yet). Re-run ./prod.sh once DNS is ready."
 }
 
 # Sign-in codes are e-mailed, so an unreachable mail server means nobody can sign in.
@@ -119,6 +197,9 @@ check_env() {
   [ -f .env ] || { info ".env not found — creating it"; create_env; }
   # Windows editors may save CRLF line endings, which break values. Normalise silently.
   if grep -q $'\r' .env; then sed -i.bak 's/\r$//' .env && rm -f .env.bak; warn "Converted .env to LF line endings"; fi
+  sync_env
+  ensure_smtp_password
+  grep -v "^#" .env | grep -q "__GENERATED__\|__APP_DB_PASSWORD__\|__POSTGRES_PASSWORD__" && die ".env still contains placeholders; delete it and run again."
 
   local missing=()
   for k in POSTGRES_PASSWORD APP_DB_PASSWORD DATABASE_URL MIGRATION_DATABASE_URL SESSION_SECRET CONVERTER_TOKEN APP_ORIGIN; do
@@ -209,6 +290,14 @@ up() {
   info "Starting services…"
   dc up -d --remove-orphans
   wait_healthy
+  setup_https
+  if [ "$MODE" = prod ]; then
+    echo
+    ok "Portal:    $(env_get APP_ORIGIN)"
+    if [ "$(env_get DB_VIEWER_ENABLED)" = true ]; then
+      ok "DB viewer: https://$(env_get DB_VIEWER_DOMAIN)  (user $(env_get DB_VIEWER_USER); password: grep DB_VIEWER_PASSWORD .env)"
+    fi
+  fi
 }
 
 # ---- Commands -----------------------------------------------------------------

@@ -6,6 +6,8 @@ import { Alert, Badge, ConfirmDialog, CsrfInput, formatDateTime, statusTone } fr
 import { clientIp, handleAction, readForm, requireStaff } from "~/lib/http.server";
 import { FORM_LABELS, POSITION_LABELS } from "~/lib/labels";
 import { getStaffApplication, transition, updateInternalNote } from "~/modules/applications/service.server";
+import { INTERVIEW_FROM, inviteForInterview } from "~/modules/applications/interview.server";
+import { CalendarCheck } from "lucide-react";
 import {
   APPLICATION_STATUSES,
   ASSIGNABLE,
@@ -103,6 +105,14 @@ export async function loader({ request, params, context }: Route.LoaderArgs) {
       hodReason: app.hodDecisionReason,
       hodRemarks: app.hodRemarks,
       hodDecidedAt: app.hodDecidedAt,
+      interview: app.interviewInvitedAt
+        ? {
+            at: app.interviewAt,
+            venue: app.interviewVenue,
+            notes: app.interviewNotes,
+            sentAt: app.interviewInvitedAt,
+          }
+        : null,
       positionChanges: app.positionChanges,
       history: app.statusHistory.map((h) => ({
         to: h.toStatus as AppStatus,
@@ -116,6 +126,12 @@ export async function loader({ request, params, context }: Route.LoaderArgs) {
     canRegenerate: isOffice && hasPermission(user.grants, "document:regenerate"),
     canApprove: await canApprovePositionChange(user),
     canAssign: isOffice && hasPermission(user.grants, "application:assign"),
+    canInterview:
+      isOffice &&
+      hasPermission(user.grants, "application:transition") &&
+      INTERVIEW_FROM.includes(app.status as AppStatus) &&
+      (app.status !== "UNDER_HR_REVIEW" || app.recruitmentCategory === "RESEARCH") &&
+      !app.positionChanges.some((c) => c.status === "PENDING"),
     hods: isOffice && app.vacancy.departmentId ? await hodsForDepartment(app.vacancy.departmentId) : [],
     changeOptions: allowedChanges(applied),
   };
@@ -158,6 +174,9 @@ export async function action({ request, params, context }: Route.ActionArgs) {
         await transition(user, params.id, to as AppStatus, String(form.get("reason") ?? ""), ip);
         return { message: `Status changed to “${STATUS_LABELS[to as AppStatus]}”.` };
       }
+      case "interview":
+        await inviteForInterview(user, params.id, Object.fromEntries(form), ip);
+        return { message: "Interview call e-mailed to the candidate. The application is now Shortlisted." };
       case "regenerate":
         await requestRegeneration(user, params.id, ip);
         return { message: "PDF regeneration has been queued as a new version." };
@@ -173,6 +192,7 @@ export default function StaffApplication({ loaderData, actionData }: Route.Compo
     isOffice,
     isAssignedHod,
     canDownload,
+    canInterview,
     canRegenerate,
     canApprove,
     canAssign,
@@ -582,6 +602,91 @@ export default function StaffApplication({ loaderData, actionData }: Route.Compo
                   Save internal note
                 </button>
               </Form>
+            </section>
+          )}
+
+          {(canInterview || app.interview) && isOffice && (
+            <section className="card space-y-4" aria-labelledby="interview">
+              <div className="flex items-center gap-3">
+                <span className="icon-tile">
+                  <CalendarCheck className="h-5 w-5" aria-hidden="true" />
+                </span>
+                <h2 id="interview" className="text-xl">
+                  Call for interview
+                </h2>
+              </div>
+              {app.interview && (
+                <div className="rounded-lg border border-success/25 bg-success-50 p-3 text-sm">
+                  <p className="font-semibold text-success">Sent {formatDateTime(app.interview.sentAt)}</p>
+                  <p className="mt-1">
+                    <strong>When:</strong> {formatDateTime(app.interview.at)}
+                  </p>
+                  <p>
+                    <strong>Where:</strong> {app.interview.venue}
+                  </p>
+                  {app.interview.notes && (
+                    <p className="mt-1 whitespace-pre-line text-muted">{app.interview.notes}</p>
+                  )}
+                </div>
+              )}
+              {canInterview ? (
+                <Form method="post" className="space-y-3">
+                  <CsrfInput />
+                  <input type="hidden" name="intent" value="interview" />
+                  <div>
+                    <label htmlFor="iv-at" className="block text-sm font-medium">
+                      Date and time (IST) <span className="text-danger">*</span>
+                    </label>
+                    <input
+                      id="iv-at"
+                      name="interviewAt"
+                      type="datetime-local"
+                      required
+                      className="field-input mt-1"
+                    />
+                  </div>
+                  <div>
+                    <label htmlFor="iv-venue" className="block text-sm font-medium">
+                      Venue or online meeting link <span className="text-danger">*</span>
+                    </label>
+                    <input
+                      id="iv-venue"
+                      name="interviewVenue"
+                      required
+                      placeholder="Board Room, Admin Block, PSG Tech"
+                      className="field-input mt-1"
+                    />
+                  </div>
+                  <div>
+                    <label htmlFor="iv-notes" className="block text-sm font-medium">
+                      Instructions for the candidate
+                    </label>
+                    <textarea
+                      id="iv-notes"
+                      name="interviewNotes"
+                      rows={3}
+                      placeholder="Report 30 minutes early; prepare a 10-minute presentation…"
+                      className="field-input mt-1"
+                    />
+                  </div>
+                  <ConfirmDialog
+                    trigger={app.interview ? "Reschedule and e-mail again" : "Send interview call"}
+                    triggerClassName="btn-primary w-full"
+                    title={
+                      app.interview ? "Send the updated interview schedule?" : "Send the interview call?"
+                    }
+                    confirmLabel="Send e-mail"
+                    disabled={busy}
+                  >
+                    <p>
+                      The candidate receives the date, venue and instructions by e-mail and sees them in their
+                      account.
+                    </p>
+                  </ConfirmDialog>
+                </Form>
+              ) : (
+                !app.interview && null
+              )}
             </section>
           )}
 

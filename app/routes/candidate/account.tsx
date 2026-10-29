@@ -119,6 +119,12 @@ export default function Account({ loaderData, actionData }: Route.ComponentProps
                     </div>
                     <Badge tone={statusTone(a.status)}>{STATUS_LABELS[a.status as AppStatus]}</Badge>
                   </div>
+                  {a.status === "SHORTLISTED" && a.interviewAt && (
+                    <p className="rounded-lg border border-success/25 bg-success-50 px-3 py-2 text-sm">
+                      <strong className="text-success">Interview:</strong> {formatDateTime(a.interviewAt)} ·{" "}
+                      {a.interviewVenue}
+                    </p>
+                  )}
                   <dl className="grid grid-cols-2 gap-3 text-sm">
                     <div className="rounded-lg bg-soft p-3">
                       <dt className="text-xs text-muted">Reference</dt>

@@ -41,15 +41,17 @@ jobs:
       - uses: actions/setup-node@v4
         with: { node-version: 22, cache: npm }
       - run: npm ci && npx prisma generate
-      - run: cp .env.example .env
+      - run: cp .env.development .env
       - name: Start services
         run: docker compose -f compose.yaml -f compose.dev.yaml up -d --build --wait db redis converter mailpit clamav
         timeout-minutes: 15
       - name: Migration validation (fresh database)
-        run: docker compose exec -T db psql -U srp_owner -d postgres -c "CREATE DATABASE srportal_shadow" && npx prisma migrate deploy && npx prisma migrate diff --from-migrations prisma/migrations --to-schema-datamodel prisma/schema.prisma --shadow-database-url "$SHADOW" --exit-code
-        env:
-          DATABASE_URL: postgresql://srp_owner:change-me-owner@localhost:65432/srportal?schema=public
-          SHADOW: postgresql://srp_owner:change-me-owner@localhost:65432/srportal_shadow
+        run: |
+          PW=$(sed -n 's/^POSTGRES_PASSWORD=//p' .env.development)
+          export DATABASE_URL="postgresql://srp_owner:$PW@localhost:6543/srportal?schema=public"
+          docker compose exec -T db psql -U srp_owner -d postgres -c "CREATE DATABASE srportal_shadow"
+          npx prisma migrate deploy
+          npx prisma migrate diff --from-migrations prisma/migrations --to-schema-datamodel prisma/schema.prisma --shadow-database-url "postgresql://srp_owner:$PW@localhost:6543/srportal_shadow" --exit-code
       - name: Integration + authorization tests
         run: npm run test:integration
       - name: Seed and run e2e
@@ -85,8 +87,7 @@ jobs:
         run: docker run --rm -v /var/run/docker.sock:/var/run/docker.sock aquasec/trivy:0.58.1 image --exit-code 1 --severity CRITICAL --ignore-unfixed psg-srp-app:${GITHUB_SHA::12}
       - name: Compose files validate
         run: |
-          cp .env.example .env
+          cp .env.development .env
           docker compose -f compose.yaml -f compose.dev.yaml config -q
-          cp .env.example .env.production
-          sed -i 's/^SMTP_HOST=.*/SMTP_HOST=smtp.example.test/' .env.production
-          docker compose -f compose.production.yaml --env-file .env.production config -q
+          sed 's/__[A-Z_]*__/ci-secret-value-1234567890/g' .env.production > .env
+          docker compose -f compose.yaml --profile dbviewer config -q

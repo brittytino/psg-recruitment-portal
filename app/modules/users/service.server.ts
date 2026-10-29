@@ -255,16 +255,17 @@ const hodInviteSchema = z.object({
   email: z.string().trim().toLowerCase().email("Enter a valid e-mail address").max(200),
 });
 
-function hodInviteBody(fullName: string, departmentName: string) {
+function hodInviteBody(fullName: string, departmentName: string, email: string) {
+  const link = `${env().APP_ORIGIN}/login?${new URLSearchParams({ email, next: "/staff/review", invite: "hod" })}`;
   return [
     `Dear ${fullName},`,
     "",
     `You have been added as the Head of Department for ${departmentName} on the PSG College of Technology Staff Recruitment Portal.`,
     "",
-    "Sign in with this e-mail address:",
-    `${env().APP_ORIGIN}/login`,
+    "Accept the invitation and sign in here:",
+    link,
     "",
-    "A 6-digit one-time code is e-mailed to you on every sign-in; no password is needed.",
+    `Your sign-in e-mail is ${email}. A 6-digit one-time code is e-mailed to you on every sign-in; no password is needed.`,
     "After signing in you will see the applications assigned to you for review and the department summary sheet.",
     "",
     "HR – N4 Section, PSG College of Technology",
@@ -311,7 +312,7 @@ export async function inviteHod(actor: SessionUser | null, input: unknown) {
       user.id,
       "account.hod_invite",
       `HOD access – ${department.name} | PSG Tech Recruitment Portal`,
-      hodInviteBody(v.fullName, department.name),
+      hodInviteBody(v.fullName, department.name, v.email),
     );
     await audit(
       {
@@ -340,7 +341,7 @@ export async function resendHodInvite(actor: SessionUser | null, roleId: string)
       r.userId,
       "account.hod_invite",
       `HOD access – ${r.department!.name} | PSG Tech Recruitment Portal`,
-      hodInviteBody(r.user.profile?.fullName ?? r.user.email, r.department!.name),
+      hodInviteBody(r.user.profile?.fullName ?? r.user.email, r.department!.name, r.user.email),
     );
     await audit(
       {

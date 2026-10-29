@@ -40,6 +40,7 @@ export default [
   // Administration
   route("admin", "routes/admin/index.tsx"),
   route("admin/vacancies/new", "routes/admin/vacancy-new.tsx"),
+  route("admin/vacancies/:id/edit", "routes/admin/vacancy-edit.tsx"),
   route("admin/departments", "routes/admin/departments.tsx"),
   route("admin/notices", "routes/admin/notices.tsx"),
   route("admin/users", "routes/admin/users.tsx"),

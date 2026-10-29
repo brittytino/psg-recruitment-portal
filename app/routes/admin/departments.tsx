@@ -39,9 +39,7 @@ export async function action({ request, context }: Route.ActionArgs) {
       case "department":
         await createDepartment(user, f);
         return {
-          message: f.hodEmail
-            ? "Department created and the HOD invitation has been e-mailed."
-            : "Department created. Add its HOD when ready.",
+          message: "Department created and the invitation has been e-mailed to the HOD.",
         };
       case "hod":
         await inviteHod(user, f);
@@ -270,10 +268,11 @@ export default function Departments({ loaderData, actionData }: Route.ComponentP
                 error={fe?.name?.[0]}
               />
               <fieldset className="space-y-4 rounded-lg border border-line p-4">
-                <legend className="px-1 text-sm font-semibold">Head of Department (optional)</legend>
+                <legend className="px-1 text-sm font-semibold">Head of Department</legend>
                 <TextInput
                   label="HOD name"
                   name="hodName"
+                  required
                   placeholder="Dr. R. Kumar"
                   error={fe?.hodName?.[0]}
                 />
@@ -281,6 +280,7 @@ export default function Departments({ loaderData, actionData }: Route.ComponentP
                   label="HOD e-mail"
                   name="hodEmail"
                   type="email"
+                  required
                   placeholder="hod.cse@psgtech.ac.in"
                   hint="An invitation with the sign-in link is e-mailed."
                   error={fe?.hodEmail?.[0]}

@@ -23,6 +23,8 @@ import {
   recordHodDecision,
   reopenSummarySheet,
 } from "~/modules/reviews/service.server";
+import { inviteForInterview } from "~/modules/applications/interview.server";
+import { createDepartment, updateVacancy } from "~/modules/recruitment/service.server";
 import { facultyV2Minimal, testPhotoPng } from "../fixtures/applications";
 
 const tag = randomUUID()
@@ -267,5 +269,88 @@ describe("HR filters and export", () => {
     expect(csv).toContain('"GATE"');
     const hod = await makeUser("HOD", deptId);
     await expect(exportCsv(hod, q, ["sNo"])).rejects.toThrow();
+  });
+});
+
+describe("HR – N4 flows", () => {
+  it("creating a department requires a HOD and e-mails the HOD an invitation link", async () => {
+    const hr = await makeUser("HR");
+    const code = `H${tag}`.slice(0, 8);
+    await expect(
+      createDepartment(hr, { code, name: `IT HOD dept ${tag}`, hodName: "", hodEmail: "" }),
+    ).rejects.toThrow(/correct/);
+    const email = `hod-${tag.toLowerCase()}@it.example.test`;
+    const d = await createDepartment(hr, {
+      code,
+      name: `IT HOD dept ${tag}`,
+      hodName: "Dr. Test",
+      hodEmail: email,
+    });
+    const hodUser = await prisma.user.findUniqueOrThrow({ where: { email }, include: { roles: true } });
+    expect(hodUser.roles.some((r) => r.role === "HOD" && r.departmentId === d.id)).toBe(true);
+    const n = await prisma.notification.findFirstOrThrow({
+      where: { userId: hodUser.id, type: "account.hod_invite" },
+    });
+    expect(n.body).toContain(`/login?email=${encodeURIComponent(email)}`);
+    expect(await prisma.outboxEvent.count({ where: { payload: { equals: { notificationId: n.id } } } })).toBe(
+      1,
+    );
+  });
+
+  it("HR edits a job opening; position stays fixed", async () => {
+    const hr = await makeUser("HR");
+    const before = await prisma.vacancy.findUniqueOrThrow({ where: { id: vacAssoc } });
+    const closes = new Date(Date.now() + 20 * 86400_000).toISOString();
+    await updateVacancy(hr, vacAssoc, {
+      description: "Updated description for the post.",
+      numberOfPosts: "3",
+      opensAt: before.opensAt.toISOString(),
+      closesAt: closes,
+      eligibility: "Ph.D.\nFirst class PG",
+    });
+    const after = await prisma.vacancy.findUniqueOrThrow({
+      where: { id: vacAssoc },
+      include: { eligibility: true },
+    });
+    expect(after.numberOfPosts).toBe(3);
+    expect(after.position).toBe(before.position);
+    expect(after.eligibility).toHaveLength(2);
+    await expect(updateVacancy(await makeUser("HOD", deptId), vacAssoc, {})).rejects.toThrow(/permission/);
+  });
+
+  it("after the HOD accepts, HR calls the candidate for interview and the candidate is e-mailed", async () => {
+    const { app } = await submitted();
+    const hr = await makeUser("HR");
+    const admin = await makeUser("ADMIN");
+    const hod = await makeUser("HOD", deptId);
+    const when = new Date(Date.now() + 7 * 86400_000).toISOString();
+    const details = { interviewAt: when, interviewVenue: "Board Room, Admin Block" };
+    await expect(inviteForInterview(hr, app.id, details)).rejects.toThrow(/HOD/);
+    await assignToHod(admin, { hodId: hod.id, applicationIds: [app.id] });
+    await expect(inviteForInterview(hr, app.id, details)).rejects.toThrow(/HOD/);
+    await recordHodDecision(hod, app.id, { decision: "ACCEPT" });
+    await expect(inviteForInterview(hod, app.id, details)).rejects.toThrow(/permission/);
+    await expect(
+      inviteForInterview(hr, app.id, {
+        ...details,
+        interviewAt: new Date(Date.now() - 3600_000).toISOString(),
+      }),
+    ).rejects.toThrow(/correct/);
+    await inviteForInterview(hr, app.id, { ...details, interviewNotes: "Bring originals." });
+    const a = await prisma.application.findUniqueOrThrow({ where: { id: app.id } });
+    expect(a.status).toBe("SHORTLISTED");
+    expect(a.interviewVenue).toBe("Board Room, Admin Block");
+    const mail = await prisma.notification.findFirstOrThrow({
+      where: { userId: a.candidateId, type: "application.interview_call" },
+    });
+    expect(mail.subject).toMatch(/Call for interview/);
+    expect(mail.body).toContain("Board Room, Admin Block");
+    // Rescheduling e-mails the updated details and keeps the status.
+    await inviteForInterview(hr, app.id, { ...details, interviewVenue: "Online: meet.google.com/abc" });
+    expect(
+      await prisma.notification.count({
+        where: { userId: a.candidateId, type: "application.interview_call" },
+      }),
+    ).toBe(2);
   });
 });

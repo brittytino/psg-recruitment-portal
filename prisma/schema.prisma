@@ -401,52 +401,58 @@ model RequiredDocument {
 }
 
 model Application {
-  id                  String                     @id @default(uuid()) @db.Uuid
+  id                   String                     @id @default(uuid()) @db.Uuid
   /// Assigned atomically at first submission, e.g. "PSGCT2026-27CSE_0001" or "PSGCT2026-27RA_0001".
-  referenceNo         String?                    @unique
-  candidateId         String                     @db.Uuid
-  vacancyId           String                     @db.Uuid
-  formTemplateId      String                     @db.Uuid
-  status              ApplicationStatus          @default(DRAFT)
-  processingStatus    ProcessingStatus           @default(NOT_STARTED)
+  referenceNo          String?                    @unique
+  candidateId          String                     @db.Uuid
+  vacancyId            String                     @db.Uuid
+  formTemplateId       String                     @db.Uuid
+  status               ApplicationStatus          @default(DRAFT)
+  processingStatus     ProcessingStatus           @default(NOT_STARTED)
   /// Current editable answers (only meaningful while DRAFT / NEEDS_CLARIFICATION).
-  draftAnswers        Json                       @default("{}")
+  draftAnswers         Json                       @default("{}")
   /// Optimistic concurrency token, incremented on every draft save.
-  draftVersion        Int                        @default(0)
-  lastSavedAt         DateTime?                  @db.Timestamptz(3)
-  submittedAt         DateTime?                  @db.Timestamptz(3)
-  currentRevisionId   String?                    @unique @db.Uuid
+  draftVersion         Int                        @default(0)
+  lastSavedAt          DateTime?                  @db.Timestamptz(3)
+  submittedAt          DateTime?                  @db.Timestamptz(3)
+  currentRevisionId    String?                    @unique @db.Uuid
   /// Denormalised from the vacancy for department-scoped queries.
-  departmentId        String?                    @db.Uuid
+  departmentId         String?                    @db.Uuid
   /// Denormalised recruitment category for explicit workflow routing.
-  recruitmentCategory RecruitmentCategory        @default(FACULTY)
+  recruitmentCategory  RecruitmentCategory        @default(FACULTY)
   /// What the candidate applied for. Never changed after creation. Null for research applications.
-  appliedPosition     Position?
+  appliedPosition      Position?
   /// Set only when Admin approves a HOD's position-change recommendation.
-  effectivePosition   Position?
-  assignedHodId       String?                    @db.Uuid
-  assignedAt          DateTime?                  @db.Timestamptz(3)
-  hodDecision         HodDecision?
-  hodDecisionReason   String?
-  hodRemarks          String?
-  hodDecidedAt        DateTime?                  @db.Timestamptz(3)
+  effectivePosition    Position?
+  assignedHodId        String?                    @db.Uuid
+  assignedAt           DateTime?                  @db.Timestamptz(3)
+  hodDecision          HodDecision?
+  hodDecisionReason    String?
+  hodRemarks           String?
+  hodDecidedAt         DateTime?                  @db.Timestamptz(3)
   /// Internal review note recorded by N4 HR (never visible to candidates).
-  internalNote        String?
-  createdAt           DateTime                   @default(now()) @db.Timestamptz(3)
-  updatedAt           DateTime                   @updatedAt @db.Timestamptz(3)
-  department          Department?                @relation(fields: [departmentId], references: [id])
-  assignedHod         User?                      @relation("AssignedHod", fields: [assignedHodId], references: [id])
-  positionChanges     PositionChangeRequest[]
-  candidate           User                       @relation("CandidateApplications", fields: [candidateId], references: [id])
-  vacancy             Vacancy                    @relation(fields: [vacancyId], references: [id])
-  formTemplate        FormTemplate               @relation(fields: [formTemplateId], references: [id])
-  currentRevision     ApplicationRevision?       @relation("CurrentRevision", fields: [currentRevisionId], references: [id])
-  revisions           ApplicationRevision[]      @relation("Revisions")
-  documents           ApplicationDocument[]
-  generated           GeneratedDocument[]
-  statusHistory       ApplicationStatusHistory[]
-  assignments         ReviewAssignment[]
-  reviews             Review[]
+  internalNote         String?
+  /// Interview call sent by HR – N4 Section after the department review (e-mailed to the candidate).
+  interviewAt          DateTime?                  @db.Timestamptz(3)
+  interviewVenue       String?
+  interviewNotes       String?
+  interviewInvitedAt   DateTime?                  @db.Timestamptz(3)
+  interviewInvitedById String?                    @db.Uuid
+  createdAt            DateTime                   @default(now()) @db.Timestamptz(3)
+  updatedAt            DateTime                   @updatedAt @db.Timestamptz(3)
+  department           Department?                @relation(fields: [departmentId], references: [id])
+  assignedHod          User?                      @relation("AssignedHod", fields: [assignedHodId], references: [id])
+  positionChanges      PositionChangeRequest[]
+  candidate            User                       @relation("CandidateApplications", fields: [candidateId], references: [id])
+  vacancy              Vacancy                    @relation(fields: [vacancyId], references: [id])
+  formTemplate         FormTemplate               @relation(fields: [formTemplateId], references: [id])
+  currentRevision      ApplicationRevision?       @relation("CurrentRevision", fields: [currentRevisionId], references: [id])
+  revisions            ApplicationRevision[]      @relation("Revisions")
+  documents            ApplicationDocument[]
+  generated            GeneratedDocument[]
+  statusHistory        ApplicationStatusHistory[]
+  assignments          ReviewAssignment[]
+  reviews              Review[]
 
   /// Policy (pending confirmation): one application per candidate per vacancy.
   @@unique([candidateId, vacancyId])

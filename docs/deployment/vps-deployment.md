@@ -13,7 +13,7 @@ sudo ufw default deny incoming && sudo ufw allow 22/tcp && sudo ufw allow 80/tcp
 sudo adduser --system --group deploy && sudo usermod -aG docker deploy
 sudo mkdir -p /opt/srportal && sudo chown deploy /opt/srportal
 git clone <repo> /opt/srportal && cd /opt/srportal
-cp .env.example .env.production   # set real values; chmod 600
+# Superseded by docs/deployment/production-server.md: ./prod.sh generates .env itself.
 ```
 
 Required `.env.production` values: `APP_ORIGIN=https://<domain>`, `COOKIE_SECURE=true`, database passwords and URLs, `SESSION_SECRET` (48+ random bytes), `CONVERTER_TOKEN`, SMTP host/port/user/password/from. Never bake secrets into images.

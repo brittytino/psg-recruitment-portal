@@ -19,25 +19,31 @@ db.recruitments.psgtech.ac.in    A   <server IP>
 
 ## 2. Server requirements
 
-- Ubuntu 22.04+/Debian 12, 4 GB RAM minimum (ClamAV needs ~2 GB), 40 GB disk.
-- Docker Engine with the Compose plugin: `curl -fsSL https://get.docker.com | sh`
-- Firewall: inbound **80** and **443** open; inbound 6969/6981 **closed** (they are bound to localhost anyway).
-- Outbound **TCP 587 to smtp.gmail.com** (or the college SMTP relay) must be allowed. Sign-in codes are
-  e-mailed, so without outbound SMTP nobody can sign in. `./prod.sh` checks this on every start.
+- Ubuntu 22.04+ / Debian 12, 4 GB RAM minimum (ClamAV needs ~2 GB), 40 GB disk, a user with sudo.
+- Inbound **80** and **443** open. Outbound **TCP 587 to smtp.gmail.com** open (sign-in codes are e-mailed).
+- Nothing else: Docker, Nginx and HTTPS certificates are installed by `./prod.sh`.
 
-## 3. Install
+## 3. Install (the only steps)
 
 ```sh
-git clone https://github.com/brittytino/PSG-SRPortal.git /opt/psg-recruitment
+git clone https://github.com/brittytino/psg-recruitment-portal.git /opt/psg-recruitment
 cd /opt/psg-recruitment
-./prod.sh                 # first run: creates .env with generated passwords/secrets and stops
-nano .env                 # set APP_ORIGIN, SMTP_USER, SMTP_PASSWORD (Gmail app password)
-                          # optional DB viewer: DB_VIEWER_ENABLED=true
-./prod.sh                 # builds, migrates, seeds staff accounts, starts, waits until healthy
-sudo infrastructure/nginx/host/setup-nginx.sh recruitments.psgtech.ac.in db.recruitments.psgtech.ac.in admin@psgtech.ac.in
+./prod.sh
 ```
 
-Restrict the DB viewer to campus/admin IPs (recommended):
+On the first run `./prod.sh`:
+
+1. installs Docker if needed (asks for the sudo password),
+2. creates `.env` from the committed `.env.production` with **freshly generated** database passwords and
+   secrets (they never leave the server),
+3. asks **once** for the Gmail app password of recruitments@psgtech.ac.in (hidden input). To run
+   without any prompt: `SMTP_PASSWORD='xxxx xxxx xxxx xxxx' ./prod.sh`, or put it in `secrets/smtp_password`,
+4. builds, migrates the database, creates the staff accounts and starts everything,
+5. configures Nginx + Let's Encrypt for both domains and prints the URLs.
+
+The Gmail password is not in the repository because the repository is public.
+
+To restrict the DB viewer to campus/admin IPs (recommended):
 
 ```sh
 echo "allow 14.139.0.0/16; deny all;" | sudo tee /etc/nginx/snippets/psg-db-allow.conf   # use your real ranges

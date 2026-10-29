@@ -1,6 +1,6 @@
 import { Form, Link, useSearchParams } from "react-router";
 import type { Route } from "./+types/index";
-import { Plus } from "lucide-react";
+import { Pencil, Plus } from "lucide-react";
 import { Alert, Badge, ConfirmDialog, CsrfInput, formatDate, statusTone } from "~/components/forms";
 import { EmptyState, PageHeader, Tabs } from "~/components/staff";
 import { handleAction, readForm, requireStaff } from "~/lib/http.server";
@@ -55,6 +55,7 @@ export default function AdminIndex({ loaderData, actionData }: Route.ComponentPr
           </Link>
         }
       />
+      {params.get("updated") === "1" && !actionData && <Alert tone="success">Job opening updated.</Alert>}
       {actionData && "message" in actionData && actionData.message && (
         <Alert tone="success">{actionData.message}</Alert>
       )}
@@ -133,29 +134,34 @@ export default function AdminIndex({ loaderData, actionData }: Route.ComponentPr
                     </td>
                     <td className="text-right tabular-nums">{v._count.applications}</td>
                     <td>
-                      <Form method="post">
-                        <CsrfInput />
-                        <input type="hidden" name="intent" value="vacancy-status" />
-                        <input type="hidden" name="id" value={v.id} />
-                        <input
-                          type="hidden"
-                          name="status"
-                          value={v.status === "PUBLISHED" ? "CLOSED" : "PUBLISHED"}
-                        />
-                        <ConfirmDialog
-                          trigger={v.status === "PUBLISHED" ? "Close" : "Publish"}
-                          triggerClassName="btn-secondary btn-sm"
-                          title={`${v.status === "PUBLISHED" ? "Close" : "Publish"} ${v.code}?`}
-                          confirmLabel="Confirm"
-                          tone={v.status === "PUBLISHED" ? "danger" : "primary"}
-                        >
-                          <p>
-                            {v.status === "PUBLISHED"
-                              ? "Candidates will no longer be able to start or submit applications."
-                              : "The job profile becomes public and open for applications within its dates."}
-                          </p>
-                        </ConfirmDialog>
-                      </Form>
+                      <div className="flex justify-end gap-2">
+                        <Link to={`/admin/vacancies/${v.id}/edit`} className="btn-secondary btn-sm">
+                          <Pencil className="h-3.5 w-3.5" aria-hidden="true" /> Edit
+                        </Link>
+                        <Form method="post">
+                          <CsrfInput />
+                          <input type="hidden" name="intent" value="vacancy-status" />
+                          <input type="hidden" name="id" value={v.id} />
+                          <input
+                            type="hidden"
+                            name="status"
+                            value={v.status === "PUBLISHED" ? "CLOSED" : "PUBLISHED"}
+                          />
+                          <ConfirmDialog
+                            trigger={v.status === "PUBLISHED" ? "Close" : "Publish"}
+                            triggerClassName="btn-secondary btn-sm"
+                            title={`${v.status === "PUBLISHED" ? "Close" : "Publish"} ${v.code}?`}
+                            confirmLabel="Confirm"
+                            tone={v.status === "PUBLISHED" ? "danger" : "primary"}
+                          >
+                            <p>
+                              {v.status === "PUBLISHED"
+                                ? "Candidates will no longer be able to start or submit applications."
+                                : "The job profile becomes public and open for applications within its dates."}
+                            </p>
+                          </ConfirmDialog>
+                        </Form>
+                      </div>
                     </td>
                   </tr>
                 ))}
