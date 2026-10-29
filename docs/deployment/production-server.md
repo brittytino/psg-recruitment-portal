@@ -102,3 +102,20 @@ curl -s -o /dev/null -w "%{http_code}\n" -F "file=@/tmp/3mb.bin" \
 `401`, `403` or `404` means the upload reached the portal (fine). `413` means a proxy in front still has
 the 1 MB default: if the college routes traffic through a separate gateway / reverse proxy, the IT team
 must add `client_max_body_size 25m;` there as well.
+
+## Sign-in codes not arriving ("e-mail service is unreachable")
+
+Everyone signs in with an e-mailed code, so this blocks all sign-ins. Diagnose on the server:
+
+```sh
+sudo ./prod.sh mailtest                       # checks DNS, ports 587/465 and the Gmail login
+sudo ./prod.sh mailtest someone@psgtech.ac.in # also sends a test e-mail
+```
+
+It prints the cause and the fix:
+
+| Result | Fix |
+| --- | --- |
+| Ports 587 and 465 **not reachable** | The firewall blocks outgoing mail. Network team: allow outbound TCP 587 and 465 from this server to `smtp.gmail.com`. (The portal uses whichever of the two is open.) |
+| Gmail **rejected the login** (535) | App password wrong or revoked. Create a new one for recruitments@psgtech.ac.in (2-Step Verification must be on) and run `sudo ./prod.sh smtp-password`. |
+| Password **empty** | `sudo ./prod.sh smtp-password` |

@@ -19,6 +19,8 @@
 #   backup         Database + file backup (infrastructure/scripts/backup.sh)
 #   shell [svc]    Shell inside a container (default: app)
 #   env            Create .env (dev: copy .env.development; prod: generate secrets)
+#   mailtest [to]  Check e-mail delivery (firewall, Gmail login); optionally send a test e-mail
+#   smtp-password  Replace the Gmail app password (asks for it), then restart the app
 # ==============================================================================
 set -Eeuo pipefail
 
@@ -391,6 +393,25 @@ case "$CMD" in
     fi
     create_env
     ;;
-  help | -h | --help) sed -n '2,24p' "$0" | sed 's/^# \{0,1\}//' ;;
+  mailtest)
+    check_env
+    dc exec -T app node --input-type=module - "${1:-}" < scripts/mail-test.mjs
+    ;;
+  smtp-password)
+    [ -f .env ] || die "No .env yet. Run ./prod.sh first."
+    if [ -n "${SMTP_PASSWORD:-}" ]; then pw="$SMTP_PASSWORD"; else
+      info "New Gmail app password for $(env_get SMTP_USER) (16 letters, spaces are ignored)"
+      read -rsp "    App password: " pw; echo
+    fi
+    pw="$(printf '%s' "$pw" | tr -d ' 
+')"
+    [ ${#pw} -ge 8 ] || die "That does not look like an app password."
+    env_set SMTP_PASSWORD "$pw"
+    ok "Saved. Restarting the app with the new password…"
+    dc up -d --force-recreate app worker
+    wait_healthy
+    dc exec -T app node --input-type=module - < scripts/mail-test.mjs || true
+    ;;
+  help | -h | --help) sed -n '2,26p' "$0" | sed 's/^# \{0,1\}//' ;;
   *) die "Unknown command '$CMD'. Run: ${0##*/} help" ;;
 esac

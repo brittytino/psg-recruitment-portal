@@ -1,4 +1,4 @@
-import nodemailer, { type Transporter } from "nodemailer";
+import nodemailer, { type SendMailOptions, type Transporter } from "nodemailer";
 import { env } from "~/modules/core/env.server";
 import { logger } from "~/modules/core/logger.server";
 
@@ -30,6 +30,7 @@ export function resetTransporterForTesting(): void {
     }
   }
   transport = undefined;
+  fallback = undefined;
 }
 
 /** Centralized transporter getter with connection pooling and timeouts. */
@@ -72,6 +73,67 @@ export function getTransporter(): Transporter {
     }
   }
   return transport;
+}
+
+let fallback: Transporter | undefined;
+
+/** Network-level failures (blocked port, timeout), as opposed to a rejected login or address. */
+function isConnectionError(err: unknown): boolean {
+  const e = err as { code?: string; message?: string };
+  return (
+    [
+      "ETIMEDOUT",
+      "ECONNREFUSED",
+      "ECONNRESET",
+      "ESOCKET",
+      "ECONNECTION",
+      "EHOSTUNREACH",
+      "ENETUNREACH",
+    ].includes(e.code ?? "") || /timed? ?out|ECONNREFUSED|ECONNRESET/i.test(e.message ?? "")
+  );
+}
+
+/** Explains a send failure in the server log so the IT team can act on it. */
+export function smtpFailureHint(err: unknown): string {
+  const e = err as { code?: string; responseCode?: number };
+  if (e.code === "EAUTH" || e.responseCode === 535 || e.responseCode === 534)
+    return "Gmail rejected the login: the app password is wrong or revoked. Run: sudo ./prod.sh smtp-password";
+  if (isConnectionError(err))
+    return "Cannot connect to the mail server: outbound TCP 587/465 is blocked by the firewall. Run: ./prod.sh mailtest";
+  if (e.code === "EDNS") return "DNS lookup of the mail server failed on this server.";
+  return "Run ./prod.sh mailtest for a diagnosis.";
+}
+
+/**
+ * Sends through the configured SMTP port; if the network blocks it (common on campus firewalls
+ * for 587), retries once over the other Gmail port (465 implicit TLS, or 587 STARTTLS).
+ */
+async function deliver(mail: SendMailOptions): Promise<void> {
+  const e = env();
+  try {
+    await getTransporter().sendMail(mail);
+    return;
+  } catch (err) {
+    if (e.EMAIL_PROVIDER !== "smtp" || !isConnectionError(err)) throw err;
+    logger.warn(
+      { port: e.SMTP_PORT, err: (err as Error).message },
+      "SMTP port unreachable, trying the other port",
+    );
+  }
+  if (!fallback) {
+    const port = e.SMTP_PORT === 465 ? 587 : 465;
+    fallback = nodemailer.createTransport({
+      host: e.SMTP_HOST,
+      port,
+      secure: port === 465,
+      auth: e.SMTP_USER ? { user: e.SMTP_USER, pass: e.SMTP_PASSWORD ?? "" } : undefined,
+      connectionTimeout: e.SMTP_CONNECTION_TIMEOUT_MS,
+      greetingTimeout: e.SMTP_GREETING_TIMEOUT_MS,
+      socketTimeout: e.SMTP_SOCKET_TIMEOUT_MS,
+      tls: { rejectUnauthorized: e.NODE_ENV === "production" },
+    });
+  }
+  await fallback.sendMail(mail);
 }
 
 /** Diagnostic check for SMTP connectivity without sending actual emails. */
@@ -239,20 +301,14 @@ export async function sendOtpEmail(
   const { subject, text, html } = renderOtpEmail(code, purpose, minutes);
 
   try {
-    const t = getTransporter();
-    await t.sendMail({
-      from: e.MAIL_FROM,
-      to,
-      subject,
-      text,
-      html,
-    });
+    await deliver({ from: e.MAIL_FROM, to, subject, text, html });
   } catch (err) {
     const msg = (err as Error).message || String(err);
     logger.error(
       {
         toDomain: to.split("@")[1] ?? "unknown",
         purpose,
+        hint: smtpFailureHint(err),
         err: msg.replace(/pass(?:word)?(?:\s+is|\s*[:=])\s*\S+/gi, "password: ***"),
       },
       "Failed to deliver OTP email",
@@ -267,8 +323,7 @@ export async function sendOtpEmail(
 /** Sends a plain-text notification. Bodies never contain application answers or documents. */
 export async function sendNotificationEmail(to: string, subject: string, body: string): Promise<void> {
   const e = env();
-  const t = getTransporter();
-  await t.sendMail({
+  await deliver({
     from: e.MAIL_FROM,
     to,
     subject,
