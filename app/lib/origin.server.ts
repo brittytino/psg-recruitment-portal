@@ -79,4 +79,3 @@ export function isOriginAllowed(origin: string | null, request: Request): boolea
 
   return false;
 }
-

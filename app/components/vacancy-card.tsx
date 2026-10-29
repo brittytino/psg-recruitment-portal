@@ -1,22 +1,7 @@
 import { Link } from "react-router";
-import { motion } from "framer-motion";
+import { ArrowRight, CalendarClock, FlaskConical, GraduationCap, Users } from "lucide-react";
 import { formatDate } from "~/components/forms";
 import { POSITION_LABELS } from "~/lib/labels";
-
-const POSITION_EMOJI: Record<string, string> = {
-  ASSISTANT_PROFESSOR: "🎓",
-  ASSOCIATE_PROFESSOR: "📚",
-  PROFESSOR: "🏛️",
-  RESEARCH_ASSISTANT: "🔬",
-  RESEARCH_ASSOCIATE: "🧪",
-};
-const POSITION_TILE: Record<string, string> = {
-  ASSISTANT_PROFESSOR: "bg-tile-pink",
-  ASSOCIATE_PROFESSOR: "bg-tile-purple",
-  PROFESSOR: "bg-tile-blue",
-  RESEARCH_ASSISTANT: "bg-emerald-50 text-emerald-800 border border-emerald-200/50",
-  RESEARCH_ASSOCIATE: "bg-teal-50 text-teal-800 border border-teal-200/50",
-};
 
 export interface VacancyCardData {
   code: string;
@@ -35,79 +20,61 @@ export function daysLeft(closesAt: Date | string): number {
   return Math.max(0, Math.ceil((new Date(closesAt).getTime() - Date.now()) / 86400_000));
 }
 
-/** Vacancy card in modern executive style with smooth Framer Motion interactions and responsive layout. */
+/** Vacancy summary card: the whole card is one link target (the title), details below. */
 export function VacancyCard({ v }: { v: VacancyCardData }) {
   const days = daysLeft(v.closesAt);
-  const isResearch = v.recruitmentCategory === "RESEARCH" || !v.department;
-  const deptOrSpec = v.department?.name ?? v.researchSpecialisation?.name ?? "Research Appointment";
-  const posTitle =
+  const isResearch = v.recruitmentCategory === "RESEARCH";
+  const where = v.department?.name ?? v.researchSpecialisation?.name ?? "Research";
+  const position =
     v.researchPositionTitle ??
-    (v.position ? (POSITION_LABELS[v.position] ?? v.position) : "Research Assistant");
-  const tileClass = isResearch
-    ? "bg-emerald-50 text-emerald-800 border border-emerald-200/60"
-    : (POSITION_TILE[v.position ?? ""] ?? "bg-soft");
-  const emoji = isResearch ? "🔬" : (POSITION_EMOJI[v.position ?? ""] ?? "💼");
+    (v.position ? (POSITION_LABELS[v.position] ?? v.position) : "Research position");
+  const Icon = isResearch ? FlaskConical : GraduationCap;
 
   return (
-    <motion.article
-      whileHover={{ y: -4, transition: { duration: 0.22, ease: "easeOut" } }}
-      whileTap={{ scale: 0.99 }}
-      className="card flex h-full flex-col justify-between gap-5 transition-shadow duration-300 hover:shadow-[var(--shadow-float)] border border-line/70 hover:border-brand-600/35"
-    >
-      <div className="space-y-4">
-        <div className="flex items-start gap-3 sm:gap-3.5">
-          <span
-            aria-hidden="true"
-            className={`grid h-12 w-12 sm:h-13 sm:w-13 shrink-0 place-items-center rounded-2xl text-xl sm:text-2xl shadow-xs transition-transform duration-300 group-hover:scale-105 ${tileClass}`}
-          >
-            {emoji}
-          </span>
-          <div className="min-w-0 flex-1">
-            <p className="truncate text-xs font-bold uppercase tracking-wider text-muted">{deptOrSpec}</p>
-            <h3 className="mt-1 text-base sm:text-lg font-bold leading-snug">
-              <Link
-                to={`/vacancies/${v.code}`}
-                className="text-ink no-underline hover:text-brand-700 transition-colors"
-              >
-                {v.title}
-              </Link>
-            </h3>
-          </div>
-        </div>
-
-        <ul className="flex flex-wrap gap-1.5 sm:gap-2" aria-label="Details">
-          {isResearch && (
-            <li className="chip font-semibold text-emerald-800 bg-emerald-100/80 border border-emerald-300/70">
-              Research
-            </li>
-          )}
-          <li className="chip font-medium text-ink bg-soft/70 border-line">{posTitle}</li>
-          {v.discipline && <li className="chip text-muted">{v.discipline.name}</li>}
-          {isResearch && v.researchSpecialisation && (
-            <li className="chip text-muted bg-soft/50">{v.researchSpecialisation.name}</li>
-          )}
-        </ul>
-      </div>
-
-      <div className="flex flex-wrap items-center justify-between gap-2.5 sm:gap-3 border-t border-line/70 pt-4 text-sm">
-        <span className="text-xs sm:text-sm text-muted">
-          <span aria-hidden="true">⏳ </span>
-          {days <= 7 ? (
-            <strong className="text-warning font-semibold">
-              {days} day{days === 1 ? "" : "s"} left
-            </strong>
-          ) : (
-            <>Closes {formatDate(v.closesAt)}</>
-          )}
+    <article className="group relative flex h-full flex-col rounded-[var(--radius-card)] border border-line bg-paper p-5 transition-[border-color,box-shadow] hover:border-line-strong hover:shadow-[var(--shadow-soft)] sm:p-6">
+      <div className="flex items-start justify-between gap-3">
+        <span className="icon-tile">
+          <Icon className="h-5 w-5" aria-hidden="true" />
         </span>
+        <span className="rounded-md bg-soft px-2 py-1 text-[11px] font-semibold tracking-wide text-muted uppercase">
+          {isResearch ? "Research" : "Faculty"}
+        </span>
+      </div>
+      <p className="mt-4 truncate text-xs font-semibold tracking-wide text-muted uppercase">{where}</p>
+      <h3 className="mt-1 text-lg leading-snug">
         <Link
           to={`/vacancies/${v.code}`}
-          className="btn-primary px-4 sm:px-5 py-2 text-xs sm:text-sm font-semibold shrink-0"
-          aria-label={`View details for ${v.title}`}
+          className="text-ink no-underline after:absolute after:inset-0 after:rounded-[var(--radius-card)] group-hover:text-brand-700"
         >
-          View Position →
+          {position}
         </Link>
-      </div>
-    </motion.article>
+      </h3>
+      {v.discipline && <p className="mt-0.5 text-sm text-muted">{v.discipline.name}</p>}
+
+      <dl className="mt-5 flex flex-wrap gap-x-5 gap-y-2 border-t border-line pt-4 text-sm text-muted">
+        <div className="flex items-center gap-1.5">
+          <dt className="sr-only">Closing date</dt>
+          <CalendarClock className="h-4 w-4" aria-hidden="true" />
+          <dd className={days <= 7 ? "font-semibold text-warning" : ""}>
+            {days <= 7 ? `${days} day${days === 1 ? "" : "s"} left` : `Closes ${formatDate(v.closesAt)}`}
+          </dd>
+        </div>
+        {v.numberOfPosts ? (
+          <div className="flex items-center gap-1.5">
+            <dt className="sr-only">Posts</dt>
+            <Users className="h-4 w-4" aria-hidden="true" />
+            <dd>
+              {v.numberOfPosts} post{v.numberOfPosts === 1 ? "" : "s"}
+            </dd>
+          </div>
+        ) : null}
+      </dl>
+      <span
+        aria-hidden="true"
+        className="mt-auto inline-flex items-center gap-1 pt-4 text-sm font-semibold text-brand-700"
+      >
+        View & apply <ArrowRight className="h-4 w-4 transition-transform group-hover:translate-x-0.5" />
+      </span>
+    </article>
   );
 }

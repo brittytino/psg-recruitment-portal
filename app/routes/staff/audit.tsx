@@ -31,7 +31,7 @@ export default function Audit({ loaderData }: Route.ComponentProps) {
     return `?${s}`;
   };
   return (
-    <div className="space-y-6">
+    <div className="page-stack">
       <h1>Audit log</h1>
       <p className="text-sm text-muted">
         Append-only record of sign-ins, submissions, decisions, privileged access and configuration changes.

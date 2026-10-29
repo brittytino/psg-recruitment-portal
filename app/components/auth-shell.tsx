@@ -1,36 +1,46 @@
 import type { ReactNode } from "react";
+import { BellRing, LockKeyhole, Save } from "lucide-react";
 
-/** Split layout for account pages: form on the left, welcome panel on the right. */
+/** Split layout for account pages: form on the left, institutional panel on the right. */
 export function AuthShell({ children }: { children: ReactNode }) {
   return (
-    <div className="mx-auto grid max-w-6xl overflow-hidden rounded-3xl bg-white shadow-[var(--shadow-soft)] border border-line/60 lg:grid-cols-2">
-      <div className="p-5 sm:p-10 lg:p-14">{children}</div>
+    <div className="mx-auto grid w-full max-w-5xl overflow-hidden rounded-[var(--radius-card)] border border-line bg-paper shadow-[var(--shadow-soft)] lg:grid-cols-[1.1fr_1fr]">
+      <div className="p-6 sm:p-10 lg:p-12">{children}</div>
       <div
         aria-hidden="true"
-        className="hero-gradient relative hidden flex-col justify-between p-12 lg:flex border-l border-pink-100/60"
+        className="hero-gradient relative hidden flex-col justify-between gap-10 p-10 lg:flex"
       >
-        <p className="chip w-fit">🌸 PSG Tech Careers</p>
-        <div>
-          <p className="text-3xl font-bold leading-tight">Teach. Research. Inspire.</p>
-          <p className="mt-3 max-w-xs text-muted">
-            One account to apply for faculty positions and follow your application from submission to
-            decision.
+        <div className="flex items-center gap-3">
+          <img src="/images/psg_logo.png" alt="" className="h-11 w-auto rounded bg-white p-1" />
+          <p className="text-sm leading-tight font-semibold text-white/90">
+            PSG College of Technology
+            <span className="block font-normal text-white/60">Recruitment Portal</span>
           </p>
         </div>
-        <div className="space-y-3">
-          <div className="float-card flex w-fit items-center gap-3">
-            <span className="grid h-10 w-10 place-items-center rounded-xl bg-tile-green text-xl">💾</span>
-            <span className="text-sm font-semibold">Drafts saved automatically</span>
-          </div>
-          <div className="float-card ml-10 flex w-fit items-center gap-3">
-            <span className="grid h-10 w-10 place-items-center rounded-xl bg-tile-purple text-xl">🔒</span>
-            <span className="text-sm font-semibold">Your documents stay private</span>
-          </div>
-          <div className="float-card flex w-fit items-center gap-3">
-            <span className="grid h-10 w-10 place-items-center rounded-xl bg-tile-orange text-xl">📬</span>
-            <span className="text-sm font-semibold">Status updates by e-mail</span>
-          </div>
+        <div>
+          <p className="font-display text-3xl leading-tight font-semibold">Teach. Research. Lead.</p>
+          <p className="mt-3 max-w-sm text-white/75">
+            One account to apply for faculty and research positions and follow each application from
+            submission to decision.
+          </p>
         </div>
+        <ul className="space-y-3 text-sm text-white/85">
+          {[
+            [Save, "Drafts are saved automatically"],
+            [LockKeyhole, "Documents stay private to the recruitment office"],
+            [BellRing, "Status updates by e-mail"],
+          ].map(([Icon, text]) => {
+            const I = Icon as typeof Save;
+            return (
+              <li key={text as string} className="flex items-center gap-3">
+                <span className="grid h-8 w-8 place-items-center rounded-md bg-white/10 ring-1 ring-white/15">
+                  <I className="h-4 w-4" />
+                </span>
+                {text as string}
+              </li>
+            );
+          })}
+        </ul>
       </div>
     </div>
   );

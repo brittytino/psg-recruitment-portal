@@ -15,3 +15,8 @@ storage-test/
 storage-dev.log
 *.tmp.*
 .deployed
+
+# Real environment files hold secrets: never commit them (templates: .env.example, .env.development)
+.env
+.env.production
+.env.backup.*

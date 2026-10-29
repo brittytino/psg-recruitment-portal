@@ -3,8 +3,10 @@
  * every loader/action/download re-checks on the server, together with record-level scope rules in
  * policy.server.ts. See docs/architecture/authorization-matrix.md.
  *
- *  - ADMIN: Dean and Principal. Full control of the system.
- *  - HR: HR – N4 Section. Job profiles, all applications, downloads, summaries and exports.
+ *  - SUPER_ADMIN: full system access.
+ *  - ADMIN: Dean and Principal. Recruitment oversight and assigning applications to HODs.
+ *  - HR: HR – N4 Section. Job profiles, screening, departments + HOD invitations, research
+ *    specialisations, the public "open positions" notice, summaries and exports.
  *  - HOD: reviews the applications of their own department that were assigned to them.
  *  - CANDIDATE: their own applications only.
  */
@@ -29,6 +31,8 @@ export type Permission =
   | "document:download"
   | "document:regenerate"
   | "recruitment:manage"
+  | "department:manage"
+  | "notice:manage"
   | "user:manage"
   | "settings:manage"
   | "audit:read"
@@ -46,6 +50,8 @@ export const ROLE_PERMISSIONS: Record<RoleName, readonly Permission[]> = {
     "document:download",
     "document:regenerate",
     "recruitment:manage",
+    "department:manage",
+    "notice:manage",
   ],
   HOD: [
     "application:list",
@@ -78,6 +84,8 @@ export const ROLE_PERMISSIONS: Record<RoleName, readonly Permission[]> = {
     "document:download",
     "document:regenerate",
     "recruitment:manage",
+    "department:manage",
+    "notice:manage",
     "user:manage",
     "settings:manage",
     "audit:read",
@@ -90,23 +98,21 @@ export const ROLE_LABELS: Record<RoleName, string> = {
   HR: "HR – N4 Section",
   HOD: "Head of Department (HOD)",
   ADMIN: "Admin (Dean / Principal)",
-  SUPER_ADMIN: "Super Admin (Tino)",
+  SUPER_ADMIN: "Super Admin",
 };
 
 export const ROLE_DESCRIPTIONS: Record<RoleName, string> = {
   CANDIDATE: "Applies for vacancies.",
-  HR: "Enters job profiles, views and downloads every application, views approved summary sheets and exports.",
-  HOD: "Reviews the applications of their own department that are assigned to them.",
+  HR: "Job profiles and screening; adds departments, invites HODs, manages research specialisations and the open-positions notice; summaries and exports.",
+  HOD: "Reviews the applications of their own department that are assigned to them and approves the department summary sheet.",
   ADMIN:
-    "Recruitment oversight: bulk assignment to HODs, progress review, approved summaries, position-change approvals.",
-  SUPER_ADMIN:
-    "Full institutional system control: users, roles, system configuration, audit logs, and recruitment operations.",
+    "Recruitment oversight: assigns applications to HODs, tracks progress, approves position changes and views summaries.",
+  SUPER_ADMIN: "Full system access: users, roles, settings, audit logs and every recruitment operation.",
 };
 
 export interface RoleGrant {
   role: RoleName;
   departmentId: string | null;
-  cycleId: string | null;
 }
 
 export function hasPermission(grants: readonly RoleGrant[], p: Permission): boolean {

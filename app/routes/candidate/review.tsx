@@ -66,7 +66,7 @@ export default function Review({ loaderData: L, actionData }: Route.ComponentPro
     "I declare that the information given in this application is true and complete to the best of my knowledge.";
   const submitting = nav.state !== "idle";
   return (
-    <div className="mx-auto max-w-5xl space-y-6">
+    <div className="page-stack mx-auto max-w-5xl">
       <nav aria-label="Breadcrumb" className="text-sm">
         <Link to={`/applications/${L.id}`}>Application form</Link> <span aria-hidden="true">/</span> Review
         and submit

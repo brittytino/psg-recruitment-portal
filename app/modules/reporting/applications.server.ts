@@ -1,12 +1,13 @@
 import type { Prisma } from "@prisma/client";
 import { z } from "zod";
-import { hasRole, isAdmin, isHrOfficer } from "~/modules/auth/permissions";
+import { isAdmin, isHrOfficer } from "~/modules/auth/permissions";
 import { requirePermission, staffApplicationScope } from "~/modules/auth/policy.server";
 import type { SessionUser } from "~/modules/auth/session.server";
 import { prisma } from "~/modules/core/db.server";
 import { ForbiddenError } from "~/modules/core/errors";
 import { APPLICATION_STATUSES, STATUS_LABELS, type AppStatus } from "~/modules/applications/workflow";
 import { POSITION_LABELS } from "~/lib/labels";
+import { academicYearOf } from "~/modules/applications/reference";
 import { formatYearsMonths, splitMonths } from "~/modules/forms/experience";
 import { experiencePeriods } from "~/modules/forms/validation";
 import { totalDuration } from "~/modules/forms/experience";
@@ -34,7 +35,6 @@ const optionalDate = z
 
 export const listQuerySchema = z.object({
   q: z.string().trim().max(100).optional().catch(undefined),
-  cycleId: z.string().uuid().optional().catch(undefined),
   departmentId: z.string().uuid().optional().catch(undefined),
   disciplineId: z.string().uuid().optional().catch(undefined),
   vacancyId: z.string().uuid().optional().catch(undefined),
@@ -77,7 +77,6 @@ function filterWhere(q: ListQuery): Prisma.ApplicationWhereInput {
   if (q.recruitmentCategory) and.push({ recruitmentCategory: q.recruitmentCategory });
   if (q.researchSpecialisationId)
     and.push({ vacancy: { researchSpecialisationId: q.researchSpecialisationId } });
-  if (q.cycleId) and.push({ vacancy: { cycleId: q.cycleId } });
   if (q.departmentId) and.push({ vacancy: { departmentId: q.departmentId } });
   if (q.disciplineId) and.push({ vacancy: { disciplineId: q.disciplineId } });
   if (q.vacancyId) and.push({ vacancyId: q.vacancyId });
@@ -212,24 +211,23 @@ export async function filteredIds(user: SessionUser | null, q: ListQuery, limit 
 }
 
 /** Dashboard counters, all computed from the database within scope. Draft counts are Admin/HR only. */
-export async function dashboardCounts(user: SessionUser | null, cycleId?: string) {
+export async function dashboardCounts(user: SessionUser | null) {
   const u = requirePermission(user, "application:list");
   const scope = staffApplicationScope(u);
   if (!scope) throw new ForbiddenError();
-  const cycle: Prisma.ApplicationWhereInput = cycleId ? { vacancy: { cycleId } } : {};
   const byStatus = await prisma.application.groupBy({
     by: ["status"],
-    where: { AND: [scope, cycle] },
+    where: scope,
     _count: { _all: true },
   });
   const failed = await prisma.application.count({
-    where: { AND: [scope, cycle, { processingStatus: "FAILED" }] },
+    where: { AND: [scope, { processingStatus: "FAILED" }] },
   });
   const count = (...s: string[]) =>
     byStatus.filter((b) => s.includes(b.status)).reduce((n, b) => n + b._count._all, 0);
   let drafts: number | null = null;
   if (isAdmin(u.grants) || isHrOfficer(u.grants))
-    drafts = await prisma.application.count({ where: { AND: [{ status: "DRAFT" }, cycle] } });
+    drafts = await prisma.application.count({ where: { status: "DRAFT" } });
   return {
     total: byStatus.reduce((n, b) => n + b._count._all, 0),
     drafts,
@@ -255,7 +253,6 @@ export async function departmentCounts(user: SessionUser | null, q: Partial<List
   const where: Prisma.ApplicationWhereInput = {
     AND: [
       scope,
-      q.cycleId ? { vacancy: { cycleId: q.cycleId } } : {},
       q.position ? { vacancy: { position: q.position } } : {},
       q.departmentId ? { departmentId: q.departmentId } : {},
     ],
@@ -289,11 +286,7 @@ export async function departmentCounts(user: SessionUser | null, q: Partial<List
 }
 
 export async function filterOptions() {
-  const [cycles, departments, vacancies, exams, researchSpecialisations] = await Promise.all([
-    prisma.recruitmentCycle.findMany({
-      orderBy: { opensAt: "desc" },
-      select: { id: true, code: true, title: true },
-    }),
+  const [departments, vacancies, exams, researchSpecialisations] = await Promise.all([
     prisma.department.findMany({
       orderBy: { name: "asc" },
       select: {
@@ -313,7 +306,7 @@ export async function filterOptions() {
     }),
   ]);
   const examNames = [...new Set(["GATE", "UGC-NET", "CSIR-NET", "SET", "SLET", ...exams.map((e) => e.exam)])];
-  return { cycles, departments, vacancies, exams: examNames, specialisations: researchSpecialisations };
+  return { departments, vacancies, exams: examNames, specialisations: researchSpecialisations };
 }
 
 // ------------------------------------------------------------------------------------------------
@@ -329,7 +322,8 @@ const exportInclude = {
       researchPositionTitle: true,
       researchSpecialisation: { select: { name: true } },
       department: { select: { name: true, code: true } },
-      cycle: { select: { title: true } },
+      academicYear: true,
+      opensAt: true,
     },
   },
   candidate: { select: { email: true } },
@@ -402,8 +396,8 @@ export function exportValue(key: ExportColumnKey, r: ExportRecord, sNo: number):
       return r.effectivePosition ? POSITION_LABELS[r.effectivePosition]! : "";
     case "vacancyCode":
       return r.vacancy.code;
-    case "cycle":
-      return r.vacancy.cycle.title;
+    case "academicYear":
+      return r.vacancy.academicYear ?? academicYearOf(r.vacancy.opensAt);
     case "sslc":
       return s(a.sslcMarks);
     case "hsc":

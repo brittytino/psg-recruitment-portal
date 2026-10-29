@@ -14,7 +14,7 @@
    appears in reference numbers and cannot be changed casually.
 4. Admin → **Users & roles**: add each HOD with their official e-mail and department(s). They receive a
    set-password e-mail. Use **Resend invitation** if it expired.
-5. Admin or HR → **Job profiles → Recruitment cycles**: create the cycle with academic year `2026-27`, publish
+5. Admin or HR → **Job profiles → Recruitment cycles**: (no longer used — vacancies carry their own academic year)
    it, then create and publish job profiles.
 
 ## During the recruitment

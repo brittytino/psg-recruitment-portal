@@ -35,7 +35,7 @@ export async function action({ request, context }: Route.ActionArgs) {
     if (r.ok !== true) return { formError: r.ok === false ? r.message : "Sign in again." };
     const roles = await prisma.userRole.findMany({
       where: { userId: r.userId },
-      select: { role: true, departmentId: true, cycleId: true },
+      select: { role: true, departmentId: true },
     });
     const headers = new Headers();
     headers.append("Set-Cookie", r.setCookie);

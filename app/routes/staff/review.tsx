@@ -175,7 +175,7 @@ export default function HodReview({ loaderData }: Route.ComponentProps) {
   if (q.phd) chips.push(["phd", `Ph.D.: ${q.phd}`]);
 
   return (
-    <div className="space-y-6">
+    <div className="page-stack">
       <PageHeader
         eyebrow={`HOD${departments.length ? ` · ${departments.join(", ")}` : ""}`}
         title="Department review"

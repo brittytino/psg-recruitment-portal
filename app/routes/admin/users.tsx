@@ -70,7 +70,7 @@ export async function action({ request, context }: Route.ActionArgs) {
           departmentIds: form.getAll("departmentIds"),
         });
         return {
-          message: "Account created. A link to set the password has been e-mailed (valid for 72 hours).",
+          message: "Account created and the sign-in instructions have been e-mailed.",
         };
       case "grant":
         await grantRole(user, Object.fromEntries(form));
@@ -87,7 +87,7 @@ export async function action({ request, context }: Route.ActionArgs) {
         return { message: "Account status updated." };
       case "invite":
         await resendInvite(user, String(form.get("userId")));
-        return { message: "A new set-password link has been e-mailed." };
+        return { message: "Sign-in instructions e-mailed again." };
       default:
         throw new ValidationError("Unknown action");
     }
@@ -102,11 +102,11 @@ export default function Users({ loaderData, actionData }: Route.ComponentProps) 
     { message?: string; formError?: string; fieldErrors?: Record<string, string[]> } | undefined;
   const fe = a?.fieldErrors;
   return (
-    <div className="space-y-6">
+    <div className="page-stack">
       <PageHeader
         eyebrow="Admin"
         title="Users and roles"
-        description="Add HODs, HR – N4 Section staff and Admins. New users receive an e-mail to set their password; every sign-in is confirmed with a code sent to their e-mail."
+        description="Add staff accounts and manage their roles. New users receive an e-mail with the sign-in link; every sign-in uses a one-time code sent to their e-mail."
       />
       {a?.message && <Alert tone="success">{a.message}</Alert>}
       {a?.formError && !fe && <Alert tone="danger">{a.formError}</Alert>}

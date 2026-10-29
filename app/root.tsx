@@ -10,23 +10,22 @@ import {
   Scripts,
   ScrollRestoration,
   useLocation,
+  useNavigation,
   useRouteLoaderData,
 } from "react-router";
-import { AnimatePresence, motion } from "framer-motion";
 import {
   Briefcase,
-  ChevronRight,
+  Building2,
   ClipboardCheck,
+  ExternalLink,
   FileSpreadsheet,
   FileText,
-  HelpCircle,
   LayoutDashboard,
-  LogIn,
   LogOut,
   Menu,
+  Search,
   Settings,
   ShieldCheck,
-  UserPlus,
   Users,
   X,
   type LucideIcon,
@@ -43,31 +42,46 @@ import {
   primaryRoleLabel,
   type RoleGrant,
 } from "./modules/auth/permissions";
+import { csrfToken, getSessionUser } from "./modules/auth/session.server";
+import { isOriginAllowed } from "./lib/origin.server";
+import { CsrfInput } from "./components/forms";
+
+type NavItem = { to: string; label: string; icon: LucideIcon; end?: boolean };
 
 /** Staff navigation, by role. Every page re-checks permissions on the server. */
-function staffNav(grants: RoleGrant[]): { to: string; label: string; icon: LucideIcon; end?: boolean }[] {
-  const items: { to: string; label: string; icon: LucideIcon; end?: boolean }[] = [];
+function staffNav(grants: RoleGrant[]): { title: string; items: NavItem[] }[] {
   const office = isAdmin(grants) || isHrOfficer(grants);
-  if (office) items.push({ to: "/staff", label: "Applications", icon: LayoutDashboard, end: true });
-  if (isHodReviewer(grants)) items.push({ to: "/staff/review", label: "My reviews", icon: ClipboardCheck });
-  items.push({
+  const work: NavItem[] = [];
+  if (office) work.push({ to: "/staff", label: "Applications", icon: LayoutDashboard, end: true });
+  if (isHodReviewer(grants)) work.push({ to: "/staff/review", label: "My reviews", icon: ClipboardCheck });
+  work.push({
     to: "/staff/summary",
     label: office ? "Summary & export" : "Summary sheet",
     icon: FileSpreadsheet,
   });
+
+  const setup: NavItem[] = [];
   if (hasPermission(grants, "recruitment:manage"))
-    items.push({ to: "/admin", label: "Job profiles", icon: Briefcase, end: true });
+    setup.push({ to: "/admin", label: "Job profiles", icon: Briefcase, end: true });
+  if (hasPermission(grants, "department:manage"))
+    setup.push({ to: "/admin/departments", label: "Departments & HODs", icon: Building2 });
+  if (hasPermission(grants, "notice:manage"))
+    setup.push({ to: "/admin/notices", label: "Open positions PDF", icon: FileText });
+
+  const system: NavItem[] = [];
   if (hasPermission(grants, "user:manage"))
-    items.push({ to: "/admin/users", label: "Users & roles", icon: Users });
+    system.push({ to: "/admin/users", label: "Users & roles", icon: Users });
   if (hasPermission(grants, "settings:manage"))
-    items.push({ to: "/admin/settings", label: "Settings", icon: Settings });
+    system.push({ to: "/admin/settings", label: "Settings", icon: Settings });
   if (hasPermission(grants, "audit:read"))
-    items.push({ to: "/staff/audit", label: "Audit", icon: ShieldCheck });
-  return items;
+    system.push({ to: "/staff/audit", label: "Audit log", icon: ShieldCheck });
+
+  return [
+    { title: "Recruitment", items: work },
+    { title: "Set-up", items: setup },
+    { title: "System", items: system },
+  ].filter((g) => g.items.length);
 }
-import { csrfToken, getSessionUser } from "./modules/auth/session.server";
-import { isOriginAllowed } from "./lib/origin.server";
-import { CsrfInput } from "./components/forms";
 
 const SAFE_METHODS = new Set(["GET", "HEAD", "OPTIONS"]);
 
@@ -105,18 +119,23 @@ export async function loader({ context }: Route.LoaderArgs) {
   };
 }
 
+export const links: Route.LinksFunction = () => [
+  { rel: "icon", href: "/images/psg_logo.png", type: "image/png" },
+];
+
 export function Layout({ children }: { children: React.ReactNode }) {
   const root = useRouteLoaderData<typeof loader>("root");
   return (
     <html lang="en">
       <head>
         <meta charSet="utf-8" />
-        <meta name="viewport" content="width=device-width, initial-scale=1" />
+        <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+        <meta name="theme-color" content="#10223b" />
         <meta name="robots" content="noindex" />
         <Meta />
         <Links />
       </head>
-      <body className="min-h-screen">
+      <body className="min-h-dvh">
         {children}
         <ScrollRestoration nonce={root?.nonce} />
         <Scripts nonce={root?.nonce} />
@@ -125,344 +144,174 @@ export function Layout({ children }: { children: React.ReactNode }) {
   );
 }
 
-function Logo({ isStaffUser }: { isStaffUser?: boolean }) {
-  return (
-    <Link
-      to={isStaffUser ? "/staff" : "/"}
-      className="flex items-center gap-2.5 sm:gap-3.5 no-underline group shrink-0"
-      aria-label="PSG College of Technology — Home"
-    >
-      <img
-        src="/images/psg_logo.png"
-        alt="PSG College of Technology Crest"
-        className="h-9 sm:h-10 md:h-11 w-auto object-contain transition-transform duration-300 group-hover:scale-105"
-      />
-      <div className="flex flex-col leading-tight border-l border-slate-200/90 pl-2.5 sm:pl-3 min-w-0">
-        <span className="text-xs sm:text-sm md:text-base font-black tracking-tight text-slate-900 group-hover:text-brand-700 transition-colors uppercase whitespace-nowrap">
-          <span className="hidden sm:inline">PSG College of Technology</span>
-          <span className="sm:hidden font-extrabold">PSG Tech</span>
-        </span>
-        <span className="text-[10px] sm:text-xs font-semibold text-slate-500 tracking-wide whitespace-nowrap">
-          {isStaffUser ? "Staff Recruitment Portal" : "Faculty Recruitment"}
-        </span>
-      </div>
-      <div className="hidden 2xl:flex items-center gap-2 border-l border-slate-200/80 pl-2.5">
-        <img
-          src="/images/75yearsLogo.png"
-          alt="75 Years Celebration"
-          className="h-7 w-auto object-contain opacity-80 transition-opacity hover:opacity-100"
-        />
-        <img
-          src="/images/100yearsLogo.png"
-          alt="100 Years Legacy"
-          className="h-7 w-auto object-contain opacity-80 transition-opacity hover:opacity-100"
-        />
-      </div>
-    </Link>
-  );
-}
-
-function Header() {
+function useUser() {
   const root = useRouteLoaderData<typeof loader>("root");
-  const user = root?.user;
+  const user = root?.user ?? null;
   const grants = user?.grants ?? [];
-  const staff = isStaff(grants);
-  const nav = staffNav(grants);
-  const location = useLocation();
-  const [mobileOpen, setMobileOpen] = useState(false);
-
-  useEffect(() => {
-    setMobileOpen(false);
-  }, [location.pathname]);
-
-  // Clean full name removing parenthetical role repetitions
-  const rawName = user?.displayName ?? "";
-  const cleanDisplayName = rawName.replace(/\s*\([^)]*\)\s*/g, "").trim() || rawName || "Staff Member";
-
-  const roleLabel = primaryRoleLabel(grants);
-
-  const initials = (cleanDisplayName || "")
+  const name = (user?.displayName ?? "").replace(/\s*\([^)]*\)\s*/g, " ").trim() || user?.email || "";
+  const initials = name
+    .replace(/^(dr|prof|mr|mrs|ms)\.?\s+/i, "")
     .split(/\s+/)
     .map((p) => p[0])
     .filter(Boolean)
     .join("")
     .slice(0, 2)
     .toUpperCase();
+  return { user, grants, staff: isStaff(grants), name, initials, roleLabel: primaryRoleLabel(grants) };
+}
 
-  const staffNavActive =
-    "inline-flex items-center gap-2 whitespace-nowrap rounded-xl px-3 py-1.5 text-xs font-bold text-brand-950 bg-white border border-slate-200/90 shadow-xs no-underline transition-all duration-150";
-  const staffNavInactive =
-    "inline-flex items-center gap-2 whitespace-nowrap rounded-xl px-3 py-1.5 text-xs font-semibold text-slate-600 hover:text-slate-900 hover:bg-white/60 transition-all duration-150 no-underline";
+function Brand({ to, subtitle, inverted }: { to: string; subtitle: string; inverted?: boolean }) {
+  return (
+    <Link
+      to={to}
+      className="flex min-w-0 items-center gap-3 no-underline"
+      aria-label="PSG College of Technology — home"
+    >
+      <img src="/images/psg_logo.png" alt="" className="h-9 w-auto shrink-0 sm:h-10" />
+      <span className="min-w-0 leading-tight">
+        <span
+          className={`block truncate font-display text-[15px] font-semibold sm:text-base ${inverted ? "text-white" : "text-ink"}`}
+        >
+          PSG College of Technology
+        </span>
+        <span className={`block truncate text-xs ${inverted ? "text-white/60" : "text-muted"}`}>
+          {subtitle}
+        </span>
+      </span>
+    </Link>
+  );
+}
 
-  const publicNavActive =
-    "rounded-full px-4 py-1.5 text-sm font-bold text-white bg-slate-900 shadow-xs no-underline transition-colors";
-  const publicNavInactive =
-    "rounded-full px-4 py-1.5 text-sm font-semibold text-slate-600 hover:text-slate-900 hover:bg-slate-100 transition-colors no-underline";
+/** Thin progress bar while a navigation or form submission is in flight. */
+function RouteProgress() {
+  const nav = useNavigation();
+  if (nav.state === "idle") return null;
+  return (
+    <div aria-hidden="true" className="fixed inset-x-0 top-0 z-[60] h-0.5 overflow-hidden bg-brand-100">
+      <div className="route-progress h-full w-1/3 bg-brand-600" />
+    </div>
+  );
+}
+
+function SignOut({ className }: { className: string }) {
+  return (
+    <form method="post" action="/logout">
+      <CsrfInput />
+      <button type="submit" className={className}>
+        <LogOut className="h-4 w-4" aria-hidden="true" /> Sign out
+      </button>
+    </form>
+  );
+}
+
+// ------------------------------------------------------------------------------------------------
+// Public layout
+// ------------------------------------------------------------------------------------------------
+function PublicHeader() {
+  const { user, staff } = useUser();
+  const [open, setOpen] = useState(false);
+  const location = useLocation();
+  useEffect(() => setOpen(false), [location.pathname]);
+
+  const links: [string, string][] = [
+    ["/vacancies", "Vacancies"],
+    ["/help", "How to apply"],
+  ];
+  if (user && !staff) links.push(["/account", "My applications"]);
+  if (staff) links.push(["/staff", "Staff workspace"]);
+  const linkCls = ({ isActive }: { isActive: boolean }) =>
+    `rounded-md px-3 py-2 text-sm font-medium no-underline transition-colors ${
+      isActive ? "bg-soft text-ink" : "text-muted hover:bg-soft hover:text-ink"
+    }`;
 
   return (
-    <header className="sticky top-0 z-40 w-full border-b border-slate-200/80 bg-white/95 backdrop-blur-md shadow-xs">
+    <header className="sticky top-0 z-40 border-b border-line bg-paper/95 backdrop-blur supports-[backdrop-filter]:bg-paper/85">
       <a href="#main" className="skip-link">
         Skip to main content
       </a>
-      <div className="mx-auto flex w-full max-w-[1550px] items-center justify-between gap-4 px-3 sm:px-6 lg:px-8 py-2.5 sm:py-3">
-        <Logo isStaffUser={staff} />
-
-        {/* Center Navigation */}
-        {staff ? (
-          <nav
-            aria-label="Staff Workspace Navigation"
-            className="hidden lg:flex items-center gap-1 p-1 rounded-2xl bg-slate-100/80 border border-slate-200/80 shadow-2xs"
-          >
-            {nav.map((n) => (
-              <NavLink
-                key={n.to}
-                to={n.to}
-                end={n.end}
-                className={({ isActive }) => (isActive ? staffNavActive : staffNavInactive)}
-              >
-                <n.icon className="h-4 w-4 text-brand-600" aria-hidden="true" />
-                <span>{n.label}</span>
+      <div className="page-container flex h-16 items-center justify-between gap-4">
+        <Brand to="/" subtitle="Recruitment Portal" />
+        <nav aria-label="Main" className="hidden items-center gap-1 md:flex">
+          {links.map(([to, label]) => (
+            <NavLink key={to} to={to} className={linkCls}>
+              {label}
+            </NavLink>
+          ))}
+        </nav>
+        <div className="hidden items-center gap-2 md:flex">
+          {user ? (
+            <SignOut className="btn-secondary btn-sm" />
+          ) : (
+            <>
+              <Link to="/login" className="btn-ghost btn-sm">
+                Sign in
+              </Link>
+              <Link to="/register" className="btn-primary btn-sm">
+                Create account
+              </Link>
+            </>
+          )}
+        </div>
+        <button
+          type="button"
+          onClick={() => setOpen((v) => !v)}
+          className="btn-ghost -mr-2 px-2 md:hidden"
+          aria-expanded={open}
+          aria-controls="mobile-nav"
+          aria-label={open ? "Close menu" : "Open menu"}
+        >
+          {open ? <X className="h-5 w-5" /> : <Menu className="h-5 w-5" />}
+        </button>
+      </div>
+      {open && (
+        <div id="mobile-nav" className="border-t border-line bg-paper md:hidden">
+          <nav aria-label="Main" className="page-container flex flex-col gap-1 py-3">
+            {links.map(([to, label]) => (
+              <NavLink key={to} to={to} className={linkCls}>
+                {label}
               </NavLink>
             ))}
           </nav>
-        ) : (
-          <nav aria-label="Main Navigation" className="hidden lg:flex items-center gap-2">
-            <NavLink
-              to="/vacancies"
-              className={({ isActive }) => (isActive ? publicNavActive : publicNavInactive)}
-            >
-              Find a job
-            </NavLink>
-            <NavLink
-              to="/help"
-              className={({ isActive }) => (isActive ? publicNavActive : publicNavInactive)}
-            >
-              How it works
-            </NavLink>
-            {user && (
-              <NavLink
-                to="/account"
-                className={({ isActive }) => (isActive ? publicNavActive : publicNavInactive)}
-              >
-                My applications
-              </NavLink>
-            )}
-          </nav>
-        )}
-
-        {/* Desktop User actions */}
-        <div className="hidden lg:flex items-center gap-2.5">
-          {staff && (
-            <Link
-              to="/vacancies"
-              className="hidden 2xl:inline-flex items-center gap-1.5 whitespace-nowrap px-3 py-1.5 rounded-full text-xs font-semibold text-slate-500 hover:text-slate-900 hover:bg-slate-100 transition-colors border border-transparent hover:border-slate-200"
-              title="Preview public candidate vacancies page"
-            >
-              <span>Public Portal</span>
-              <span className="text-[10px]">↗</span>
-            </Link>
-          )}
-
-          {user ? (
-            <div className="flex items-center gap-2">
-              {/* Executive User Pill */}
-              <div className="flex items-center gap-2.5 pl-1.5 pr-3.5 py-1 rounded-full bg-slate-50/90 border border-slate-200 shadow-2xs hover:border-brand-300 transition-colors">
-                <span
-                  aria-hidden="true"
-                  className="grid h-8 w-8 place-items-center rounded-full bg-gradient-to-br from-brand-700 via-indigo-700 to-indigo-900 text-white text-xs font-black shadow-xs tracking-wider"
-                >
-                  {initials || "U"}
-                </span>
-                <div className="flex flex-col leading-tight min-w-0">
-                  <span className="text-xs font-bold text-slate-900 truncate max-w-[150px]">
-                    {cleanDisplayName}
-                  </span>
-                  <span className="inline-flex items-center gap-1 text-[10px] font-extrabold text-brand-700">
-                    <span className="h-1.5 w-1.5 rounded-full bg-emerald-500" />
-                    {roleLabel}
-                  </span>
-                </div>
+          <div className="page-container grid grid-cols-2 gap-2 border-t border-line py-3">
+            {user ? (
+              <div className="col-span-2">
+                <SignOut className="btn-secondary w-full" />
               </div>
-
-              {/* Sign out */}
-              <form method="post" action="/logout" className="flex items-center">
-                <CsrfInput />
-                <button
-                  type="submit"
-                  className="inline-flex items-center gap-1.5 rounded-full px-3 py-1.5 text-xs font-semibold text-slate-600 hover:text-rose-700 hover:bg-rose-50 border border-slate-200 hover:border-rose-200 transition-all shadow-2xs"
-                  title="Sign out of account"
-                >
-                  <LogOut className="h-3.5 w-3.5" />
-                  <span>Sign out</span>
-                </button>
-              </form>
-            </div>
-          ) : (
-            <div className="flex items-center gap-2">
-              <Link to="/login" className="btn px-4 py-2 text-ink hover:bg-soft text-sm font-semibold">
-                Login
-              </Link>
-              <Link to="/register" className="btn-primary px-5 py-2 text-sm font-bold shadow-xs">
-                Sign up
-              </Link>
-            </div>
-          )}
+            ) : (
+              <>
+                <Link to="/login" className="btn-secondary">
+                  Sign in
+                </Link>
+                <Link to="/register" className="btn-primary">
+                  Create account
+                </Link>
+              </>
+            )}
+          </div>
         </div>
-
-        {/* Mobile Hamburger Button */}
-        <button
-          type="button"
-          onClick={() => setMobileOpen(!mobileOpen)}
-          className="lg:hidden p-2 rounded-xl text-ink hover:bg-soft transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-600"
-          aria-expanded={mobileOpen}
-          aria-label={mobileOpen ? "Close navigation menu" : "Open navigation menu"}
-        >
-          {mobileOpen ? <X className="h-6 w-6" /> : <Menu className="h-6 w-6" />}
-        </button>
-      </div>
-
-      {/* Animated Mobile Navigation Drawer */}
-      <AnimatePresence>
-        {mobileOpen && (
-          <motion.div
-            initial={{ opacity: 0, height: 0 }}
-            animate={{ opacity: 1, height: "auto" }}
-            exit={{ opacity: 0, height: 0 }}
-            transition={{ duration: 0.22, ease: "easeInOut" }}
-            className="lg:hidden border-t border-line/70 bg-white/98 backdrop-blur-xl px-4 py-5 shadow-xl overflow-hidden"
-          >
-            <nav aria-label="Mobile Navigation" className="flex flex-col space-y-1">
-              {staff ? (
-                <>
-                  {nav.map((n) => (
-                    <NavLink
-                      key={n.to}
-                      to={n.to}
-                      end={n.end}
-                      className="flex items-center justify-between rounded-xl p-3 text-sm font-semibold text-ink hover:bg-soft aria-[current=page]:bg-ink aria-[current=page]:text-white transition-colors"
-                    >
-                      <span className="flex items-center gap-3">
-                        <n.icon className="h-4 w-4 text-brand-600" aria-hidden="true" />
-                        {n.label}
-                      </span>
-                      <ChevronRight className="h-4 w-4 opacity-50" />
-                    </NavLink>
-                  ))}
-
-                  <NavLink
-                    to="/vacancies"
-                    className="flex items-center justify-between rounded-xl p-3 text-sm font-semibold text-slate-500 hover:bg-soft transition-colors"
-                  >
-                    <span className="flex items-center gap-3">
-                      <Briefcase className="h-4 w-4" />
-                      Public Candidate Site ↗
-                    </span>
-                    <ChevronRight className="h-4 w-4 opacity-50" />
-                  </NavLink>
-                </>
-              ) : (
-                <>
-                  <NavLink
-                    to="/vacancies"
-                    className="flex items-center justify-between rounded-xl p-3 text-sm font-semibold text-ink hover:bg-soft aria-[current=page]:bg-ink aria-[current=page]:text-white transition-colors"
-                  >
-                    <span className="flex items-center gap-3">
-                      <Briefcase className="h-4 w-4 text-brand-600" />
-                      Find a job
-                    </span>
-                    <ChevronRight className="h-4 w-4 opacity-50" />
-                  </NavLink>
-
-                  <NavLink
-                    to="/help"
-                    className="flex items-center justify-between rounded-xl p-3 text-sm font-semibold text-ink hover:bg-soft aria-[current=page]:bg-ink aria-[current=page]:text-white transition-colors"
-                  >
-                    <span className="flex items-center gap-3">
-                      <HelpCircle className="h-4 w-4 text-brand-600" />
-                      How it works
-                    </span>
-                    <ChevronRight className="h-4 w-4 opacity-50" />
-                  </NavLink>
-
-                  {user && (
-                    <NavLink
-                      to="/account"
-                      className="flex items-center justify-between rounded-xl p-3 text-sm font-semibold text-ink hover:bg-soft aria-[current=page]:bg-ink aria-[current=page]:text-white transition-colors"
-                    >
-                      <span className="flex items-center gap-3">
-                        <FileText className="h-4 w-4 text-brand-600" />
-                        My applications
-                      </span>
-                      <ChevronRight className="h-4 w-4 opacity-50" />
-                    </NavLink>
-                  )}
-                </>
-              )}
-            </nav>
-
-            {/* Mobile Auth Bar */}
-            <div className="mt-5 border-t border-line/70 pt-4">
-              {user ? (
-                <div className="space-y-3">
-                  <div className="flex items-center gap-3 rounded-2xl bg-slate-50 p-3 border border-slate-200">
-                    <span
-                      aria-hidden="true"
-                      className="grid h-10 w-10 place-items-center rounded-full bg-gradient-to-br from-brand-700 to-indigo-900 text-sm font-bold text-white shadow-xs"
-                    >
-                      {initials || "U"}
-                    </span>
-                    <div className="min-w-0 flex-1">
-                      <p className="truncate text-sm font-bold text-slate-900">{cleanDisplayName}</p>
-                      <p className="text-xs font-semibold text-brand-700">{roleLabel}</p>
-                    </div>
-                  </div>
-                  <form method="post" action="/logout">
-                    <CsrfInput />
-                    <button
-                      type="submit"
-                      className="btn-secondary w-full py-2.5 text-danger hover:text-danger font-semibold flex items-center justify-center gap-2"
-                    >
-                      <LogOut className="h-4 w-4" /> Sign out
-                    </button>
-                  </form>
-                </div>
-              ) : (
-                <div className="grid grid-cols-2 gap-3">
-                  <Link to="/login" className="btn-secondary w-full py-2.5 text-center font-semibold">
-                    <LogIn className="h-4 w-4 mr-1.5 inline" /> Sign in
-                  </Link>
-                  <Link to="/register" className="btn-primary w-full py-2.5 text-center font-semibold">
-                    <UserPlus className="h-4 w-4 mr-1.5 inline" /> Sign up
-                  </Link>
-                </div>
-              )}
-            </div>
-          </motion.div>
-        )}
-      </AnimatePresence>
+      )}
     </header>
   );
 }
 
 function Footer() {
   return (
-    <footer className="mt-20 border-t border-line/60 bg-white py-12 px-4 sm:px-6 lg:px-10">
-      <div className="mx-auto grid w-full max-w-[1500px] gap-10 sm:grid-cols-2 lg:grid-cols-[2fr_1fr_1fr]">
+    <footer className="mt-16 border-t border-line bg-paper">
+      <div className="page-container grid gap-10 py-12 sm:grid-cols-2 lg:grid-cols-[2fr_1fr_1fr]">
         <div className="space-y-4">
-          <Logo />
-          <p className="max-w-md text-sm text-muted leading-relaxed">
-            Faculty recruitment for PSG College of Technology, Peelamedu, Coimbatore – 641 004. Autonomous,
-            affiliated to Anna University, accredited with an ISO 9001:2015 certified legacy.
+          <Brand to="/" subtitle="Recruitment Portal" />
+          <p className="max-w-md text-sm text-muted">
+            Avinashi Road, Peelamedu, Coimbatore – 641 004, Tamil Nadu. An autonomous institution affiliated
+            to Anna University.
           </p>
-          <div className="flex items-center gap-2 text-xs text-muted pt-2">
-            <span>© {new Date().getFullYear()} PSG College of Technology</span>
-            <span>·</span>
-            <span>All rights reserved</span>
+          <div className="flex items-center gap-3 opacity-80">
+            <img src="/images/75yearsLogo.png" alt="75 years of PSG Tech" className="h-8 w-auto" />
+            <img src="/images/100yearsLogo.png" alt="100 years of PSG" className="h-8 w-auto" />
           </div>
         </div>
         <div>
-          <h2 className="text-sm font-bold uppercase tracking-wider text-muted">Candidates</h2>
-          <ul className="mt-4 space-y-2.5 text-sm">
+          <h2 className="label-caps font-sans">Candidates</h2>
+          <ul className="mt-4 space-y-2 text-sm">
             <li>
               <Link to="/vacancies">Open vacancies</Link>
             </li>
@@ -475,8 +324,8 @@ function Footer() {
           </ul>
         </div>
         <div>
-          <h2 className="text-sm font-bold uppercase tracking-wider text-muted">Institution</h2>
-          <ul className="mt-4 space-y-2.5 text-sm">
+          <h2 className="label-caps font-sans">Institution</h2>
+          <ul className="mt-4 space-y-2 text-sm">
             <li>
               <Link to="/privacy">Privacy notice</Link>
             </li>
@@ -489,58 +338,270 @@ function Footer() {
           </ul>
         </div>
       </div>
+      <div className="border-t border-line">
+        <p className="page-container py-4 text-xs text-muted">
+          © {new Date().getFullYear()} PSG College of Technology. All rights reserved.
+        </p>
+      </div>
     </footer>
   );
 }
 
-export default function App() {
+function PublicLayout({ children }: { children: React.ReactNode }) {
   return (
-    <div className="min-h-screen flex flex-col justify-between">
-      <Header />
-      <main
-        id="main"
-        className="mx-auto w-full max-w-[1500px] flex-1 px-4 py-8 sm:px-6 sm:py-10 lg:px-10 lg:py-12"
-      >
-        <Outlet />
+    <div className="flex min-h-dvh flex-col">
+      <PublicHeader />
+      <main id="main" className="page-container flex-1 py-8 sm:py-10 lg:py-12">
+        {children}
       </main>
       <Footer />
     </div>
   );
 }
 
+// ------------------------------------------------------------------------------------------------
+// Staff layout: sidebar on large screens, top bar + drawer on small screens.
+// ------------------------------------------------------------------------------------------------
+function StaffSidebarContent({ onNavigate }: { onNavigate?: () => void }) {
+  const { grants, name, initials, roleLabel, user } = useUser();
+  const groups = staffNav(grants);
+  return (
+    <div className="flex h-full flex-col">
+      <div className="px-5 py-5">
+        <Brand to="/staff" subtitle="Staff workspace" inverted />
+      </div>
+      <nav aria-label="Staff" className="flex-1 space-y-6 overflow-y-auto px-3 pb-6">
+        {groups.map((g) => (
+          <div key={g.title}>
+            <p className="px-3 pb-2 text-[11px] font-semibold tracking-[0.12em] text-white/45 uppercase">
+              {g.title}
+            </p>
+            <ul className="space-y-0.5">
+              {g.items.map((n) => (
+                <li key={n.to}>
+                  <NavLink
+                    to={n.to}
+                    end={n.end}
+                    onClick={onNavigate}
+                    className={({ isActive }) =>
+                      `flex items-center gap-3 rounded-md px-3 py-2 text-sm no-underline transition-colors ${
+                        isActive
+                          ? "bg-brand-600 font-semibold text-white shadow-sm"
+                          : "text-white/80 hover:bg-white/8 hover:text-white"
+                      }`
+                    }
+                  >
+                    <n.icon className="h-4 w-4 shrink-0" aria-hidden="true" />
+                    {n.label}
+                  </NavLink>
+                </li>
+              ))}
+            </ul>
+          </div>
+        ))}
+        <div>
+          <a
+            href="/"
+            target="_blank"
+            rel="noreferrer"
+            className="flex items-center gap-3 rounded-md px-3 py-2 text-sm text-white/60 no-underline hover:bg-white/6 hover:text-white"
+          >
+            <ExternalLink className="h-4 w-4" aria-hidden="true" /> Public site
+          </a>
+        </div>
+      </nav>
+      <div className="border-t border-white/10 p-4">
+        <div className="flex items-center gap-3">
+          <span
+            aria-hidden="true"
+            className="grid h-9 w-9 shrink-0 place-items-center rounded-full bg-gold-400 text-xs font-bold text-navy-900"
+          >
+            {initials || "U"}
+          </span>
+          <span className="min-w-0 leading-tight">
+            <span className="block truncate text-sm font-semibold text-white">{name}</span>
+            <span className="block truncate text-xs text-white/60">{roleLabel}</span>
+          </span>
+        </div>
+        <p className="mt-2 truncate text-xs text-white/45" title={user?.email}>
+          {user?.email}
+        </p>
+        <SignOut className="btn btn-sm mt-3 w-full border border-white/15 text-white hover:bg-white/10 hover:text-white" />
+      </div>
+    </div>
+  );
+}
+
+/** Desktop header: institution name, application search and the signed-in user. */
+function StaffTopBar() {
+  const { grants, name, initials, roleLabel } = useUser();
+  const canSearch = isAdmin(grants) || isHrOfficer(grants);
+  return (
+    <header className="sticky top-0 z-30 hidden h-16 items-center gap-6 border-b border-line bg-paper/95 px-8 backdrop-blur lg:flex">
+      <div className="flex min-w-0 items-center gap-3">
+        <img src="/images/psg_logo.png" alt="" className="h-9 w-auto" />
+        <span className="min-w-0 leading-tight">
+          <span className="block truncate font-display text-base font-semibold text-navy-800 uppercase">
+            PSG College of Technology
+          </span>
+          <span className="block truncate text-xs text-muted">Staff Recruitment Portal</span>
+        </span>
+      </div>
+      {canSearch ? (
+        <form method="get" action="/staff" role="search" className="relative mx-auto w-full max-w-xl">
+          <label htmlFor="top-q" className="sr-only">
+            Search applications
+          </label>
+          <Search
+            className="pointer-events-none absolute top-1/2 left-3 h-4 w-4 -translate-y-1/2 text-muted"
+            aria-hidden="true"
+          />
+          <input
+            id="top-q"
+            name="q"
+            type="search"
+            placeholder="Search applications, candidates, reference no…"
+            className="field-input border-transparent bg-soft pl-9 hover:border-line"
+          />
+        </form>
+      ) : (
+        <div className="mx-auto" />
+      )}
+      <div className="flex shrink-0 items-center gap-3">
+        <span
+          aria-hidden="true"
+          className="grid h-9 w-9 place-items-center rounded-full bg-navy-800 text-xs font-bold text-white"
+        >
+          {initials || "U"}
+        </span>
+        <span className="leading-tight">
+          <span className="block max-w-48 truncate text-sm font-semibold text-ink">{name}</span>
+          <span className="block text-xs font-medium text-brand-700">{roleLabel}</span>
+        </span>
+      </div>
+    </header>
+  );
+}
+
+function StaffLayout({ children }: { children: React.ReactNode }) {
+  const [open, setOpen] = useState(false);
+  const location = useLocation();
+  useEffect(() => setOpen(false), [location.pathname, location.search]);
+  useEffect(() => {
+    if (!open) return;
+    const onKey = (e: KeyboardEvent) => e.key === "Escape" && setOpen(false);
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [open]);
+
+  return (
+    <div className="min-h-dvh lg:grid lg:grid-cols-[16.5rem_1fr]">
+      <a href="#main" className="skip-link">
+        Skip to main content
+      </a>
+      <aside className="hero-gradient sticky top-0 hidden h-dvh lg:block">
+        <StaffSidebarContent />
+      </aside>
+
+      <header className="sticky top-0 z-40 flex h-14 items-center justify-between border-b border-white/10 bg-navy-800 px-4 lg:hidden">
+        <Brand to="/staff" subtitle="Staff workspace" inverted />
+        <button
+          type="button"
+          onClick={() => setOpen(true)}
+          className="btn -mr-2 px-2 text-white hover:bg-white/10"
+          aria-expanded={open}
+          aria-controls="staff-drawer"
+          aria-label="Open menu"
+        >
+          <Menu className="h-5 w-5" />
+        </button>
+      </header>
+
+      {open && (
+        <div className="fixed inset-0 z-50 lg:hidden" role="dialog" aria-modal="true" aria-label="Staff menu">
+          <button
+            type="button"
+            className="absolute inset-0 bg-navy-900/60"
+            aria-label="Close menu"
+            onClick={() => setOpen(false)}
+          />
+          <div
+            id="staff-drawer"
+            className="hero-gradient absolute inset-y-0 left-0 w-[min(18rem,85vw)] shadow-2xl"
+          >
+            <button
+              type="button"
+              onClick={() => setOpen(false)}
+              className="btn absolute top-4 right-3 px-2 text-white hover:bg-white/10"
+              aria-label="Close menu"
+            >
+              <X className="h-5 w-5" />
+            </button>
+            <StaffSidebarContent onNavigate={() => setOpen(false)} />
+          </div>
+        </div>
+      )}
+
+      <div className="min-w-0">
+        <StaffTopBar />
+        <main id="main" className="px-4 py-6 sm:px-6 sm:py-8 lg:px-8">
+          <div className="mx-auto w-full max-w-[1440px]">{children}</div>
+        </main>
+      </div>
+    </div>
+  );
+}
+
+function Shell({ children }: { children: React.ReactNode }) {
+  const { staff } = useUser();
+  const { pathname } = useLocation();
+  const staffArea = staff && /^\/(staff|admin)(\/|$)/.test(pathname);
+  return (
+    <>
+      <RouteProgress />
+      {staffArea ? <StaffLayout>{children}</StaffLayout> : <PublicLayout>{children}</PublicLayout>}
+    </>
+  );
+}
+
+export default function App() {
+  return (
+    <Shell>
+      <Outlet />
+    </Shell>
+  );
+}
+
 export function ErrorBoundary({ error }: Route.ErrorBoundaryProps) {
+  let status = 500;
   let title = "Something went wrong";
-  let emoji = "😕";
   let detail =
     "An unexpected error occurred. Please try again. If the problem continues, contact the recruitment office.";
   if (isRouteErrorResponse(error)) {
+    status = error.status;
     if (error.status === 404) {
       title = "Page not found";
-      emoji = "🧭";
       detail = "The page you requested does not exist or you do not have access to it.";
     } else if (error.status === 403) {
       title = "Access denied";
-      emoji = "🔒";
       detail = typeof error.data === "string" ? error.data : "You do not have permission to view this page.";
     } else if (typeof error.data === "string") detail = error.data;
   }
   return (
-    <>
-      <Header />
-      <main id="main" className="mx-auto max-w-2xl px-4 py-16">
-        <div className="card hero-gradient text-center">
-          <p aria-hidden="true" className="text-5xl">
-            {emoji}
-          </p>
-          <h1 className="mt-4">{title}</h1>
-          <p className="mt-3 text-muted">{detail}</p>
-          <p className="mt-6">
-            <Link to="/" className="btn-primary">
-              Back to home
-            </Link>
-          </p>
+    <Shell>
+      <div className="mx-auto max-w-xl py-10 text-center">
+        <p className="font-display text-6xl font-semibold text-brand-600">{status}</p>
+        <h1 className="mt-4">{title}</h1>
+        <p className="mt-3 text-muted">{detail}</p>
+        <div className="mt-8 flex flex-col justify-center gap-3 sm:flex-row">
+          <Link to="/" className="btn-primary">
+            Back to home
+          </Link>
+          <Link to="/help#contact" className="btn-secondary">
+            Contact the recruitment office
+          </Link>
         </div>
-      </main>
-    </>
+      </div>
+    </Shell>
   );
 }

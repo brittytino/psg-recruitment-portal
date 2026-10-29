@@ -245,7 +245,7 @@ export default function ApplicationEditor({ loaderData }: Route.ComponentProps) 
   const pct = Math.round((complete / sections.length) * 100);
 
   return (
-    <div className="space-y-6">
+    <div className="page-stack">
       <header className="flex flex-wrap items-start justify-between gap-4">
         <div>
           <p className="text-sm font-medium text-muted">{FORM_LABELS[L.formCode]}</p>

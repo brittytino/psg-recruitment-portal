@@ -82,7 +82,7 @@ export default function Documents({ loaderData, actionData }: Route.ComponentPro
     ...standaloneRequired,
   ];
   return (
-    <div className="space-y-6">
+    <div className="page-stack">
       <nav aria-label="Breadcrumb" className="text-sm">
         <Link to={`/applications/${id}`}>Application form</Link> <span aria-hidden="true">/</span> Documents
       </nav>

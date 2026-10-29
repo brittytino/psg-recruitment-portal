@@ -3,31 +3,26 @@
 ARG NODE_IMAGE=node:22.22.0-bookworm-slim
 
 FROM ${NODE_IMAGE} AS base
-# Some deployment networks block plain HTTP egress (403/Forbidden on deb.debian.org).
-# Patch ALL possible apt source file locations to use HTTPS mirrors before any apt call.
+# Some deployment networks block deb.debian.org (403 Forbidden).
+# Route package sources through official ftp.debian.org and security.debian.org.
 RUN set -eux; \
     if [ -f /etc/apt/sources.list.d/debian.sources ]; then \
       sed -i \
-        's|http://deb.debian.org|https://deb.debian.org|g; \
-         s|http://security.debian.org|https://security.debian.org|g' \
+        -e 's|deb.debian.org/debian-security|security.debian.org/debian-security|g' \
+        -e 's|deb.debian.org/debian|ftp.debian.org/debian|g' \
         /etc/apt/sources.list.d/debian.sources; \
     fi; \
     if [ -f /etc/apt/sources.list ]; then \
       sed -i \
-        's|http://deb.debian.org|https://deb.debian.org|g; \
-         s|http://security.debian.org|https://security.debian.org|g' \
+        -e 's|deb.debian.org/debian-security|security.debian.org/debian-security|g' \
+        -e 's|deb.debian.org/debian|ftp.debian.org/debian|g' \
         /etc/apt/sources.list; \
     fi; \
     find /etc/apt/sources.list.d/ -name '*.list' -exec sed -i \
-      's|http://deb.debian.org|https://deb.debian.org|g; \
-       s|http://security.debian.org|https://security.debian.org|g' {} +; \
-    apt-get -o Acquire::https::Verify-Peer=false \
-            -o Acquire::https::Verify-Host=false update \
- && apt-get -o Acquire::https::Verify-Peer=false \
-            -o Acquire::https::Verify-Host=false \
-            install -y --no-install-recommends ca-certificates \
- && apt-get update \
- && apt-get install -y --no-install-recommends openssl tini \
+      -e 's|deb.debian.org/debian-security|security.debian.org/debian-security|g' \
+      -e 's|deb.debian.org/debian|ftp.debian.org/debian|g' {} +; \
+    apt-get update \
+ && apt-get install -y --no-install-recommends ca-certificates openssl tini \
  && rm -rf /var/lib/apt/lists/*
 WORKDIR /app
 

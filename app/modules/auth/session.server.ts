@@ -97,7 +97,6 @@ export async function getSessionUser(request: Request): Promise<SessionUser | nu
     grants: s.user.roles.map((r) => ({
       role: r.role as RoleName,
       departmentId: r.departmentId,
-      cycleId: r.cycleId,
     })),
     sessionId: id,
   };

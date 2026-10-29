@@ -30,9 +30,8 @@ export default function Privacy() {
         <p>Solely to process your application for faculty recruitment at PSG College of Technology.</p>
         <h2>Who can access it</h2>
         <p>
-          You, and authorised recruitment staff whose role and assigned scope (recruitment cycle or
-          department) cover your application. Every staff access to documents and every decision is recorded
-          in an audit log.
+          You, and authorised recruitment staff whose role and assigned scope (department) cover your
+          application. Every staff access to documents and every decision is recorded in an audit log.
         </p>
         <h2>How it is protected</h2>
         <p>

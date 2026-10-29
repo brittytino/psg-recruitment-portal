@@ -1,5 +1,6 @@
 import { Form, Link } from "react-router";
-import { motion } from "framer-motion";
+import { ArrowRight, Search } from "lucide-react";
+import { EmptyState, StatTile } from "~/components/staff";
 import type { Route } from "./+types/account";
 import { Alert, Badge, CsrfInput, formatDateTime, statusTone } from "~/components/forms";
 import { handleAction, readForm, requireUser } from "~/lib/http.server";
@@ -36,51 +37,27 @@ export async function action({ request, context }: Route.ActionArgs) {
   });
 }
 
-const STATUS_EMOJI: Record<string, string> = {
-  DRAFT: "📝",
-  SUBMITTED: "📨",
-  UNDER_HR_REVIEW: "🔍",
-  UNDER_DEPARTMENT_REVIEW: "🏛️",
-  NEEDS_CLARIFICATION: "💬",
-  SHORTLISTED: "⭐",
-  REJECTED: "📁",
-  APPROVED: "🎉",
-  WITHDRAWN: "↩️",
-};
-
 export default function Account({ loaderData, actionData }: Route.ComponentProps) {
   const { applications, verified, name } = loaderData;
   const count = (pred: (s: string) => boolean) => applications.filter((a) => pred(a.status)).length;
-  const tiles: [string, string, number, string][] = [
-    ["bg-tile-pink", "Drafts in progress", count((s) => s === "DRAFT" || s === "NEEDS_CLARIFICATION"), "📝"],
-    ["bg-tile-blue", "Submitted", count((s) => !["DRAFT", "WITHDRAWN"].includes(s)), "📨"],
-    [
-      "bg-tile-purple",
-      "Under review",
-      count((s) => ["SUBMITTED", "UNDER_HR_REVIEW", "UNDER_DEPARTMENT_REVIEW"].includes(s)),
-      "🔍",
-    ],
-    ["bg-tile-green", "Shortlisted / selected", count((s) => s === "SHORTLISTED" || s === "APPROVED"), "⭐"],
+  const tiles: [string, number][] = [
+    ["Drafts in progress", count((s) => s === "DRAFT" || s === "NEEDS_CLARIFICATION")],
+    ["Submitted", count((s) => !["DRAFT", "WITHDRAWN"].includes(s))],
+    ["Under review", count((s) => ["SUBMITTED", "UNDER_HR_REVIEW", "UNDER_DEPARTMENT_REVIEW"].includes(s))],
+    ["Shortlisted / selected", count((s) => s === "SHORTLISTED" || s === "APPROVED")],
   ];
   return (
-    <motion.div
-      initial={{ opacity: 0, y: 12 }}
-      animate={{ opacity: 1, y: 0 }}
-      transition={{ duration: 0.45, ease: [0.16, 1, 0.3, 1] }}
-      className="space-y-8"
-    >
-      <div className="flex flex-col sm:flex-row items-start sm:items-end justify-between gap-4 border-b border-line/70 pb-6">
+    <div className="page-stack">
+      <div className="flex flex-col items-start justify-between gap-4 border-b border-line pb-5 sm:flex-row sm:items-end">
         <div>
           <p className="eyebrow">Candidate workspace</p>
-          <h1 className="mt-1.5 text-2xl sm:text-4xl lg:text-5xl font-extrabold text-ink">
-            Welcome back, {name} 👋
-          </h1>
-          <p className="mt-1.5 sm:mt-2 text-sm sm:text-base text-muted">
+          <h1 className="mt-1 text-2xl sm:text-3xl">Welcome, {name}</h1>
+          <p className="mt-1.5 text-muted">
             Track your submitted applications, review feedback, and continue draft forms.
           </p>
         </div>
         <Link to="/vacancies" className="btn-primary w-full sm:w-auto text-center shrink-0">
-          🔎 Browse open vacancies
+          <Search className="h-4 w-4" aria-hidden="true" /> Browse vacancies
         </Link>
       </div>
 
@@ -96,7 +73,7 @@ export default function Account({ loaderData, actionData }: Route.ComponentProps
           <Form method="post" className="mt-3">
             <CsrfInput />
             <input type="hidden" name="intent" value="resend-verification" />
-            <button type="submit" className="btn-secondary py-2">
+            <button type="submit" className="btn-secondary btn-sm">
               Send a new verification e-mail
             </button>
           </Form>
@@ -104,17 +81,11 @@ export default function Account({ loaderData, actionData }: Route.ComponentProps
       )}
 
       <section aria-label="Summary">
-        <dl className="grid grid-cols-2 gap-3 sm:gap-4 lg:grid-cols-4">
-          {tiles.map(([bg, label, value, emoji]) => (
-            <div key={label} className={`stat-tile p-3.5 sm:p-5 ${bg}`}>
-              <dt className="text-xs sm:text-sm font-medium truncate">
-                <span aria-hidden="true">{emoji} </span>
-                {label}
-              </dt>
-              <dd className="mt-1.5 sm:mt-2 text-2xl sm:text-3xl font-bold">{value}</dd>
-            </div>
+        <div className="grid grid-cols-2 gap-3 sm:gap-4 lg:grid-cols-4">
+          {tiles.map(([label, value]) => (
+            <StatTile key={label} label={label} value={value} />
           ))}
-        </dl>
+        </div>
       </section>
 
       <section aria-labelledby="apps">
@@ -122,17 +93,10 @@ export default function Account({ loaderData, actionData }: Route.ComponentProps
           My applications
         </h2>
         {applications.length === 0 ? (
-          <div className="card mt-4 text-center">
-            <p className="text-5xl" aria-hidden="true">
-              🌱
-            </p>
-            <p className="mt-3 font-semibold">You have not started any applications yet</p>
-            <p className="mt-1 text-sm text-muted">
-              Find a position that fits you and start the official application form.
-            </p>
-            <Link to="/vacancies" className="btn-primary mt-5">
-              Browse open vacancies
-            </Link>
+          <div className="mt-4">
+            <EmptyState title="You have not started any applications yet">
+              <Link to="/vacancies">Find a vacancy</Link> and start the application form.
+            </EmptyState>
           </div>
         ) : (
           <ul className="mt-4 grid gap-4 md:grid-cols-2">
@@ -141,18 +105,12 @@ export default function Account({ loaderData, actionData }: Route.ComponentProps
               return (
                 <li key={a.id} className="card flex flex-col gap-4">
                   <div className="flex items-start justify-between gap-3">
-                    <div className="flex items-start gap-3 min-w-0">
-                      <span
-                        aria-hidden="true"
-                        className="grid h-12 w-12 shrink-0 place-items-center rounded-2xl bg-soft text-2xl"
-                      >
-                        {STATUS_EMOJI[a.status] ?? "📄"}
-                      </span>
-                      <div className="min-w-0">
-                        <p className="text-xs font-medium text-muted">
+                    <div className="min-w-0">
+                      <div>
+                        <p className="label-caps">
                           {a.vacancy.department?.name ?? a.vacancy.researchSpecialisation?.name ?? "Research"}
                         </p>
-                        <h3 className="font-semibold leading-snug">{a.vacancy.title}</h3>
+                        <h3 className="mt-1 leading-snug">{a.vacancy.title}</h3>
                         <p className="mt-0.5 text-xs text-muted">
                           {a.vacancy.researchPositionTitle ??
                             (a.vacancy.position ? POSITION_LABELS[a.vacancy.position] : "Research Assistant")}
@@ -162,24 +120,25 @@ export default function Account({ loaderData, actionData }: Route.ComponentProps
                     <Badge tone={statusTone(a.status)}>{STATUS_LABELS[a.status as AppStatus]}</Badge>
                   </div>
                   <dl className="grid grid-cols-2 gap-3 text-sm">
-                    <div className="card-soft p-3">
+                    <div className="rounded-lg bg-soft p-3">
                       <dt className="text-xs text-muted">Reference</dt>
                       <dd className="font-semibold">{a.referenceNo ?? "On submission"}</dd>
                     </div>
-                    <div className="card-soft p-3">
+                    <div className="rounded-lg bg-soft p-3">
                       <dt className="text-xs text-muted">Last updated</dt>
                       <dd className="font-semibold">{formatDateTime(a.updatedAt)}</dd>
                     </div>
                   </dl>
                   <Link
                     to={editable ? `/applications/${a.id}` : `/applications/${a.id}/receipt`}
-                    className={editable ? "btn-primary" : "btn-secondary"}
+                    className={`${editable ? "btn-primary" : "btn-secondary"} mt-auto`}
                   >
                     {a.status === "DRAFT"
-                      ? "Continue application →"
+                      ? "Continue application"
                       : a.status === "NEEDS_CLARIFICATION"
-                        ? "Update and resubmit →"
+                        ? "Update and resubmit"
                         : "View status"}
+                    <ArrowRight className="h-4 w-4" aria-hidden="true" />
                   </Link>
                 </li>
               );
@@ -187,6 +146,6 @@ export default function Account({ loaderData, actionData }: Route.ComponentProps
           </ul>
         )}
       </section>
-    </motion.div>
+    </div>
   );
 }

@@ -170,7 +170,11 @@ export async function revokeRole(actor: SessionUser | null, roleId: string) {
     if (r.role === "ADMIN" || r.role === "SUPER_ADMIN") {
       if (r.userId === a.id) throw new ConflictError("You cannot remove your own Admin role");
       const others = await tx.userRole.count({
-        where: { role: { in: ["ADMIN", "SUPER_ADMIN"] }, userId: { not: r.userId }, user: { status: "ACTIVE" } },
+        where: {
+          role: { in: ["ADMIN", "SUPER_ADMIN"] },
+          userId: { not: r.userId },
+          user: { status: "ACTIVE" },
+        },
       });
       if (others === 0) throw new ConflictError("At least one active Admin must remain");
     }
@@ -242,6 +246,132 @@ export async function resendInvite(actor: SessionUser | null, userId: string) {
       `An administrator has resent your sign-in details for the PSG College of Technology Staff Recruitment Portal.\n\nSign in directly using your email address:\n${env().APP_ORIGIN}/login\n\nA secure 6-digit one-time verification code (OTP) will be sent to your email address on every sign-in. No password is required.`,
     );
     await audit({ actorId: a.id, action: "user.invite_resent", entityType: "user", entityId: userId }, tx);
+  });
+}
+
+const hodInviteSchema = z.object({
+  departmentId: z.string().uuid("Choose a department"),
+  fullName: z.string().trim().min(2, "Enter the HOD's full name").max(120),
+  email: z.string().trim().toLowerCase().email("Enter a valid e-mail address").max(200),
+});
+
+function hodInviteBody(fullName: string, departmentName: string) {
+  return [
+    `Dear ${fullName},`,
+    "",
+    `You have been added as the Head of Department for ${departmentName} on the PSG College of Technology Staff Recruitment Portal.`,
+    "",
+    "Sign in with this e-mail address:",
+    `${env().APP_ORIGIN}/login`,
+    "",
+    "A 6-digit one-time code is e-mailed to you on every sign-in; no password is needed.",
+    "After signing in you will see the applications assigned to you for review and the department summary sheet.",
+    "",
+    "HR – N4 Section, PSG College of Technology",
+  ].join("\n");
+}
+
+/**
+ * HR – N4 Section adds a department's HOD (name + e-mail) and sends the invitation link.
+ * A new account is created when needed; an existing staff account gains the HOD role for the
+ * department. Candidate accounts are never turned into staff accounts.
+ */
+export async function inviteHod(actor: SessionUser | null, input: unknown) {
+  if (!actor || !hasPermission(actor.grants, "department:manage")) throw new ForbiddenError();
+  const p = hodInviteSchema.safeParse(input);
+  if (!p.success)
+    throw new ValidationError("Please correct the highlighted fields", z.flattenError(p.error).fieldErrors);
+  const v = p.data;
+  const department = await prisma.department.findUnique({ where: { id: v.departmentId } });
+  if (!department || !department.active) throw new ValidationError("Choose an active department");
+  const existing = await prisma.user.findUnique({ where: { email: v.email }, include: { roles: true } });
+  if (existing?.roles.some((r) => r.role === "CANDIDATE"))
+    throw new ConflictError(
+      "This e-mail belongs to a candidate account. Use the HOD's official institutional e-mail address.",
+    );
+  if (existing?.roles.some((r) => r.role === "HOD" && r.departmentId === v.departmentId))
+    throw new ConflictError("This person is already a HOD of the department");
+  await prisma.$transaction(async (tx) => {
+    const user =
+      existing ??
+      (await tx.user.create({
+        data: {
+          email: v.email,
+          emailVerifiedAt: new Date(),
+          profile: {
+            create: { fullName: v.fullName, privacyVersion: "staff", privacyAcceptedAt: new Date() },
+          },
+        },
+      }));
+    await tx.userRole.create({
+      data: { userId: user.id, role: "HOD", departmentId: v.departmentId, grantedById: actor.id },
+    });
+    await notify(
+      tx,
+      user.id,
+      "account.hod_invite",
+      `HOD access – ${department.name} | PSG Tech Recruitment Portal`,
+      hodInviteBody(v.fullName, department.name),
+    );
+    await audit(
+      {
+        actorId: actor.id,
+        action: "department.hod_invited",
+        entityType: "department",
+        entityId: v.departmentId,
+        metadata: { userId: user.id, newAccount: !existing },
+      },
+      tx,
+    );
+  });
+}
+
+/** Re-sends the HOD invitation e-mail for a department. */
+export async function resendHodInvite(actor: SessionUser | null, roleId: string) {
+  if (!actor || !hasPermission(actor.grants, "department:manage")) throw new ForbiddenError();
+  const r = await prisma.userRole.findUnique({
+    where: { id: roleId },
+    include: { department: true, user: { include: { profile: true } } },
+  });
+  if (!r || r.role !== "HOD" || !r.department) throw new NotFoundError("HOD");
+  await prisma.$transaction(async (tx) => {
+    await notify(
+      tx,
+      r.userId,
+      "account.hod_invite",
+      `HOD access – ${r.department!.name} | PSG Tech Recruitment Portal`,
+      hodInviteBody(r.user.profile?.fullName ?? r.user.email, r.department!.name),
+    );
+    await audit(
+      {
+        actorId: actor.id,
+        action: "department.hod_invite_resent",
+        entityType: "department",
+        entityId: r.departmentId,
+        metadata: { userId: r.userId },
+      },
+      tx,
+    );
+  });
+}
+
+/** Removes a HOD from a department. Applications already assigned to them stay assigned. */
+export async function removeHod(actor: SessionUser | null, roleId: string) {
+  if (!actor || !hasPermission(actor.grants, "department:manage")) throw new ForbiddenError();
+  const r = await prisma.userRole.findUnique({ where: { id: roleId } });
+  if (!r || r.role !== "HOD") throw new NotFoundError("HOD");
+  await prisma.$transaction(async (tx) => {
+    await tx.userRole.delete({ where: { id: roleId } });
+    await audit(
+      {
+        actorId: actor.id,
+        action: "department.hod_removed",
+        entityType: "department",
+        entityId: r.departmentId,
+        metadata: { userId: r.userId },
+      },
+      tx,
+    );
   });
 }
 

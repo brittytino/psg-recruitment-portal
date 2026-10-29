@@ -117,7 +117,7 @@ The production database bootstraps with **only** the approved institutional acco
 
 | Identity / Name         | Official Email            | System Role   | Operational Scope & Permissions                                                                                                                                                                                |
 | :---------------------- | :------------------------ | :------------ | :------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| **Tino**                | `brittytino08@gmail.com`  | `SUPER_ADMIN` | **Super Admin**: Highest system privileges, user & role management, system settings, department management, full audit log access, security configuration, and full recruitment oversight.                     |
+| **Super Admin**         | `brittytino08@gmail.com`  | `SUPER_ADMIN` | **Super Admin**: Highest system privileges, user & role management, system settings, department management, full audit log access, security configuration, and full recruitment oversight.                     |
 | **Dr. S. Saravanan**    | `dean.admn@psgtech.ac.in` | `ADMIN`       | **Dean**: Recruitment administration, institution-wide application monitoring, bulk HOD assignment, summary review, and position-change oversight. _(No unrestricted system log or user administration)_       |
 | **Dr. G. Thilagavathi** | `principal@psgtech.ac.in` | `ADMIN`       | **Principal**: Recruitment administration, institution-wide application monitoring, bulk HOD assignment, summary review, and position-change oversight. _(No unrestricted system log or user administration)_  |
 | **HR / N4 Section**     | `admin.n4@psgtech.ac.in`  | `HR`          | **HR / N4 Section**: Vacancy and job profile creation/publishing, applicant qualification screening, complete PDF bundle downloads, approved summary review, and selective CSV export.                         |
@@ -173,7 +173,7 @@ The portal employs a zero-password, zero-magic-link authentication architecture.
 
 The candidate application wizard organizes the official requirements into structured, accessible steps:
 
-1. **Vacancy and Post**: Displays the selected department, post, and recruitment cycle.
+1. **Vacancy and Post**: Displays the selected department and post.
 2. **Personal Information**: Full name (block letters), title, DOB, calculated age, gender, nationality, religion (with custom option), community category, caste, marital status, spouse details (conditional), present address, permanent address, contact details.
 3. **Academic Qualifications**:
    - **School Education**: Separate SSLC and HSC subsections capturing school name, completion year, marks, maximum marks, calculated percentage, class, and attempts/arrears.
@@ -253,47 +253,28 @@ The portal provides an auditable, Excel-compatible CSV export engine:
 
 ### Quick Start with Docker
 
-**First Deployment (Initial Setup, Build & DB Seed):**
+One launcher per environment. Each run builds the images, applies database migrations, seeds the
+staff accounts and waits until the portal is healthy.
+
+| | Linux / macOS server | Windows (Docker Desktop) |
+| --- | --- | --- |
+| Development (Mailpit shows e-mails and sign-in codes at http://localhost:8025) | `./dev.sh` | `dev.bat` |
+| Production | `./prod.sh` | `prod.bat` |
+
+Other commands (same for every launcher): `stop`, `down`, `restart`, `logs [service]`, `status`,
+`health`, `seed`, `migrate`, `rebuild`, `shell [service]`, `env`, `help`.
+
+**Production server, first time**
 
 ```sh
-# Make executable
-chmod +x ./start.sh ./run.sh ./dev.sh ./prod.sh
-
-# Run first-time deployment (builds images, prepares storage, migrates DB & seeds accounts)
-./start.sh
-# Or for first-time production deployment:
-./start.sh prod
+./prod.sh            # creates .env with generated database passwords and secrets, then stops
+nano .env            # set APP_ORIGIN (https://…) and the SMTP_* settings
+./prod.sh            # builds, migrates, seeds and starts
 ```
 
-**Subsequent System Runs (Fast Uptime & Management):**
-
-```sh
-# Bring up the running system
-./run.sh
-
-# Or start in background (headless/CI):
-./run.sh start
-```
-
-**Windows (cmd / PowerShell):**
-
-```bat
-REM First time automatically builds and migrates; subsequent runs quickly bring up the system:
-.\run.bat
-```
-
-Or via Docker Compose commands manually:
-
-```sh
-# Copy environment configuration
-cp .env.example .env
-
-# Build and start the complete local stack
-docker compose -f compose.yaml -f compose.dev.yaml up -d --build
-
-# Run database migrations and bootstrap initial institutional accounts
-docker compose -f compose.yaml -f compose.dev.yaml run --rm migrate
-```
+Put Nginx with TLS in front (`infrastructure/nginx`) and keep `APP_BIND=127.0.0.1` so the app port is
+only reachable through the proxy. `.env` is never committed; `.env.example` and `.env.development` are
+the templates.
 
 ### Local Development on Host Machine
 

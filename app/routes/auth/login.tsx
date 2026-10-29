@@ -37,9 +37,11 @@ export default function Login({ actionData }: Route.ComponentProps) {
   return (
     <AuthShell>
       <div>
-        <h1>Sign in</h1>
+        <p className="eyebrow">Candidates and staff</p>
+        <h1 className="mt-1">Sign in</h1>
         <p className="mt-2 text-muted">
-          New candidate? <Link to="/register">Create an account</Link>
+          Enter your e-mail address and we will send you a 6-digit sign-in code. New candidate?{" "}
+          <Link to="/register">Create an account</Link>
         </p>
         {params.get("verified") === "1" && (
           <div className="mt-5">
@@ -60,18 +62,15 @@ export default function Login({ actionData }: Route.ComponentProps) {
             type="email"
             required
             autoComplete="email"
-            placeholder="e.g. name@example.com or staff@psgtech.ac.in"
+            placeholder="name@example.com"
           />
-          <button type="submit" className="btn-primary w-full" disabled={busy}>
-            {busy ? "Sending one-time code…" : "Send One-Time Password (OTP)"}
+          <button type="submit" className="btn-primary btn-lg w-full" disabled={busy}>
+            {busy ? "Sending code…" : "Send sign-in code"}
           </button>
-          <div className="rounded-xl border border-line bg-soft p-4 text-sm text-muted space-y-1.5">
-            <p className="font-semibold text-ink">Passwordless Email Authentication</p>
-            <p>
-              A 6-digit one-time password (OTP) will be delivered to your official or verified mailbox. All
-              users (Applicants, HODs, HR, Dean, Principal, Super Admin) authenticate securely via email OTP.
-            </p>
-          </div>
+          <p className="text-sm text-muted">
+            No password is needed. The code is valid for a few minutes and can be used once. Staff use their
+            official e-mail address.
+          </p>
         </Form>
       </div>
     </AuthShell>

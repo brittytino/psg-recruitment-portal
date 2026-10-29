@@ -84,7 +84,7 @@ export async function action({ request, params, context }: Route.ActionArgs) {
 export default function Receipt({ loaderData: L, actionData }: Route.ComponentProps) {
   const [params] = useSearchParams();
   return (
-    <div className="space-y-6">
+    <div className="page-stack">
       {params.get("submitted") === "1" && (
         <Alert tone="success" title="Application submitted">
           Your application has been submitted. A confirmation has been sent to your e-mail address.

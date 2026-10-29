@@ -75,7 +75,6 @@ export async function loader({ request, params, context }: Route.LoaderArgs) {
         department: app.vacancy.department?.name ?? app.vacancy.researchSpecialisation?.name ?? "Research",
         departmentId: app.vacancy.departmentId,
         specialisation: app.vacancy.researchSpecialisation?.name ?? null,
-        cycle: app.vacancy.cycle.title,
       },
       formCode: app.formTemplate.code as FormCode,
       formVersion: app.formTemplate.version,
@@ -194,7 +193,7 @@ export default function StaffApplication({ loaderData, actionData }: Route.Compo
   const answers = app.revision?.answers ?? {};
 
   return (
-    <div className="space-y-6">
+    <div className="page-stack">
       <p className="text-sm">
         <Link to={back}>← Back</Link>
       </p>

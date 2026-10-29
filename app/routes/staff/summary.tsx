@@ -45,7 +45,7 @@ export async function loader({ request, context }: Route.LoaderArgs) {
   if (!office) return { office: false as const, hod, sheets };
   const q = parseListQuery(new URL(request.url));
   const [departments, options, list, approvals, me] = await Promise.all([
-    departmentCounts(user, { position: q.position, departmentId: q.departmentId, cycleId: q.cycleId }),
+    departmentCounts(user, { position: q.position, departmentId: q.departmentId }),
     filterOptions(),
     listApplications(user, { ...q, size: q.size < 50 ? 50 : q.size, sort: "referenceNo" }),
     pendingPositionChanges(user),
@@ -256,7 +256,7 @@ export default function Summary({ loaderData, actionData }: Route.ComponentProps
             HODs approve a sheet after deciding every application.
           </EmptyState>
         ) : (
-          <div className="overflow-x-auto">
+          <div className="table-wrap">
             <table className="table">
               <thead>
                 <tr>
@@ -314,7 +314,7 @@ function OfficeSummary({ L }: { L: OfficeData }) {
   const [selectedRows, setSelectedRows] = useState<Set<string>>(new Set());
   const [showPreview, setShowPreview] = useState(false);
   const groups = [...new Set(EXPORT_COLUMNS.map((c) => c.group))];
-  const filterKeys = ["departmentId", "position", "status", "cycleId", "phd", "exam", "minExp", "q"];
+  const filterKeys = ["departmentId", "position", "status", "phd", "exam", "minExp", "q"];
 
   const allVisibleIds = L.list.rows.map((r) => r.id);
   const allVisibleSelected = allVisibleIds.length > 0 && allVisibleIds.every((id) => selectedRows.has(id));
@@ -414,7 +414,7 @@ function OfficeSummary({ L }: { L: OfficeData }) {
         {L.list.rows.length === 0 ? (
           <EmptyState title="No applications for these filters" />
         ) : (
-          <div className="overflow-x-auto">
+          <div className="table-wrap">
             <table className="table">
               <caption className="sr-only">Summary of applications</caption>
               <thead>
@@ -460,8 +460,8 @@ function OfficeSummary({ L }: { L: OfficeData }) {
                       {r.vacancy.department ? (
                         r.vacancy.department.name
                       ) : (
-                        <span className="inline-flex items-center gap-1 font-medium text-emerald-800">
-                          🔬 {r.vacancy.researchSpecialisation?.name ?? "Research"}
+                        <span className="font-medium">
+                          {r.vacancy.researchSpecialisation?.name ?? "Research"}
                         </span>
                       )}
                     </td>

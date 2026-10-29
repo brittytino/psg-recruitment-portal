@@ -7,6 +7,7 @@ export default [
   route("vacancies/:code", "routes/vacancy.tsx"),
   route("help", "routes/help.tsx"),
   route("privacy", "routes/privacy.tsx"),
+  route("open-positions.pdf", "routes/files/notice.ts"),
 
   // Account
   route("register", "routes/auth/register.tsx"),
@@ -39,6 +40,8 @@ export default [
   // Administration
   route("admin", "routes/admin/index.tsx"),
   route("admin/vacancies/new", "routes/admin/vacancy-new.tsx"),
+  route("admin/departments", "routes/admin/departments.tsx"),
+  route("admin/notices", "routes/admin/notices.tsx"),
   route("admin/users", "routes/admin/users.tsx"),
   route("admin/settings", "routes/admin/settings.tsx"),
 

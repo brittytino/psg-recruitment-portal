@@ -18,7 +18,7 @@ export const EXPORT_COLUMNS = [
   { key: "mobile", label: "Mobile", group: "Contact" },
   { key: "city", label: "Present Address (City, District, State)", group: "Contact" },
   { key: "vacancyCode", label: "Vacancy Code", group: "Post" },
-  { key: "cycle", label: "Recruitment Cycle", group: "Post" },
+  { key: "academicYear", label: "Academic Year", group: "Post" },
   { key: "effectivePosition", label: "Approved Position (after change)", group: "Post" },
   { key: "sslc", label: "SSLC Marks", group: "Qualifications" },
   { key: "hsc", label: "HSC Marks", group: "Qualifications" },

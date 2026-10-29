@@ -25,7 +25,7 @@ export async function action({ request, context }: Route.ActionArgs) {
 export default function Settings({ loaderData, actionData }: Route.ComponentProps) {
   const keys = Object.keys(SETTINGS) as SettingKey[];
   return (
-    <div className="max-w-3xl space-y-6">
+    <div className="page-stack max-w-3xl">
       <PageHeader
         eyebrow="Admin"
         title="Settings"

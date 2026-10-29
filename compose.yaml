@@ -1,6 +1,7 @@
 # PSG Staff Recruitment Portal — local stack.
 #   docker compose up -d --build            # full stack on http://localhost:${APP_HOST_PORT:-6969}
-#   docker compose -f compose.yaml -f compose.dev.yaml up -d   # + DB/Redis/Mailpit/converter host ports
+#   docker compose -f compose.yaml -f compose.dev.yaml up -d   # development: + Mailpit, DB viewer, host ports
+# Use ./dev.sh / ./prod.sh (Linux) or dev.bat / prod.bat (Windows) instead of calling compose directly.
 # Production uses compose.production.yaml (blue-green). See docs/deployment/.
 name: psg-srportal
 
@@ -119,32 +120,6 @@ services:
       resources:
         limits: { memory: 2g }
 
-  mailpit:
-    image: axllent/mailpit:v1.27.10
-    restart: unless-stopped
-    ports:
-      - "${MAILPIT_UI_HOST_PORT:-8025}:8025"
-    healthcheck:
-      test: ["CMD-SHELL", "wget -q --spider http://127.0.0.1:8025/api/v1/info || exit 1"]
-      interval: 10s
-      timeout: 3s
-      retries: 5
-    networks: [backend, frontend]
-
-  # Modern Visual Database Management Tool (pgweb) accessible at http://localhost:6981
-  db-viewer:
-    image: sosedoff/pgweb:0.16.1
-    restart: unless-stopped
-    environment:
-      DATABASE_URL: postgresql://${POSTGRES_USER:-srp_owner}:${POSTGRES_PASSWORD}@db:5432/${POSTGRES_DB:-srportal}?sslmode=disable
-      PGWEB_AUTH_USER: ${DB_VIEWER_USER:-}
-      PGWEB_AUTH_PASS: ${DB_VIEWER_PASSWORD:-}
-    ports:
-      - "${DB_VIEWER_HOST_PORT:-${ADMINER_HOST_PORT:-6981}}:8081"
-    depends_on:
-      db: { condition: service_healthy }
-    networks: [data, frontend]
-
   # One-shot migration runner (owner role). App and worker start only after it succeeds.
   migrate:
     build: { context: ., target: runtime }
@@ -166,7 +141,8 @@ services:
       <<: *app-env
       ROLE: web
     ports:
-      - "${APP_HOST_PORT:-6969}:3000"
+      # Production: APP_BIND=127.0.0.1 so only the reverse proxy (Nginx) can reach the app.
+      - "${APP_BIND:-0.0.0.0}:${APP_HOST_PORT:-6969}:3000"
     volumes:
       - storage:/var/lib/srportal/storage
     depends_on:

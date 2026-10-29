@@ -1,5 +1,6 @@
 import { useEffect, useId, useRef, type ReactNode } from "react";
 import { useRouteLoaderData } from "react-router";
+import { AlertTriangle, CheckCircle2, Info, XCircle } from "lucide-react";
 
 type RootData = { csrf: string } | undefined;
 
@@ -136,7 +137,7 @@ export function ErrorSummary({
       tabIndex={-1}
       role="alert"
       aria-labelledby="error-summary-title"
-      className="mb-6 rounded-2xl bg-danger-50 p-5 ring-1 ring-red-200"
+      className="rounded-lg border border-danger/30 bg-danger-50 p-5"
     >
       <h2 id="error-summary-title" className="text-base font-semibold text-danger">
         {title}
@@ -160,21 +161,19 @@ export function Alert({
   children: ReactNode;
 }) {
   const styles = {
-    info: "bg-brand-50 ring-brand-100",
-    success: "bg-success-50 ring-green-200",
-    warning: "bg-warning-50 ring-amber-200",
-    danger: "bg-danger-50 ring-red-200",
+    info: "bg-info-50 border-info/25 text-ink [--alert-icon:var(--color-info)]",
+    success: "bg-success-50 border-success/25 text-ink [--alert-icon:var(--color-success)]",
+    warning: "bg-warning-50 border-warning/25 text-ink [--alert-icon:var(--color-warning)]",
+    danger: "bg-danger-50 border-danger/25 text-ink [--alert-icon:var(--color-danger)]",
   }[tone];
   const label = { info: "Information", success: "Success", warning: "Warning", danger: "Error" }[tone];
-  const icon = { info: "💡", success: "✅", warning: "⚠️", danger: "⛔" }[tone];
+  const Icon = { info: Info, success: CheckCircle2, warning: AlertTriangle, danger: XCircle }[tone];
   return (
     <div
       role={tone === "danger" ? "alert" : "status"}
-      className={`flex gap-3 rounded-2xl p-4 text-sm ring-1 ${styles}`}
+      className={`flex gap-3 rounded-lg border p-4 text-sm ${styles}`}
     >
-      <span aria-hidden="true" className="text-lg leading-5">
-        {icon}
-      </span>
+      <Icon aria-hidden="true" className="mt-0.5 h-5 w-5 shrink-0 text-[var(--alert-icon)]" />
       <div className="min-w-0 flex-1">
         <p className="font-semibold">
           <span className="sr-only">{label}: </span>
@@ -196,14 +195,14 @@ export function Badge({
 }) {
   const styles = {
     neutral: "bg-soft text-ink before:bg-muted",
-    info: "bg-tile-purple/60 text-ink before:bg-violet-600",
+    info: "bg-info-50 text-info before:bg-info",
     success: "bg-success-50 text-success before:bg-success",
     warning: "bg-warning-50 text-warning before:bg-amber-500",
     danger: "bg-danger-50 text-danger before:bg-danger",
   }[tone];
   return (
     <span
-      className={`inline-flex items-center gap-1.5 whitespace-nowrap rounded-full px-2.5 py-1 text-xs font-semibold before:h-1.5 before:w-1.5 before:rounded-full before:content-[""] ${styles}`}
+      className={`inline-flex items-center gap-1.5 whitespace-nowrap rounded-md px-2 py-0.5 text-xs font-semibold before:h-1.5 before:w-1.5 before:rounded-full before:content-[""] ${styles}`}
     >
       {children}
     </span>
@@ -232,7 +231,7 @@ export function ConfirmDialog({
   triggerClassName,
   disabled,
 }: {
-  trigger: string;
+  trigger: ReactNode;
   title: string;
   children: ReactNode;
   confirmLabel: string;
@@ -255,12 +254,14 @@ export function ConfirmDialog({
       <dialog
         ref={ref}
         aria-labelledby={titleId}
-        className="m-auto w-full max-w-lg rounded-3xl border-0 p-0 shadow-2xl"
+        className="m-auto w-[calc(100%-2rem)] max-w-lg rounded-xl border border-line p-0 shadow-2xl"
       >
         <div className="p-6">
-          <h2 id={titleId}>{title}</h2>
+          <h2 id={titleId} className="text-xl">
+            {title}
+          </h2>
           <div className="mt-3 space-y-3 text-sm">{children}</div>
-          <div className="mt-6 flex justify-end gap-3">
+          <div className="mt-6 flex flex-col-reverse gap-2 sm:flex-row sm:justify-end sm:gap-3">
             <button type="button" className="btn-secondary" onClick={() => ref.current?.close()}>
               Cancel
             </button>

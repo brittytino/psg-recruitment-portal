@@ -1,14 +1,16 @@
 /**
  * Seed script (idempotent; safe to run repeatedly, including in production).
  *  1. Registers the application form templates (immutable; checksum verified).
- *  2. Creates the institutional staff accounts if they do not exist yet:
- *       dean.admn@psgtech.ac.in  — Admin (Dean)
- *       principal@psgtech.ac.in  — Admin (Principal)
- *       admin.n4@psgtech.ac.in   — HR – N4 Section
- *     New accounts get an unusable random password and a one-time set-password link (72 hours),
- *     which is e-mailed through the outbox and printed once to the console.
+ *  2. Adds the initial research specialisations, only when none exist yet (HR manages them after).
+ *  3. Ensures the CSE department and the institutional staff accounts exist with the right roles:
+ *       brittytino08@gmail.com  — Super Admin (full system access)
+ *       dean.admn@psgtech.ac.in — Admin (Dean)
+ *       principal@psgtech.ac.in — Admin (Principal)
+ *       admin.n4@psgtech.ac.in  — HR – N4 Section
+ *       hod.cse@psgtech.ac.in   — HOD, Computer Science and Engineering
+ *     Staff sign in with a one-time code e-mailed on every sign-in; no passwords are stored.
  *
- * No demo accounts, departments or HODs are created: Admin adds departments and HODs in the portal.
+ * No demo candidates, vacancies or applications are created.
  *
  * Usage: npm run db:seed   (production image: npm run db:seed:prod)
  */
@@ -86,16 +88,11 @@ const INITIAL_SPECIALISATIONS = [
 ];
 
 const STAFF: { email: string; name: string; role: Role; departmentCode?: string }[] = [
-  { email: "brittytino08@gmail.com", name: "Tino", role: "SUPER_ADMIN" },
-  { email: "dean.admn@psgtech.ac.in", name: "Dr. S. Saravanan (Dean)", role: "ADMIN" },
-  { email: "principal@psgtech.ac.in", name: "Dr. G. Thilagavathi (Principal)", role: "ADMIN" },
+  { email: "brittytino08@gmail.com", name: "System Administrator", role: "SUPER_ADMIN" },
+  { email: "dean.admn@psgtech.ac.in", name: "Dr. S. Saravanan", role: "ADMIN" },
+  { email: "principal@psgtech.ac.in", name: "Dr. G. Thilagavathi", role: "ADMIN" },
   { email: "admin.n4@psgtech.ac.in", name: "HR – N4 Section", role: "HR" },
-  {
-    email: "hod.cse@psgtech.ac.in",
-    name: "HOD Computer Science and Engineering",
-    role: "HOD",
-    departmentCode: "CSE",
-  },
+  { email: "hod.cse@psgtech.ac.in", name: "HOD – CSE", role: "HOD", departmentCode: "CSE" },
 ];
 
 async function registerTemplates() {
@@ -124,21 +121,19 @@ async function registerTemplates() {
 }
 
 async function ensureSpecialisations() {
-  for (let i = 0; i < INITIAL_SPECIALISATIONS.length; i++) {
-    const s = INITIAL_SPECIALISATIONS[i]!;
-    await prisma.researchSpecialisation.upsert({
-      where: { name: s.name },
-      update: { description: s.description, sortOrder: i + 1, active: true },
-      create: { name: s.name, description: s.description, sortOrder: i + 1, active: true },
-    });
-  }
-  console.log(`ensured ${INITIAL_SPECIALISATIONS.length} research specialisations`);
+  // Only on a fresh database: afterwards HR – N4 Section owns the list (edits are never overwritten).
+  if ((await prisma.researchSpecialisation.count()) > 0) return;
+  await prisma.researchSpecialisation.createMany({
+    data: INITIAL_SPECIALISATIONS.map((s, i) => ({ ...s, sortOrder: i + 1, active: true })),
+    skipDuplicates: true,
+  });
+  console.log(`added ${INITIAL_SPECIALISATIONS.length} initial research specialisations`);
 }
 
 async function ensureDepartments() {
   const cse = await prisma.department.upsert({
     where: { code: "CSE" },
-    update: { name: "Computer Science and Engineering", active: true },
+    update: {},
     create: {
       code: "CSE",
       name: "Computer Science and Engineering",
@@ -206,10 +201,29 @@ async function ensureStaff() {
   }
 }
 
+/** Test/demo staff accounts (reserved .test domain) must never have access in a real deployment. */
+async function disableTestAccounts() {
+  const r = await prisma.user.updateMany({
+    where: {
+      email: { endsWith: ".test" },
+      status: "ACTIVE",
+      roles: { some: { role: { not: "CANDIDATE" } } },
+    },
+    data: { status: "DISABLED" },
+  });
+  if (r.count) {
+    await prisma.session.deleteMany({
+      where: { user: { email: { endsWith: ".test" }, status: "DISABLED" } },
+    });
+    console.log(`disabled ${r.count} test staff account(s)`);
+  }
+}
+
 async function main() {
   await registerTemplates();
   await ensureSpecialisations();
   await ensureStaff();
+  await disableTestAccounts();
 }
 
 main()

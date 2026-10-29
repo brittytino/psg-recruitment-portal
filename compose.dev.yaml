@@ -12,10 +12,31 @@ services:
   clamav:
     ports: ["127.0.0.1:63310:3310"]
   mailpit:
-    ports: ["127.0.0.1:${MAILPIT_SMTP_HOST_PORT:-2525}:1025"]
-  # Modern Database viewer (development only): http://localhost:6981
+    image: axllent/mailpit:v1.27.10
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:${MAILPIT_UI_HOST_PORT:-8025}:8025"
+      - "127.0.0.1:${MAILPIT_SMTP_HOST_PORT:-2525}:1025"
+    healthcheck:
+      test: ["CMD-SHELL", "wget -q --spider http://127.0.0.1:8025/api/v1/info || exit 1"]
+      interval: 10s
+      timeout: 3s
+      retries: 5
+    networks: [backend, frontend]
+
+  # Modern Visual Database Management Tool (pgweb) accessible at http://localhost:6981
   db-viewer:
-    networks: [data, devhost]
+    image: sosedoff/pgweb:0.16.1
+    restart: unless-stopped
+    environment:
+      DATABASE_URL: postgresql://${POSTGRES_USER:-srp_owner}:${POSTGRES_PASSWORD}@db:5432/${POSTGRES_DB:-srportal}?sslmode=disable
+      PGWEB_AUTH_USER: ${DB_VIEWER_USER:-}
+      PGWEB_AUTH_PASS: ${DB_VIEWER_PASSWORD:-}
+    ports:
+      - "127.0.0.1:${DB_VIEWER_HOST_PORT:-6981}:8081"
+    depends_on:
+      db: { condition: service_healthy }
+    networks: [data, frontend, devhost]
 
 networks:
   # Ports cannot be published from an internal-only network, so the data services join an

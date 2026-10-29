@@ -124,7 +124,6 @@ export async function getOwnApplication(user: SessionUser, id: string) {
           department: true,
           discipline: true,
           researchSpecialisation: true,
-          cycle: true,
           requiredDocuments: { orderBy: { sortOrder: "asc" } },
         },
       },
@@ -449,9 +448,9 @@ export async function submit(user: SessionUser, id: string, expectedVersion: num
   const def = getFormDefinition(app.formTemplate.code as FormCode, app.formTemplate.version);
   const answers = withDerived(def, app.draftAnswers as Answers, derivedContext(app));
   const academicYear =
-    app.vacancy.cycle.academicYear && ACADEMIC_YEAR.test(app.vacancy.cycle.academicYear)
-      ? app.vacancy.cycle.academicYear
-      : academicYearOf(app.vacancy.cycle.opensAt);
+    app.vacancy.academicYear && ACADEMIC_YEAR.test(app.vacancy.academicYear)
+      ? app.vacancy.academicYear
+      : academicYearOf(app.vacancy.opensAt);
   const manifest = app.documents
     .filter((d) => !d.removedAt)
     .map((d) => ({
@@ -584,7 +583,6 @@ export async function getStaffApplication(user: SessionUser, id: string) {
           department: true,
           discipline: true,
           researchSpecialisation: true,
-          cycle: true,
           requiredDocuments: { orderBy: { sortOrder: "asc" } },
         },
       },

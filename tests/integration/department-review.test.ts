@@ -49,7 +49,7 @@ async function makeUser(role: RoleName, departmentId?: string): Promise<SessionU
     email: u.email,
     emailVerified: true,
     displayName: u.email,
-    grants: [{ role, departmentId: departmentId ?? null, cycleId: null }],
+    grants: [{ role, departmentId: departmentId ?? null }],
     sessionId: randomUUID(),
   };
 }
@@ -67,16 +67,7 @@ beforeAll(async () => {
   otherDeptId = (
     await prisma.department.create({ data: { code: `W${tag}`.slice(0, 8), name: `IT v2 other ${tag}` } })
   ).id;
-  const cycle = await prisma.recruitmentCycle.create({
-    data: {
-      code: `ITV2-${tag}`,
-      title: `IT v2 cycle ${tag}`,
-      academicYear: "2026-27",
-      opensAt: new Date(Date.now() - 86400_000),
-      closesAt: new Date(Date.now() + 86400_000),
-      status: "PUBLISHED",
-    },
-  });
+  const cycle = { opensAt: new Date(Date.now() - 86400_000), closesAt: new Date(Date.now() + 86400_000) };
   const tpl = await prisma.formTemplate.findUniqueOrThrow({
     where: { code_version: { code: "ASSOCIATE_PROFESSOR", version: 2 } },
   });
@@ -84,7 +75,6 @@ beforeAll(async () => {
     await prisma.vacancy.create({
       data: {
         code: `ITV2-${tag}-ASP`,
-        cycleId: cycle.id,
         departmentId: deptId,
         position: "ASSOCIATE_PROFESSOR",
         formTemplateId: tpl.id,

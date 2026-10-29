@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { ArrowLeftRight, CheckCircle2, Clock, Download, FileText, Plus, Users, XCircle } from "lucide-react";
 import { Form, Link, redirect, useLocation, useNavigation, useSearchParams } from "react-router";
 import type { Route } from "./+types/index";
 import { Alert, Badge, ConfirmDialog, CsrfInput, formatDate, statusTone } from "~/components/forms";
@@ -36,8 +37,8 @@ export async function loader({ request, context }: Route.LoaderArgs) {
   const q = parseListQuery(new URL(request.url));
   const [list, counts, departments, options] = await Promise.all([
     listApplications(user, q),
-    dashboardCounts(user, q.cycleId),
-    departmentCounts(user, { cycleId: q.cycleId, position: q.position }),
+    dashboardCounts(user),
+    departmentCounts(user, { position: q.position }),
     filterOptions(),
   ]);
   const canAssign = hasPermission(user.grants, "application:assign");
@@ -120,7 +121,6 @@ export default function StaffIndex({ loaderData, actionData }: Route.ComponentPr
   if (q.hod) chips.push(["hod", q.hod === "assigned" ? "With a HOD" : "Not yet with a HOD"]);
   if (q.from) chips.push(["from", `From ${q.from}`]);
   if (q.to) chips.push(["to", `To ${q.to}`]);
-  if (q.cycleId) chips.push(["cycleId", options.cycles.find((c) => c.id === q.cycleId)?.title ?? "Cycle"]);
 
   const assignableRows = list.rows.filter((r) => ASSIGNABLE.includes(r.status as AppStatus));
   const toggle = (id: string) =>
@@ -132,18 +132,19 @@ export default function StaffIndex({ loaderData, actionData }: Route.ComponentPr
   const allOnPage = assignableRows.length > 0 && assignableRows.every((r) => selected.has(r.id));
 
   return (
-    <div className="space-y-6">
+    <div className="page-stack">
       <PageHeader
+        crumbs={[["Dashboard", "/staff"], ["Applications"]]}
         eyebrow={admin ? "Admin" : "HR – N4 Section"}
         title="Applications"
-        description="All submitted applications, department-wise and research appointments. Filter, review candidates, or transition statuses."
+        description="All submitted applications for faculty and research positions. Filter, review, assign to a HOD and track status."
         actions={
           <div className="flex flex-wrap items-center gap-2">
             <Link to="/staff/summary" className="btn-secondary">
-              Summary &amp; export
+              <Download className="h-4 w-4" aria-hidden="true" /> Summary &amp; export
             </Link>
             <Link to="/admin/vacancies/new" className="btn-primary">
-              + New job profile
+              <Plus className="h-4 w-4" aria-hidden="true" /> New job profile
             </Link>
           </div>
         }
@@ -152,21 +153,21 @@ export default function StaffIndex({ loaderData, actionData }: Route.ComponentPr
       <div className="flex items-center gap-2 border-b border-line pb-3">
         <Link
           to={withParams({ recruitmentCategory: null, page: 1 })}
-          className={`chip font-semibold transition-colors ${!q.recruitmentCategory ? "bg-brand-600 text-white" : "bg-soft text-muted hover:text-ink"}`}
+          className={`chip font-semibold transition-colors ${!q.recruitmentCategory ? "bg-ink text-white" : "bg-soft text-muted hover:text-ink"}`}
         >
           All Applications
         </Link>
         <Link
           to={withParams({ recruitmentCategory: "FACULTY", page: 1 })}
-          className={`chip font-semibold transition-colors ${q.recruitmentCategory === "FACULTY" ? "bg-brand-600 text-white" : "bg-soft text-muted hover:text-ink"}`}
+          className={`chip font-semibold transition-colors ${q.recruitmentCategory === "FACULTY" ? "bg-ink text-white" : "bg-soft text-muted hover:text-ink"}`}
         >
-          🎓 Faculty
+          Faculty
         </Link>
         <Link
           to={withParams({ recruitmentCategory: "RESEARCH", page: 1 })}
-          className={`chip font-semibold transition-colors ${q.recruitmentCategory === "RESEARCH" ? "bg-emerald-600 text-white" : "bg-soft text-muted hover:text-ink"}`}
+          className={`chip font-semibold transition-colors ${q.recruitmentCategory === "RESEARCH" ? "bg-ink text-white" : "bg-soft text-muted hover:text-ink"}`}
         >
-          🔬 Research Assistant
+          Research
         </Link>
       </div>
 
@@ -178,37 +179,50 @@ export default function StaffIndex({ loaderData, actionData }: Route.ComponentPr
       )}
 
       <section aria-label="Totals" className="grid grid-cols-2 gap-3 md:grid-cols-3 xl:grid-cols-6">
-        <StatTile label="Submitted" value={counts.total} to="?" />
-        <StatTile
-          label="Not yet with a HOD"
-          value={counts.submitted}
-          to={withParams({ hod: "unassigned", status: null, page: 1 })}
-          tone="bg-tile-blue/40"
-        />
-        <StatTile
-          label="With HOD"
-          value={counts.withHod}
-          to={withParams({ status: "ASSIGNED_TO_HOD", page: 1 })}
-          tone="bg-tile-orange/40"
-        />
-        <StatTile
-          label="Accepted by HOD"
-          value={counts.hodAccepted}
-          to={withParams({ status: "HOD_ACCEPTED", page: 1 })}
-          tone="bg-tile-green/50"
-        />
-        <StatTile
-          label="Position change"
-          value={counts.hodChanged}
-          to={withParams({ status: "HOD_RECOMMENDED_CHANGE", page: 1 })}
-          tone="bg-tile-purple/50"
-        />
-        <StatTile
-          label="Rejected by HOD"
-          value={counts.hodRejected}
-          to={withParams({ status: "HOD_REJECTED", page: 1 })}
-          tone="bg-tile-pink/50"
-        />
+        {(
+          [
+            ["Submitted", counts.total, "?", FileText, "blue"],
+            [
+              "Not yet with a HOD",
+              counts.submitted,
+              withParams({ hod: "unassigned", status: null, page: 1 }),
+              Users,
+              "blue",
+            ],
+            ["With HOD", counts.withHod, withParams({ status: "ASSIGNED_TO_HOD", page: 1 }), Clock, "orange"],
+            [
+              "Accepted by HOD",
+              counts.hodAccepted,
+              withParams({ status: "HOD_ACCEPTED", page: 1 }),
+              CheckCircle2,
+              "green",
+            ],
+            [
+              "Position change",
+              counts.hodChanged,
+              withParams({ status: "HOD_RECOMMENDED_CHANGE", page: 1 }),
+              ArrowLeftRight,
+              "purple",
+            ],
+            [
+              "Rejected by HOD",
+              counts.hodRejected,
+              withParams({ status: "HOD_REJECTED", page: 1 }),
+              XCircle,
+              "red",
+            ],
+          ] as const
+        ).map(([label, value, to, icon, accent], i) => (
+          <StatTile
+            key={label}
+            label={label}
+            value={value}
+            to={to}
+            icon={icon}
+            accent={accent}
+            share={i > 0 && counts.total ? Math.round((value / counts.total) * 100) : undefined}
+          />
+        ))}
       </section>
 
       {departments.length > 0 && (
@@ -352,12 +366,6 @@ export default function StaffIndex({ loaderData, actionData }: Route.ComponentPr
               ["assigned", "With a HOD"],
             ]}
           />
-          <FilterSelect
-            name="cycleId"
-            label="Recruitment cycle"
-            value={q.cycleId}
-            options={options.cycles.map((c) => [c.id, c.title])}
-          />
           <div>
             <label htmlFor="f-from" className="block text-sm font-semibold">
               Submitted from
@@ -490,7 +498,7 @@ export default function StaffIndex({ loaderData, actionData }: Route.ComponentPr
             </EmptyState>
           </div>
         ) : (
-          <div className="overflow-x-auto">
+          <div className="table-wrap">
             <table className="table">
               <caption className="sr-only">Applications, sortable by column</caption>
               <thead>
@@ -572,7 +580,7 @@ export default function StaffIndex({ loaderData, actionData }: Route.ComponentPr
                         {r.vacancy.department?.code ? (
                           <span title={r.vacancy.department.name}>{r.vacancy.department.code}</span>
                         ) : (
-                          <span className="badge bg-emerald-100 text-emerald-800 text-xs font-semibold px-2 py-0.5 rounded">
+                          <span className="rounded bg-soft px-2 py-0.5 text-xs font-semibold text-ink">
                             RA
                           </span>
                         )}

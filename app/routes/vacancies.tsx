@@ -1,15 +1,14 @@
 import { Form, Link } from "react-router";
-import { motion } from "framer-motion";
+import { Search, X } from "lucide-react";
 import type { Route } from "./+types/vacancies";
 import { VacancyCard } from "~/components/vacancy-card";
+import { EmptyState } from "~/components/staff";
 import { POSITION_LABELS } from "~/lib/labels";
-import {
-  listDepartments,
-  listPublishedVacancies,
-  listResearchSpecialisations,
-} from "~/modules/recruitment/service.server";
+import { listDepartments, listPublishedVacancies } from "~/modules/recruitment/service.server";
 
-export const meta: Route.MetaFunction = () => [{ title: "Open vacancies — PSG Tech Careers" }];
+export const meta: Route.MetaFunction = () => [{ title: "Open vacancies — PSG Tech Recruitment" }];
+
+const FACULTY_POSITIONS = ["ASSISTANT_PROFESSOR", "ASSOCIATE_PROFESSOR", "PROFESSOR"] as const;
 
 export async function loader({ request }: Route.LoaderArgs) {
   const url = new URL(request.url);
@@ -17,20 +16,19 @@ export async function loader({ request }: Route.LoaderArgs) {
   const position = url.searchParams.get("position") || undefined;
   const category = url.searchParams.get("category") || undefined;
   const q = url.searchParams.get("q")?.trim().slice(0, 100) || undefined;
-  const [vacancies, departments, specialisations] = await Promise.all([
+  const [vacancies, departments] = await Promise.all([
     listPublishedVacancies({
       departmentId: departmentId && /^[0-9a-f-]{36}$/.test(departmentId) ? departmentId : undefined,
-      position: position && position in POSITION_LABELS ? position : undefined,
+      position:
+        position && (FACULTY_POSITIONS as readonly string[]).includes(position) ? position : undefined,
       recruitmentCategory: category === "FACULTY" || category === "RESEARCH" ? category : undefined,
       q,
     }),
     listDepartments(),
-    listResearchSpecialisations(),
   ]);
   return {
     vacancies,
-    departments,
-    specialisations,
+    departments: departments.map((d) => ({ id: d.id, name: d.name })),
     departmentId: departmentId ?? "",
     position: position ?? "",
     category: category ?? "",
@@ -41,75 +39,74 @@ export async function loader({ request }: Route.LoaderArgs) {
 export default function Vacancies({ loaderData }: Route.ComponentProps) {
   const { vacancies, departments, departmentId, position, category, q } = loaderData;
   const filtered = !!(departmentId || position || category || q);
-  return (
-    <div className="space-y-8 sm:space-y-10">
-      <motion.section
-        initial={{ opacity: 0, y: 14 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ duration: 0.5, ease: [0.16, 1, 0.3, 1] }}
-        className="hero-gradient rounded-3xl p-6 sm:p-12 lg:p-14 border border-pink-100/60 shadow-[var(--shadow-soft)]"
-      >
-        <p className="eyebrow">PSG Tech Careers</p>
-        <h1 className="mt-2 text-2xl sm:text-4xl lg:text-5xl font-extrabold text-ink">
-          Find your next academic or research position 🔎
-        </h1>
-        <p className="mt-2.5 sm:mt-3 max-w-2xl text-sm sm:text-lg text-muted leading-relaxed">
-          Explore faculty openings and research assistant positions across engineering, technology, applied
-          sciences, and advanced research centres. Apply directly online.
-        </p>
+  const qs = (c: string) => {
+    const p = new URLSearchParams();
+    if (c) p.set("category", c);
+    if (q) p.set("q", q);
+    const s = p.toString();
+    return `/vacancies${s ? `?${s}` : ""}`;
+  };
 
-        {/* Category Pill Filters */}
-        <div className="mt-6 flex flex-wrap items-center gap-2">
-          <Link
-            to={`/vacancies${q ? `?q=${encodeURIComponent(q)}` : ""}`}
-            className={`chip font-semibold transition-colors ${!category ? "bg-brand-600 text-white" : "bg-white/80 text-muted hover:text-ink hover:bg-white"}`}
-          >
-            All Openings
-          </Link>
-          <Link
-            to={`/vacancies?category=FACULTY${q ? `&q=${encodeURIComponent(q)}` : ""}`}
-            className={`chip font-semibold transition-colors ${category === "FACULTY" ? "bg-brand-600 text-white" : "bg-white/80 text-muted hover:text-ink hover:bg-white"}`}
-          >
-            🎓 Faculty Positions
-          </Link>
-          <Link
-            to={`/vacancies?category=RESEARCH${q ? `&q=${encodeURIComponent(q)}` : ""}`}
-            className={`chip font-semibold transition-colors ${category === "RESEARCH" ? "bg-emerald-600 text-white" : "bg-white/80 text-muted hover:text-ink hover:bg-white"}`}
-          >
-            🔬 Research Appointments
-          </Link>
-        </div>
+  return (
+    <div className="page-stack">
+      <header className="max-w-3xl">
+        <p className="eyebrow">Careers at PSG Tech</p>
+        <h1 className="mt-2">Open vacancies</h1>
+        <p className="mt-2 text-muted">
+          Faculty and research positions currently accepting applications. Choose a vacancy to read the
+          eligibility and apply online.
+        </p>
+      </header>
+
+      <div className="space-y-4">
+        <nav aria-label="Category" className="flex flex-wrap gap-2">
+          {(
+            [
+              ["", "All"],
+              ["FACULTY", "Faculty"],
+              ["RESEARCH", "Research"],
+            ] as const
+          ).map(([k, label]) => (
+            <Link
+              key={k}
+              to={qs(k)}
+              aria-current={category === k ? "page" : undefined}
+              className="chip px-4 py-1.5 text-sm aria-[current=page]:border-ink aria-[current=page]:bg-ink aria-[current=page]:text-white"
+            >
+              {label}
+            </Link>
+          ))}
+        </nav>
 
         <Form
           method="get"
           role="search"
           aria-label="Filter vacancies"
-          className="mt-4 grid gap-3 rounded-2xl sm:rounded-3xl bg-white p-3 sm:p-4 shadow-[var(--shadow-float)] border border-line/70 sm:grid-cols-2 lg:grid-cols-[2fr_1.3fr_1.2fr_auto]"
+          className="grid gap-3 rounded-[var(--radius-card)] border border-line bg-paper p-3 sm:grid-cols-2 sm:p-4 lg:grid-cols-[2fr_1.4fr_1.2fr_auto]"
         >
           {category && <input type="hidden" name="category" value={category} />}
-          <div>
+          <div className="relative">
             <label htmlFor="q" className="sr-only">
               Keyword
             </label>
+            <Search
+              className="pointer-events-none absolute top-1/2 left-3 h-4 w-4 -translate-y-1/2 text-muted"
+              aria-hidden="true"
+            />
             <input
               id="q"
               name="q"
               type="search"
               defaultValue={q}
-              placeholder="🔍  Search position, research area, department..."
-              className="field-input h-11 w-full"
+              placeholder="Position, department or research area"
+              className="field-input pl-9"
             />
           </div>
           <div>
             <label htmlFor="department" className="sr-only">
               Department
             </label>
-            <select
-              id="department"
-              name="department"
-              defaultValue={departmentId}
-              className="field-input h-11 w-full"
-            >
+            <select id="department" name="department" defaultValue={departmentId} className="field-input">
               <option value="">All departments</option>
               {departments.map((d) => (
                 <option key={d.id} value={d.id}>
@@ -122,72 +119,50 @@ export default function Vacancies({ loaderData }: Route.ComponentProps) {
             <label htmlFor="position" className="sr-only">
               Position
             </label>
-            <select id="position" name="position" defaultValue={position} className="field-input h-11 w-full">
+            <select id="position" name="position" defaultValue={position} className="field-input">
               <option value="">All positions</option>
-              {Object.entries(POSITION_LABELS).map(([k, v]) => (
+              {FACULTY_POSITIONS.map((k) => (
                 <option key={k} value={k}>
-                  {v}
+                  {POSITION_LABELS[k]}
                 </option>
               ))}
             </select>
           </div>
-          <button
-            type="submit"
-            className="btn-primary h-11 w-full sm:w-auto px-8 text-sm sm:text-base font-semibold"
-          >
+          <button type="submit" className="btn-primary sm:col-span-2 lg:col-span-1">
             Search
           </button>
         </Form>
-      </motion.section>
+      </div>
 
-      <div className="flex flex-wrap items-center justify-between gap-3 border-b border-line/70 pb-4">
-        <p className="text-xs sm:text-sm text-muted" role="status">
-          Showing <strong className="text-ink font-bold">{vacancies.length}</strong>{" "}
-          {vacancies.length === 1 ? "position" : "positions"} available
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <p className="text-sm text-muted" role="status">
+          <strong className="text-ink">{vacancies.length}</strong>{" "}
+          {vacancies.length === 1 ? "vacancy" : "vacancies"}
+          {filtered ? " match your search" : " open"}
         </p>
         {filtered && (
-          <Link
-            to="/vacancies"
-            className="chip no-underline hover:bg-soft text-xs font-semibold text-brand-700"
-          >
-            ✕ Clear all filters
+          <Link to="/vacancies" className="chip">
+            <X className="h-3.5 w-3.5" aria-hidden="true" /> Clear filters
           </Link>
         )}
       </div>
 
       {vacancies.length === 0 ? (
-        <div className="card text-center py-16">
-          <p className="text-5xl" aria-hidden="true">
-            🧐
-          </p>
-          <p className="mt-4 text-xl font-bold text-ink">No vacancies match your criteria</p>
-          <p className="mt-2 text-sm text-muted">Try adjusting your keywords or clearing the filters.</p>
-          <Link to="/vacancies" className="btn-secondary mt-6 inline-flex">
-            Reset search filters
-          </Link>
-        </div>
+        <EmptyState title={filtered ? "No vacancies match your search" : "No vacancies are open right now"}>
+          {filtered ? (
+            <Link to="/vacancies">Clear the filters</Link>
+          ) : (
+            "New openings are published here and in the official notification."
+          )}
+        </EmptyState>
       ) : (
-        <motion.ul
-          initial="hidden"
-          animate="visible"
-          variants={{
-            hidden: { opacity: 0 },
-            visible: { opacity: 1, transition: { staggerChildren: 0.07 } },
-          }}
-          className="grid gap-5 sm:gap-6 sm:grid-cols-2 lg:grid-cols-3"
-        >
+        <ul className="grid gap-4 sm:grid-cols-2 sm:gap-5 xl:grid-cols-3">
           {vacancies.map((v) => (
-            <motion.li
-              key={v.id}
-              variants={{
-                hidden: { opacity: 0, y: 14 },
-                visible: { opacity: 1, y: 0, transition: { duration: 0.45, ease: [0.16, 1, 0.3, 1] } },
-              }}
-            >
+            <li key={v.id}>
               <VacancyCard v={v} />
-            </motion.li>
+            </li>
           ))}
-        </motion.ul>
+        </ul>
       )}
     </div>
   );

@@ -9,13 +9,11 @@ export default function ForgotPassword() {
   return (
     <AuthShell>
       <div>
-        <h1>Passwordless Access 🔐</h1>
+        <h1>No password needed</h1>
         <div className="mt-4">
-          <Alert tone="info" title="Passwordless 6-Digit Email OTP Authentication">
-            The PSG College of Technology Staff Recruitment Portal uses passwordless authentication
-            exclusively. You do not need to create, remember, or reset a password. Every user (Candidates,
-            HODs, HR, Dean, Principal, and Super Admin) authenticates securely via a 6-digit one-time code
-            sent directly to their registered e-mail address.
+          <Alert tone="info" title="Sign in with a one-time code">
+            This portal does not use passwords. Enter your e-mail address on the sign-in page and we send a
+            6-digit code to it every time you sign in.
           </Alert>
         </div>
         <div className="mt-6">
@@ -23,7 +21,7 @@ export default function ForgotPassword() {
             to="/login"
             className="btn-primary inline-flex w-full items-center justify-center text-center"
           >
-            Sign In with 6-Digit Email OTP →
+            Sign in with an e-mail code
           </Link>
         </div>
         <p className="mt-6 text-sm">

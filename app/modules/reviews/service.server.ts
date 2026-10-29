@@ -1,7 +1,7 @@
 import type { Position, Prisma } from "@prisma/client";
 import { z } from "zod";
 import { audit } from "~/modules/audit/audit.server";
-import { hasRole, hodDepartments, isAdmin, isHrOfficer } from "~/modules/auth/permissions";
+import { hodDepartments, isAdmin, isHrOfficer } from "~/modules/auth/permissions";
 import { hrScope, requirePermission } from "~/modules/auth/policy.server";
 import type { SessionUser } from "~/modules/auth/session.server";
 import { prisma, type Tx } from "~/modules/core/db.server";
@@ -15,8 +15,9 @@ import { isAllowedChange } from "./position-policy";
 
 const fieldErrors = (e: z.ZodError) => z.flattenError(e).fieldErrors;
 
-export const cycleYear = (c: { academicYear: string | null; opensAt: Date }) =>
-  c.academicYear && ACADEMIC_YEAR.test(c.academicYear) ? c.academicYear : academicYearOf(c.opensAt);
+/** Academic year of a vacancy: its own value when set, otherwise derived from the opening date. */
+export const vacancyYear = (v: { academicYear: string | null; opensAt: Date }) =>
+  v.academicYear && ACADEMIC_YEAR.test(v.academicYear) ? v.academicYear : academicYearOf(v.opensAt);
 
 async function history(
   tx: Tx,
@@ -393,7 +394,7 @@ export async function departmentSummary(departmentId: string) {
     orderBy: [{ referenceNo: "asc" }],
     include: {
       department: { select: { name: true } },
-      vacancy: { select: { position: true, cycle: { select: { academicYear: true, opensAt: true } } } },
+      vacancy: { select: { position: true, academicYear: true, opensAt: true } },
       currentRevision: { select: { candidateName: true } },
       positionChanges: { orderBy: { createdAt: "desc" }, take: 1 },
     },
@@ -420,7 +421,7 @@ export async function departmentSummary(departmentId: string) {
       status: STATUS_LABELS[a.status as AppStatus],
     };
   });
-  const years = [...new Set(apps.map((a) => cycleYear(a.vacancy.cycle)))];
+  const years = [...new Set(apps.map((a) => vacancyYear(a.vacancy)))];
   return {
     rows,
     pending: pending.map((a) => a.referenceNo ?? a.id),

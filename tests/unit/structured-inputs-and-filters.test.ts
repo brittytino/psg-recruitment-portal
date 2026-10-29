@@ -263,7 +263,7 @@ describe("CSV Export and Formula Injection Defense", () => {
 });
 
 describe("Role-Based Access Control and Isolation", () => {
-  const g = (role: RoleGrant["role"]): RoleGrant[] => [{ role, departmentId: null, cycleId: null }];
+  const g = (role: RoleGrant["role"]): RoleGrant[] => [{ role, departmentId: null }];
 
   it("guarantees Super Admin holds all system, user, and audit permissions", () => {
     const superAdmin = g("SUPER_ADMIN");

@@ -14,7 +14,7 @@ export default function ResetPassword() {
   return (
     <AuthShell>
       <div>
-        <h1>Passwordless Authentication 🔐</h1>
+        <h1>No password needed</h1>
         <div className="mt-4">
           <Alert tone="info" title="No Password Required">
             The PSG College of Technology Staff Recruitment Portal uses passwordless sign-in exclusively. You

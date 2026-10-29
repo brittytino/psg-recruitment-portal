@@ -92,7 +92,7 @@ export async function action({ request, params, context }: Route.ActionArgs) {
 export default function SummarySheetPage({ loaderData, actionData }: Route.ComponentProps) {
   const { sheet, approver, canReopen } = loaderData;
   return (
-    <div className="space-y-6">
+    <div className="page-stack">
       <p className="text-sm">
         <Link to="/staff/summary">← Summary sheets</Link>
       </p>

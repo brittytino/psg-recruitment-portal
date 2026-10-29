@@ -92,7 +92,7 @@ describe("position-change policy", () => {
 });
 
 describe("roles", () => {
-  const g = (role: RoleGrant["role"]): RoleGrant[] => [{ role, departmentId: null, cycleId: null }];
+  const g = (role: RoleGrant["role"]): RoleGrant[] => [{ role, departmentId: null }];
   it("gives HODs review but not export, user management or position approval", () => {
     expect(hasPermission(g("HOD"), "review:record")).toBe(true);
     expect(hasPermission(g("HOD"), "application:export")).toBe(false);

@@ -96,11 +96,11 @@ describe("Authentication & Authorization Security Controls", () => {
   });
 
   describe("Role Authorization Matrix & Hierarchy", () => {
-    const superAdminGrants: RoleGrant[] = [{ role: "SUPER_ADMIN", departmentId: null, cycleId: null }];
-    const adminGrants: RoleGrant[] = [{ role: "ADMIN", departmentId: null, cycleId: null }];
-    const hrGrants: RoleGrant[] = [{ role: "HR", departmentId: null, cycleId: null }];
-    const hodGrants: RoleGrant[] = [{ role: "HOD", departmentId: "dept-cse-101", cycleId: null }];
-    const candidateGrants: RoleGrant[] = [{ role: "CANDIDATE", departmentId: null, cycleId: null }];
+    const superAdminGrants: RoleGrant[] = [{ role: "SUPER_ADMIN", departmentId: null }];
+    const adminGrants: RoleGrant[] = [{ role: "ADMIN", departmentId: null }];
+    const hrGrants: RoleGrant[] = [{ role: "HR", departmentId: null }];
+    const hodGrants: RoleGrant[] = [{ role: "HOD", departmentId: "dept-cse-101" }];
+    const candidateGrants: RoleGrant[] = [{ role: "CANDIDATE", departmentId: null }];
 
     it("preserves Super Admin (Tino) full system permissions", () => {
       expect(isSuperAdmin(superAdminGrants)).toBe(true);

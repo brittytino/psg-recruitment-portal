@@ -416,7 +416,7 @@ function RemoveButton({ label, onConfirm }: { label: string; onConfirm: () => vo
       <dialog
         ref={ref}
         aria-labelledby={titleId}
-        className="m-auto w-full max-w-md rounded-3xl border-0 p-0 shadow-2xl"
+        className="m-auto w-[calc(100%-2rem)] max-w-md rounded-xl border border-line p-0 shadow-2xl"
       >
         <div className="p-6">
           <h2 id={titleId}>Remove {label}?</h2>
