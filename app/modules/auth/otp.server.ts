@@ -7,7 +7,7 @@ import { ConflictError } from "~/modules/core/errors";
 import { logger } from "~/modules/core/logger.server";
 import { redis } from "~/modules/core/redis.server";
 import { sendOtpEmail } from "~/modules/notifications/mailer.server";
-import { rateLimit, refundRateLimit } from "./rate-limit.server";
+import { perIp, rateLimit, refundRateLimit } from "./rate-limit.server";
 
 export const OTP_TTL_MINUTES = 5;
 export const OTP_MAX_ATTEMPTS = 5;
@@ -52,7 +52,7 @@ export async function issueOtp(userId: string, purpose: OtpPurpose, ip: string):
   const ttl = await r.ttl(cooldownKey);
   if (ttl > 0) throw new ConflictError(`Please wait ${ttl} seconds before requesting another code.`);
   await rateLimit(`otp-send-${purpose}`, userId, cfg.maxSendsPerHour, 3600);
-  await rateLimit("otp-send-ip", ip, cfg.maxSendsPerHour * 4, 3600);
+  await rateLimit("otp-send-ip", ip, perIp(cfg.maxSendsPerHour * 4), 3600);
   const user = await prisma.user.findUniqueOrThrow({ where: { id: userId }, select: { email: true } });
   const code = generateCode(cfg.length);
   const challenge = await prisma.$transaction(async (tx) => {
@@ -121,7 +121,7 @@ export async function verifyOtp(
     message: "The code is incorrect or has expired. Request a new code.",
   };
   if (!/^[0-9a-f-]{36}$/.test(challengeId)) return invalid;
-  await rateLimit("otp-verify-ip", ip, 60, 900);
+  await rateLimit("otp-verify-ip", ip, perIp(60), 900);
   const c = await prisma.otpChallenge.findUnique({ where: { id: challengeId } });
   const isLoginPurpose = (p: OtpPurpose) => p === "STAFF_LOGIN" || p === "LOGIN";
   const purposeMatches =

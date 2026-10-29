@@ -1,4 +1,5 @@
 import { RateLimitedError } from "~/modules/core/errors";
+import { env } from "~/modules/core/env.server";
 import { redis } from "~/modules/core/redis.server";
 
 /**
@@ -19,6 +20,11 @@ export async function rateLimit(
     const ttl = await r.ttl(k);
     throw new RateLimitedError(ttl > 0 ? ttl : windowSeconds);
   }
+}
+
+/** Per-IP limit scaled by IP_RATE_LIMIT_MULTIPLIER (shared campus/office networks). */
+export function perIp(base: number): number {
+  return base * env().IP_RATE_LIMIT_MULTIPLIER;
 }
 
 /** Gives back one unit of a bucket, e.g. when the action failed for reasons outside the user's control. */

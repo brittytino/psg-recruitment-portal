@@ -16,6 +16,7 @@ x-app-env: &app-env
   SESSION_TTL_HOURS: ${SESSION_TTL_HOURS:-12}
   STORAGE_DIR: /var/lib/srportal/storage
   MAX_UPLOAD_MB: ${MAX_UPLOAD_MB:-10}
+  IP_RATE_LIMIT_MULTIPLIER: ${IP_RATE_LIMIT_MULTIPLIER:-30}
   CONVERTER_URL: http://converter:3100
   CONVERTER_TOKEN: ${CONVERTER_TOKEN}
   MALWARE_SCAN: ${MALWARE_SCAN:-clamav}
@@ -128,7 +129,8 @@ services:
     restart: unless-stopped
     command: ["--readonly", "--lock-session"]
     environment:
-      DATABASE_URL: postgresql://${POSTGRES_USER:-srp_owner}:${POSTGRES_PASSWORD}@db:5432/${POSTGRES_DB:-srportal}?sslmode=disable
+      # Timestamps show in IST: prod.sh sets the owner role's display timezone (stored values stay UTC).
+      PGWEB_DATABASE_URL: postgresql://${POSTGRES_USER:-srp_owner}:${POSTGRES_PASSWORD}@db:5432/${POSTGRES_DB:-srportal}?sslmode=disable
       PGWEB_AUTH_USER: ${DB_VIEWER_USER:?set DB_VIEWER_USER in .env}
       PGWEB_AUTH_PASS: ${DB_VIEWER_PASSWORD:?set DB_VIEWER_PASSWORD in .env}
     ports:

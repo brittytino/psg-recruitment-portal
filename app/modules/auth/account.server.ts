@@ -7,7 +7,7 @@ import { ValidationError } from "~/modules/core/errors";
 import { notify } from "~/modules/notifications/outbox.server";
 import { hashPassword, passwordProblems } from "./password.server";
 import { issueOtp, verifyOtp } from "./otp.server";
-import { rateLimit, refundRateLimit } from "./rate-limit.server";
+import { perIp, rateLimit, refundRateLimit } from "./rate-limit.server";
 import { createSession, destroyAllSessions, hashToken } from "./session.server";
 
 export { PRIVACY_NOTICE_VERSION } from "~/lib/privacy";
@@ -35,7 +35,7 @@ async function issueToken(userId: string, type: "EMAIL_VERIFICATION" | "PASSWORD
  * Registers a candidate with passwordless email OTP verification.
  */
 export async function registerCandidate(input: unknown, ip: string): Promise<string> {
-  await rateLimit("register", ip, 10, 3600);
+  await rateLimit("register", ip, perIp(10), 3600);
   const parsed = registerSchema.safeParse(input);
   if (!parsed.success)
     throw new ValidationError(
@@ -149,7 +149,7 @@ export async function requestLoginOtp(emailRaw: string, ip: string): Promise<Req
   const valid = z.string().email().safeParse(email);
   if (!valid.success) return { ok: false, message: "Enter a valid e-mail address." };
 
-  await rateLimit("login-ip", ip, 30, 900);
+  await rateLimit("login-ip", ip, perIp(30), 900);
   await rateLimit("login-account", hashToken(email), 10, 900);
 
   const user = await prisma.user.findUnique({ where: { email } });
@@ -244,7 +244,7 @@ export async function login(
 /** Starts password recovery. Identical response whether or not the account exists. */
 export async function requestPasswordReset(emailRaw: string, ip: string): Promise<void> {
   const email = emailRaw.trim().toLowerCase();
-  await rateLimit("reset-ip", ip, 10, 3600);
+  await rateLimit("reset-ip", ip, perIp(10), 3600);
   await rateLimit("reset-account", hashToken(email), 3, 3600);
   const user = await prisma.user.findUnique({ where: { email } });
   if (!user || user.status !== "ACTIVE") return;
@@ -266,7 +266,7 @@ export async function requestPasswordReset(emailRaw: string, ip: string): Promis
 }
 
 export async function resetPassword(token: string, password: string, ip: string): Promise<void> {
-  await rateLimit("reset-confirm", ip, 20, 3600);
+  await rateLimit("reset-confirm", ip, perIp(20), 3600);
   const invalid = new ValidationError("This reset link is invalid or has expired. Please request a new one.");
   if (!/^[A-Za-z0-9_-]{43}$/.test(token)) throw invalid;
   const t = await prisma.authToken.findUnique({

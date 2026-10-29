@@ -13,6 +13,11 @@ const schema = z.object({
   SESSION_TTL_HOURS: z.coerce.number().int().min(1).max(72).default(12),
   STORAGE_DIR: z.string().min(1),
   MAX_UPLOAD_MB: z.coerce.number().int().min(1).max(50).default(10),
+  /**
+   * Scales every per-IP rate limit. Campus users share one public IP (NAT), so per-IP limits must be
+   * generous; per-account limits are unaffected and still protect individual accounts.
+   */
+  IP_RATE_LIMIT_MULTIPLIER: z.coerce.number().int().min(1).max(1000).default(30),
   CONVERTER_URL: z.string().url(),
   CONVERTER_TOKEN: z.string().default(""),
   MALWARE_SCAN: z.enum(["clamav", "disabled"]).default("clamav"),

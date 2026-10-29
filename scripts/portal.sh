@@ -326,6 +326,8 @@ SELECT format('CREATE ROLE %I LOGIN SUPERUSER', :'owner') WHERE NOT EXISTS (SELE
 SELECT format('ALTER ROLE %I WITH LOGIN PASSWORD %L', :'owner', :'owner_pw') \gexec
 SELECT format('CREATE ROLE %I LOGIN', :'app') WHERE NOT EXISTS (SELECT FROM pg_roles WHERE rolname = :'app') \gexec
 SELECT format('ALTER ROLE %I WITH LOGIN PASSWORD %L', :'app', :'app_pw') \gexec
+-- The DB viewer connects as the owner: show its timestamps in IST (storage stays UTC; the app role is unaffected).
+SELECT format('ALTER ROLE %I SET timezone = %L', :'owner', 'Asia/Kolkata') \gexec
 SELECT format('CREATE DATABASE %I OWNER %I', :'db', :'owner') WHERE NOT EXISTS (SELECT FROM pg_database WHERE datname = :'db') \gexec
 SQL
     die "Could not align the database passwords with .env (see the error above)."
