@@ -14,7 +14,7 @@ server {
     ssl_certificate_key /etc/letsencrypt/live/recruitment.example.edu/privkey.pem;
     ssl_protocols TLSv1.2 TLSv1.3;
     server_tokens off;
-    client_max_body_size 12m;
+    client_max_body_size 25m;
     add_header Strict-Transport-Security "max-age=31536000; includeSubDomains" always;
     location = /healthz/ready { allow 127.0.0.1; deny all; proxy_pass http://app_active; }
     location / { proxy_pass http://app_active; include /etc/nginx/proxy_params.conf; }

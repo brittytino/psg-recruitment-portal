@@ -8,6 +8,7 @@ export default [
   route("help", "routes/help.tsx"),
   route("privacy", "routes/privacy.tsx"),
   route("open-positions.pdf", "routes/files/notice.ts"),
+  route("research-positions.pdf", "routes/files/notice.ts", { id: "research-notice" }),
 
   // Account
   route("register", "routes/auth/register.tsx"),

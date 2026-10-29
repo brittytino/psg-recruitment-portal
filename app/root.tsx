@@ -67,7 +67,7 @@ function staffNav(grants: RoleGrant[]): { title: string; items: NavItem[] }[] {
   if (hasPermission(grants, "department:manage"))
     setup.push({ to: "/admin/departments", label: "Departments & HODs", icon: Building2 });
   if (hasPermission(grants, "notice:manage"))
-    setup.push({ to: "/admin/notices", label: "Open positions PDF", icon: FileText });
+    setup.push({ to: "/admin/notices", label: "Open positions PDFs", icon: FileText });
 
   const system: NavItem[] = [];
   if (hasPermission(grants, "user:manage"))

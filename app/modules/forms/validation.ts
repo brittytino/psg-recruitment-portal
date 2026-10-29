@@ -1,3 +1,4 @@
+import { todayIst } from "~/lib/dates";
 import { z } from "zod";
 import {
   formatYearsMonths,
@@ -168,7 +169,7 @@ const rowsOf = (a: Record<string, unknown>, k: string): TableRow[] =>
 
 /** Cross-field rules that the source forms imply. */
 function checkCrossField(def: FormDefinition, a: Answers, mode: ValidationMode, issues: FieldIssue[]) {
-  const today = new Date().toISOString().slice(0, 10);
+  const today = todayIst();
   const dob = a.dateOfBirth;
   if (typeof dob === "string" && validDate(dob) && dob >= today)
     issues.push({ path: "dateOfBirth", sectionId: "personal", message: "Date of birth must be in the past" });

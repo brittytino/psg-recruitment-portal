@@ -78,7 +78,7 @@ Backups go to `backups/<timestamp>/` (database dump + uploaded files). Copy them
 | --- | --- |
 | Uploaded documents (photos, signatures, certificates, PDFs) | Docker volume `psg-srportal_storage`, folder `uploads/<2 chars>/<random id>.<pdf, jpg or png>` |
 | Generated application PDFs and consolidated bundles | Same volume, folder `generated/<application id>/` |
-| Open-positions notice PDFs | Same volume, folder `generated/notices/` |
+| Open-positions PDFs (Faculty: `/open-positions.pdf`, Research: `/research-positions.pdf`) | Same volume, folder `generated/notices/` |
 | Which file belongs to whom | Database tables `application_documents` and `generated_documents`; readable views `reports.documents` and `reports.generated_pdfs` |
 
 On the server the volume is at `/var/lib/docker/volumes/psg-srportal_storage/_data/` (inside the app
@@ -89,7 +89,7 @@ application bundle. `./prod.sh backup` copies the database and this volume to `b
 
 ## Upload size limit (413 errors)
 
-Nginx's default request limit is 1 MB, which rejects most PDFs with **413 Request Entity Too Large**.
+Candidates may upload files of up to 20 MB (`MAX_UPLOAD_MB`). Nginx's default request limit is 1 MB, which rejects most PDFs with **413 Request Entity Too Large**.
 `./prod.sh` sets `client_max_body_size 25m` for every site on this server
 (`/etc/nginx/conf.d/psg-uploads.conf`). Check from any computer:
 

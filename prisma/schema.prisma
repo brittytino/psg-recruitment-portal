@@ -767,6 +767,8 @@ model SummarySheet {
 model PublicNotice {
   id           String   @id @default(uuid()) @db.Uuid
   title        String
+  /// FACULTY or RESEARCH: which "open positions" button on the home page opens this PDF.
+  category     String   @default("FACULTY")
   originalName String
   storageKey   String   @unique
   sizeBytes    Int
@@ -775,6 +777,6 @@ model PublicNotice {
   uploadedById String   @db.Uuid
   uploadedAt   DateTime @default(now()) @db.Timestamptz(3)
 
-  @@index([active, uploadedAt])
+  @@index([category, active, uploadedAt])
   @@map("public_notices")
 }

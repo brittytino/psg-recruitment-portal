@@ -1,17 +1,27 @@
 import { Readable } from "node:stream";
 import type { Route } from "./+types/notice";
-import { currentNotice } from "~/modules/notices/service.server";
+import { currentNotice, type NoticeCategory } from "~/modules/notices/service.server";
 import { streamFile } from "~/modules/documents/storage.server";
 
-/** Public: the "Open positions" PDF uploaded by HR – N4 Section, opened inline in the browser. */
-export async function loader(_: Route.LoaderArgs) {
-  const n = await currentNotice();
-  if (!n) throw new Response("No open positions notice has been published yet.", { status: 404 });
+/**
+ * Public: the "open positions" PDFs uploaded by HR – N4 Section, opened inline in the browser.
+ * /open-positions.pdf is the Faculty notice, /research-positions.pdf the Research notice.
+ */
+export async function loader({ request }: Route.LoaderArgs) {
+  const category: NoticeCategory = new URL(request.url).pathname.startsWith("/research")
+    ? "RESEARCH"
+    : "FACULTY";
+  const n = await currentNotice(category);
+  if (!n)
+    throw new Response(
+      `No ${category === "RESEARCH" ? "research" : "faculty"} positions notice has been published yet.`,
+      { status: 404 },
+    );
   return new Response(Readable.toWeb(streamFile(n.storageKey)) as ReadableStream, {
     headers: {
       "Content-Type": "application/pdf",
       "Content-Length": String(n.sizeBytes),
-      "Content-Disposition": `inline; filename="psg-tech-open-positions.pdf"`,
+      "Content-Disposition": `inline; filename="psg-tech-${category === "RESEARCH" ? "research" : "faculty"}-positions.pdf"`,
       "Cache-Control": "public, max-age=300",
       ETag: `"${n.sha256.slice(0, 32)}"`,
       "X-Content-Type-Options": "nosniff",

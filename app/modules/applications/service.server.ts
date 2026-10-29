@@ -1,3 +1,4 @@
+import { todayIst } from "~/lib/dates";
 import { createHash } from "node:crypto";
 import { Prisma, type Application, type ApplicationStatus } from "@prisma/client";
 import { audit } from "~/modules/audit/audit.server";
@@ -6,7 +7,7 @@ import { hrScope, staffApplicationScope } from "~/modules/auth/policy.server";
 import type { SessionUser } from "~/modules/auth/session.server";
 import { prisma, type Tx } from "~/modules/core/db.server";
 import { ConflictError, ForbiddenError, NotFoundError, ValidationError } from "~/modules/core/errors";
-import { getFormDefinition } from "~/modules/forms/registry";
+import { allFields, getFormDefinition } from "~/modules/forms/registry";
 import type { Answers, FormCode, FormDefinition, TableRow } from "~/modules/forms/types";
 import { periodDuration, totalDuration } from "~/modules/forms/experience";
 import {
@@ -30,7 +31,7 @@ import {
   type RecruitmentCategory,
 } from "./workflow";
 
-const today = () => new Date().toISOString().slice(0, 10);
+const today = () => todayIst();
 
 /** Deterministic JSON (sorted keys) so the answers hash is stable. */
 export function canonicalJson(v: unknown): string {
@@ -428,8 +429,44 @@ async function nextResearchReference(tx: Tx, academicYear: string): Promise<stri
  * job and receipt notification (via the outbox). The row is locked to serialise concurrent
  * submissions; the version check rejects submitting a stale view.
  */
-export async function submit(user: SessionUser, id: string, expectedVersion: number) {
-  const app = await getOwnApplication(user, id);
+/** Key of the "Place" / "Station" field of the declaration, if the form has one. */
+export function declarationPlaceKey(def: FormDefinition): "place" | "station" | null {
+  const keys = new Set(allFields(def).map((f) => f.key));
+  return keys.has("place") ? "place" : keys.has("station") ? "station" : null;
+}
+
+/**
+ * Place and date of the declaration, fixed at submission: the place the candidate confirmed on the
+ * review page and the date of submission (IST). Both are mandatory on the printed application.
+ */
+function applyDeclaration(def: FormDefinition, draft: Answers, place: string | undefined): Answers {
+  const out: Answers = { ...draft };
+  const key = declarationPlaceKey(def);
+  if (key && place !== undefined) {
+    const p = place.trim();
+    if (p.length < 2 || p.length > 100)
+      throw new ValidationError("Enter the place (city or town) where you are signing the declaration", {
+        place: ["Enter the place, e.g. Coimbatore"],
+      });
+    out[key] = p;
+  }
+  const dateField = allFields(def).find((f) => f.key === "declarationDate");
+  if (dateField && dateField.kind !== "derived") out.declarationDate = todayIst();
+  return out;
+}
+
+export async function submit(
+  user: SessionUser,
+  id: string,
+  expectedVersion: number,
+  declaration: { place?: string } = {},
+) {
+  const loaded = await getOwnApplication(user, id);
+  const declDef = getFormDefinition(loaded.formTemplate.code as FormCode, loaded.formTemplate.version);
+  const app = {
+    ...loaded,
+    draftAnswers: applyDeclaration(declDef, loaded.draftAnswers as Answers, declaration.place),
+  };
   const transition = findTransition(app.status as AppStatus, "SUBMITTED", "candidate");
   if (!transition)
     throw new ConflictError(
@@ -499,6 +536,7 @@ export async function submit(user: SessionUser, id: string, expectedVersion: num
           submittedAt: new Date(),
           currentRevisionId: revision.id,
           processingStatus: "QUEUED",
+          draftAnswers: app.draftAnswers as Prisma.InputJsonObject,
           draftVersion: { increment: 1 },
         },
       });

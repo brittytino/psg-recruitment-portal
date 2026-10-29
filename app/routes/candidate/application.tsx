@@ -1,3 +1,4 @@
+import { todayIst } from "~/lib/dates";
 import { useEffect, useMemo, useRef, useState } from "react";
 import {
   data,
@@ -138,7 +139,7 @@ export default function ApplicationEditor({ loaderData }: Route.ComponentProps) 
   const dirtyRef = useRef(false);
   dirtyRef.current = dirty;
 
-  const today = new Date().toISOString().slice(0, 10);
+  const today = todayIst();
   const derived = useMemo(
     () =>
       computeDerived(def, answers, {

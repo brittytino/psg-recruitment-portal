@@ -1,5 +1,6 @@
+import { todayIst } from "~/lib/dates";
 import { useEffect, useId, useMemo, useRef, useState } from "react";
-import { postUpload } from "~/lib/upload-client";
+import { postUpload, tooLargeMessage } from "~/lib/upload-client";
 import { useParams } from "react-router";
 import { useCsrf } from "~/components/forms";
 import { DOCUMENT_TYPE_LABELS, type DocType } from "~/modules/documents/policy";
@@ -16,7 +17,7 @@ import type {
 } from "~/modules/forms/types";
 import { conditionMet, rowDuration, type FieldIssue } from "~/modules/forms/validation";
 
-const todayIso = () => new Date().toISOString().slice(0, 10);
+const todayIso = () => todayIst();
 /** Scalars sit in a two-column grid; tables, lists, long text and wide fields span both columns. */
 const fullWidth = (f: FieldDef) =>
   f.kind === "table" || f.kind === "list" || f.kind === "textarea" || !!f.wide;
@@ -670,9 +671,9 @@ function InlineAttachmentEditor({
       setUploadError("Unable to upload document: session context is missing. Please reload the page.");
       return;
     }
-    const maxBytes = (maxUploadMb ?? 10) * 1024 * 1024;
-    if (file.size > maxBytes) {
-      setUploadError(`File is too large. Maximum allowed size is ${maxUploadMb ?? 10} MB.`);
+    const big = tooLargeMessage(file, maxUploadMb ?? 10);
+    if (big) {
+      setUploadError(big);
       if (fileInputRef.current) fileInputRef.current.value = "";
       return;
     }
@@ -690,7 +691,7 @@ function InlineAttachmentEditor({
         setUploadError(data.formError || "Upload failed. Please check that the file is not damaged.");
       }
     } catch {
-      setUploadError("Could not connect to upload file. Please try again.");
+      setUploadError("The upload could not be completed. Please try again.");
     } finally {
       setUploading(false);
       if (fileInputRef.current) fileInputRef.current.value = "";
@@ -784,7 +785,7 @@ function InlineAttachmentEditor({
             )}
           </label>
           <p className="mt-0.5 text-xs text-muted">
-            {config.help ?? `Upload PDF, JPEG, or PNG up to ${maxUploadMb ?? 10} MB`}
+            {config.help ?? `PDF, JPG or PNG · maximum ${maxUploadMb ?? 10} MB per file`}
           </p>
         </div>
         {config.allowedDocTypes && config.allowedDocTypes.length > 1 && (

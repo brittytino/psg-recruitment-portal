@@ -1,5 +1,5 @@
 import { useRef, useState } from "react";
-import { postUpload } from "~/lib/upload-client";
+import { postUpload, tooLargeMessage } from "~/lib/upload-client";
 import { useRevalidator } from "react-router";
 import { Badge, useCsrf } from "~/components/forms";
 import { DOCUMENT_TYPE_LABELS, IMAGE_ONLY_TYPES, type DocType } from "~/modules/documents/policy";
@@ -113,7 +113,7 @@ function GroupCard({
       if (!data.ok) setError(data.formError ?? "The file could not be uploaded.");
       revalidator.revalidate();
     } catch {
-      setError("Could not reach the server. Check your connection and try again.");
+      setError("The upload could not be completed. Please try again.");
     } finally {
       setBusy(false);
       if (input.current) input.current.value = "";
@@ -122,8 +122,14 @@ function GroupCard({
 
   const upload = (file: File | undefined) => {
     if (!file) return;
-    if (file.size > maxUploadMb * 1024 * 1024) {
-      setError(`The file is larger than ${maxUploadMb} MB.`);
+    const big = imageOnly
+      ? file.size > 2 * 1024 * 1024
+        ? "The image is larger than 2 MB. Take a smaller photo or reduce its size and upload again."
+        : null
+      : tooLargeMessage(file, maxUploadMb);
+    if (big) {
+      setError(big);
+      if (input.current) input.current.value = "";
       return;
     }
     const fd = new FormData();
@@ -214,10 +220,10 @@ function GroupCard({
           />
           <p className="mt-1.5 text-xs text-muted">
             {imageOnly
-              ? "JPEG or PNG, up to 2 MB."
+              ? "JPG or PNG · maximum 2 MB."
               : type === "RESUME"
-                ? `PDF, up to ${maxUploadMb} MB.`
-                : `PDF, JPEG or PNG, up to ${maxUploadMb} MB each.`}
+                ? `PDF only · maximum ${maxUploadMb} MB.`
+                : `PDF, JPG or PNG · maximum ${maxUploadMb} MB per file.`}
           </p>
         </div>
       )}

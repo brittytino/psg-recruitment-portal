@@ -5,7 +5,9 @@ import { AnswerView } from "~/components/application-form";
 import { Alert, CsrfInput, ErrorSummary } from "~/components/forms";
 import { handleAction, readForm, requireUser } from "~/lib/http.server";
 import { FORM_LABELS } from "~/lib/labels";
+import { todayIst } from "~/lib/dates";
 import {
+  declarationPlaceKey,
   derivedContext,
   getOwnApplication,
   submissionIssues,
@@ -23,9 +25,16 @@ export async function loader({ request, params, context }: Route.LoaderArgs) {
   const user = requireUser(context, request);
   const app = await getOwnApplication(user, params.id);
   if (!EDITABLE.includes(app.status as AppStatus)) throw redirect(`/applications/${app.id}/receipt`);
-  const issues = await submissionIssues(app);
+  const all = await submissionIssues(app);
   const def = getFormDefinition(app.formTemplate.code as FormCode, app.formTemplate.version);
+  // Place is entered next to the declaration below, so it is not listed as a missing item.
+  const placeKey = declarationPlaceKey(def);
+  const issues = { ...all, field: all.field.filter((i) => i.path !== placeKey) };
+  const draft = app.draftAnswers as Answers;
   return {
+    placeKey,
+    place: placeKey && typeof draft[placeKey] === "string" ? (draft[placeKey] as string) : "",
+    today: todayIst(),
     id: app.id,
     status: app.status,
     formCode: app.formTemplate.code as FormCode,
@@ -46,7 +55,10 @@ export async function action({ request, params, context }: Route.ActionArgs) {
   return handleAction(async () => {
     if (form.get("declaration") !== "yes")
       return { formError: "Tick the declaration to confirm that the information is correct." };
-    await submit(user, params.id, Number(form.get("version")));
+    const place = form.get("place");
+    await submit(user, params.id, Number(form.get("version")), {
+      place: typeof place === "string" ? place : undefined,
+    });
     throw redirect(`/applications/${params.id}/receipt?submitted=1`);
   });
 }
@@ -65,6 +77,13 @@ export default function Review({ loaderData: L, actionData }: Route.ComponentPro
     def.preservedText.find((p) => p.id === "declaration")?.text ??
     "I declare that the information given in this application is true and complete to the best of my knowledge.";
   const submitting = nav.state !== "idle";
+  const placeError =
+    actionData && "fieldErrors" in actionData
+      ? (actionData.fieldErrors as Record<string, string[] | undefined> | undefined)?.place?.[0]
+      : undefined;
+  const [place, setPlace] = useState(L.place);
+  const placeOk = !L.placeKey || place.trim().length >= 2;
+  const shownDate = `${L.today.slice(8, 10)}-${L.today.slice(5, 7)}-${L.today.slice(0, 4)}`;
   return (
     <div className="page-stack mx-auto max-w-5xl">
       <nav aria-label="Breadcrumb" className="text-sm">
@@ -213,8 +232,51 @@ export default function Review({ loaderData: L, actionData }: Route.ComponentPro
             />
             <span>{declaration}</span>
           </label>
+          <div className="grid gap-4 sm:grid-cols-2">
+            {L.placeKey && (
+              <div className="space-y-1">
+                <label htmlFor="decl-place" className="block text-sm font-medium">
+                  Place{" "}
+                  <span className="text-danger" aria-hidden="true">
+                    *
+                  </span>
+                </label>
+                <input
+                  id="decl-place"
+                  name="place"
+                  required
+                  minLength={2}
+                  maxLength={100}
+                  autoComplete="address-level2"
+                  placeholder="e.g. Coimbatore"
+                  value={place}
+                  onChange={(e) => setPlace(e.target.value)}
+                  aria-invalid={!!placeError}
+                  aria-describedby="decl-place-hint"
+                  className="field-input"
+                  disabled={blocking > 0}
+                />
+                <p id="decl-place-hint" className={placeError ? "text-sm text-danger" : "text-xs text-muted"}>
+                  {placeError ?? "City or town where you are signing. Printed on your application."}
+                </p>
+              </div>
+            )}
+            <div className="space-y-1">
+              <p className="block text-sm font-medium">Date</p>
+              <p className="field-input flex items-center bg-soft text-ink" aria-describedby="decl-date-hint">
+                {shownDate}
+              </p>
+              <p id="decl-date-hint" className="text-xs text-muted">
+                The date of submission is printed automatically.
+              </p>
+            </div>
+          </div>
           <div className="flex flex-wrap items-center gap-3">
-            <button type="submit" className="btn-primary" disabled={blocking > 0 || !agree || submitting}>
+            <button
+              type="submit"
+              className="btn-primary"
+              disabled={blocking > 0 || !agree || !placeOk || submitting}
+            >
               {submitting
                 ? "Submitting…"
                 : L.status === "NEEDS_CLARIFICATION"

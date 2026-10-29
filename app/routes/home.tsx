@@ -15,7 +15,8 @@ import type { Route } from "./+types/home";
 import { formatDate } from "~/components/forms";
 import { VacancyCard } from "~/components/vacancy-card";
 import { listPublishedVacancies } from "~/modules/recruitment/service.server";
-import { currentNotice } from "~/modules/notices/service.server";
+import { NOTICE_PATHS } from "~/modules/notices/categories";
+import { currentNotices } from "~/modules/notices/service.server";
 
 export const meta: Route.MetaFunction = () => [
   { title: "Recruitment — PSG College of Technology" },
@@ -26,11 +27,11 @@ export const meta: Route.MetaFunction = () => [
 ];
 
 export async function loader() {
-  const [vacancies, notice] = await Promise.all([listPublishedVacancies(), currentNotice()]);
+  const [vacancies, notices] = await Promise.all([listPublishedVacancies(), currentNotices()]);
   return {
     vacancies: vacancies.slice(0, 6),
     nextClosing: vacancies[0]?.closesAt ?? null,
-    notice: notice ? { title: notice.title, uploadedAt: notice.uploadedAt } : null,
+    notices,
   };
 }
 
@@ -56,10 +57,24 @@ const fade = {
 };
 
 export default function Home({ loaderData }: Route.ComponentProps) {
-  const { vacancies, nextClosing, notice } = loaderData;
-  const openPositions = notice
-    ? { href: "/open-positions.pdf", external: true }
-    : { href: "/vacancies", external: false };
+  const { vacancies, nextClosing, notices: published } = loaderData;
+  const notices = (
+    [
+      ["FACULTY", "Faculty positions", GraduationCap, true],
+      ["RESEARCH", "Research positions", FlaskConical, false],
+    ] as const
+  ).map(([category, label, Icon, primary]) => {
+    const n = published[category];
+    return {
+      label,
+      Icon,
+      primary,
+      pdf: !!n,
+      href: n ? NOTICE_PATHS[category] : `/vacancies?category=${category}`,
+      sub: n ? `PDF · ${formatDate(n.uploadedAt)}` : "View current openings",
+    };
+  });
+  const anyPdf = notices.some((n) => n.pdf);
 
   return (
     <div className="relative">
@@ -79,45 +94,56 @@ export default function Home({ loaderData }: Route.ComponentProps) {
             </p>
             <h1
               id="hero"
-              className="mt-6 font-display text-[2.6rem] leading-[1.06] font-semibold tracking-tight text-navy-800 sm:text-6xl xl:text-[4.25rem]"
+              className="mt-5 font-display text-[2.1rem] leading-[1.1] font-semibold tracking-tight text-navy-800 sm:text-[2.75rem] xl:text-[3.25rem]"
             >
               Join PSG College of Technology
-              <span className="mt-2 block text-brand-600">
-                Shape the future through education and research.
-              </span>
             </h1>
-            <p className="mt-6 max-w-2xl text-base leading-relaxed text-muted sm:text-lg">
-              We invite applications from eligible candidates for Faculty and Research positions across
-              various departments. Explore the openings, review the details and submit your application
-              online.
+            <p className="mt-3 font-display text-xl leading-snug font-medium text-brand-600 sm:text-2xl xl:text-[1.75rem]">
+              Shape the future through education and research.
             </p>
-            <div className="mt-9 flex flex-col gap-3 sm:flex-row">
-              {openPositions.external ? (
-                <a
-                  href={openPositions.href}
-                  target="_blank"
-                  rel="noreferrer"
-                  className="btn-primary btn-lg px-7"
-                >
-                  <FileText className="h-5 w-5" aria-hidden="true" /> View open positions
-                  <ArrowRight className="h-4 w-4" aria-hidden="true" />
-                </a>
-              ) : (
-                <Link to={openPositions.href} className="btn-primary btn-lg px-7">
-                  <FileText className="h-5 w-5" aria-hidden="true" /> View open positions
-                  <ArrowRight className="h-4 w-4" aria-hidden="true" />
-                </Link>
-              )}
-              <Link
-                to="/help"
-                className="btn btn-lg border border-brand-600 bg-paper px-7 text-brand-700 hover:bg-brand-50 hover:text-brand-800"
-              >
-                How to apply
-              </Link>
+            <p className="mt-5 max-w-xl text-[15px] leading-relaxed text-muted sm:text-base">
+              We invite applications from eligible candidates for Faculty and Research positions across
+              various departments. Read the official notification, then apply online.
+            </p>
+
+            <div className="mt-8 grid max-w-xl gap-3 sm:grid-cols-2">
+              {notices.map((n) => {
+                const inner = (
+                  <>
+                    <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-white/15">
+                      <n.Icon className="h-5 w-5" aria-hidden="true" />
+                    </span>
+                    <span className="min-w-0 flex-1 text-left">
+                      <span className="block text-[15px] leading-tight font-semibold">{n.label}</span>
+                      <span className="mt-0.5 block text-xs font-normal opacity-80">{n.sub}</span>
+                    </span>
+                    <ArrowRight
+                      className="h-4 w-4 shrink-0 transition-transform group-hover:translate-x-0.5"
+                      aria-hidden="true"
+                    />
+                  </>
+                );
+                const cls = `group flex items-center gap-3 rounded-xl px-4 py-3.5 no-underline shadow-sm transition-colors ${
+                  n.primary
+                    ? "bg-brand-600 text-white hover:bg-brand-700 hover:text-white"
+                    : "bg-navy-800 text-white hover:bg-navy-900 hover:text-white"
+                }`;
+                return n.pdf ? (
+                  <a key={n.label} href={n.href} target="_blank" rel="noreferrer" className={cls}>
+                    {inner}
+                  </a>
+                ) : (
+                  <Link key={n.label} to={n.href} className={cls}>
+                    {inner}
+                  </Link>
+                );
+              })}
             </div>
-            <p className="mt-5 text-sm text-muted">
-              Applications must be submitted online with the required supporting documents.
-              {notice ? ` Latest notification: ${notice.title} (${formatDate(notice.uploadedAt)}).` : ""}
+            <p className="mt-5 flex flex-wrap items-center gap-x-4 gap-y-2 text-sm text-muted">
+              <Link to="/help" className="inline-flex items-center gap-1 font-semibold text-brand-700">
+                How to apply <ArrowRight className="h-3.5 w-3.5" aria-hidden="true" />
+              </Link>
+              <span>Applications are accepted online only.</span>
             </p>
           </div>
 
@@ -197,11 +223,13 @@ export default function Home({ loaderData }: Route.ComponentProps) {
               )}
             </div>
             <div className="flex flex-wrap gap-2">
-              {notice && (
-                <a href="/open-positions.pdf" target="_blank" rel="noreferrer" className="btn-secondary">
-                  <FileText className="h-4 w-4" aria-hidden="true" /> Notification PDF
-                </a>
-              )}
+              {notices
+                .filter((n) => n.pdf)
+                .map((n) => (
+                  <a key={n.label} href={n.href} target="_blank" rel="noreferrer" className="btn-secondary">
+                    <FileText className="h-4 w-4" aria-hidden="true" /> {n.label} PDF
+                  </a>
+                ))}
               <Link to="/vacancies" className="btn-secondary">
                 All vacancies <ArrowRight className="h-4 w-4" aria-hidden="true" />
               </Link>
@@ -212,7 +240,7 @@ export default function Home({ loaderData }: Route.ComponentProps) {
               <p className="font-display text-xl font-semibold text-ink">No vacancies are open right now</p>
               <p className="mx-auto mt-2 max-w-md text-sm text-muted">
                 New openings appear here as soon as they are published.
-                {notice ? " The latest recruitment notification is available as a PDF above." : ""}
+                {anyPdf ? " The latest recruitment notification is available as a PDF above." : ""}
               </p>
             </div>
           ) : (

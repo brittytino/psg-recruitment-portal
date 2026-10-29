@@ -7,21 +7,31 @@ import { env } from "~/modules/core/env.server";
 import { NotFoundError, ValidationError } from "~/modules/core/errors";
 import { sanitizeFilename } from "~/modules/documents/policy";
 import { scanBytes } from "~/modules/documents/scan.server";
+import { pdfHeaderOffset } from "~/modules/documents/pdf-normalize.server";
+import { NOTICE_CATEGORIES, NOTICE_LABELS, NOTICE_PATHS, type NoticeCategory } from "./categories";
 import { newKey, putFile } from "~/modules/documents/storage.server";
 
 /**
  * "Open positions" notice: a PDF uploaded by HR – N4 Section and linked from the landing page.
  * Only the newest active notice is public; older uploads are kept for the record.
  */
-export const NOTICE_MAX_MB = 10;
+export const NOTICE_MAX_MB = 20;
+export { NOTICE_CATEGORIES, NOTICE_LABELS, NOTICE_PATHS, type NoticeCategory };
 
-/** The notice currently shown on the landing page, or null. */
-export function currentNotice() {
+/** The notice of one category currently shown on the landing page, or null. */
+export function currentNotice(category: NoticeCategory) {
   return prisma.publicNotice.findFirst({
-    where: { active: true },
+    where: { active: true, category },
     orderBy: { uploadedAt: "desc" },
     select: { id: true, title: true, sizeBytes: true, uploadedAt: true, storageKey: true, sha256: true },
   });
+}
+
+/** Both public notices (Faculty and Research), for the home page. */
+export async function currentNotices() {
+  const [faculty, research] = await Promise.all([currentNotice("FACULTY"), currentNotice("RESEARCH")]);
+  const pick = (n: typeof faculty) => (n ? { title: n.title, uploadedAt: n.uploadedAt } : null);
+  return { FACULTY: pick(faculty), RESEARCH: pick(research) };
 }
 
 export function listNotices(user: SessionUser | null) {
@@ -29,14 +39,32 @@ export function listNotices(user: SessionUser | null) {
   return prisma.publicNotice.findMany({
     orderBy: { uploadedAt: "desc" },
     take: 20,
-    select: { id: true, title: true, originalName: true, sizeBytes: true, active: true, uploadedAt: true },
+    select: {
+      id: true,
+      title: true,
+      category: true,
+      originalName: true,
+      sizeBytes: true,
+      active: true,
+      uploadedAt: true,
+    },
   });
 }
 
 const titleSchema = z.string().trim().min(3, "Enter a title for the notice").max(150);
 
-export async function uploadNotice(user: SessionUser | null, titleRaw: unknown, file: unknown) {
+export async function uploadNotice(
+  user: SessionUser | null,
+  categoryRaw: unknown,
+  titleRaw: unknown,
+  file: unknown,
+) {
   const u = requirePermission(user, "notice:manage");
+  const category = NOTICE_CATEGORIES.find((c) => c === categoryRaw);
+  if (!category)
+    throw new ValidationError("Please correct the highlighted fields", {
+      category: ["Choose Faculty or Research"],
+    });
   const title = titleSchema.safeParse(titleRaw);
   if (!title.success)
     throw new ValidationError("Please correct the highlighted fields", {
@@ -49,8 +77,8 @@ export async function uploadNotice(user: SessionUser | null, titleRaw: unknown, 
       file: [`Maximum ${NOTICE_MAX_MB} MB`],
     });
   const bytes = new Uint8Array(await file.arrayBuffer());
-  // Check the real content, not the browser-supplied type: a PDF starts with "%PDF-".
-  if (new TextDecoder().decode(bytes.subarray(0, 5)) !== "%PDF-")
+  // Check the real content, not the browser-supplied type: a PDF contains "%PDF-" at the start.
+  if (pdfHeaderOffset(bytes) < 0)
     throw new ValidationError("The file is not a PDF", { file: ["Only PDF files are accepted"] });
   if (env().MALWARE_SCAN !== "disabled") {
     const scan = await scanBytes(bytes);
@@ -62,10 +90,11 @@ export async function uploadNotice(user: SessionUser | null, titleRaw: unknown, 
   const key = newKey("generated", "pdf", "notices");
   const stored = await putFile(key, bytes);
   await prisma.$transaction(async (tx) => {
-    await tx.publicNotice.updateMany({ where: { active: true }, data: { active: false } });
+    await tx.publicNotice.updateMany({ where: { active: true, category }, data: { active: false } });
     const n = await tx.publicNotice.create({
       data: {
         title: title.data,
+        category,
         originalName: sanitizeFilename(file.name || "notice.pdf"),
         storageKey: key,
         sizeBytes: stored.size,
@@ -79,20 +108,24 @@ export async function uploadNotice(user: SessionUser | null, titleRaw: unknown, 
         action: "notice.uploaded",
         entityType: "notice",
         entityId: n.id,
-        metadata: { size: stored.size },
+        metadata: { size: stored.size, category },
       },
       tx,
     );
   });
 }
 
-/** Shows (active) or hides a notice. Showing one hides the others. */
+/** Shows (active) or hides a notice. Showing one hides the others of the same category. */
 export async function setNoticeActive(user: SessionUser | null, id: string, active: boolean) {
   const u = requirePermission(user, "notice:manage");
   const n = await prisma.publicNotice.findUnique({ where: { id } });
   if (!n) throw new NotFoundError("Notice");
   await prisma.$transaction(async (tx) => {
-    if (active) await tx.publicNotice.updateMany({ where: { active: true }, data: { active: false } });
+    if (active)
+      await tx.publicNotice.updateMany({
+        where: { active: true, category: n.category },
+        data: { active: false },
+      });
     await tx.publicNotice.update({ where: { id }, data: { active } });
     await audit(
       {
