@@ -12,23 +12,80 @@ app.set("trust proxy", true);
 
 app.use(compression());
 
-// Fallback safeguard: if running behind HTTPS or a reverse proxy, ensure forwarded headers match APP_ORIGIN
+// Request header normalization and reverse proxy handling
 app.use((req, _res, next) => {
-  if (process.env.APP_ORIGIN) {
+  const hostHeader = (req.headers["host"] || "").toLowerCase();
+  const isLoopback =
+    hostHeader.startsWith("localhost") ||
+    hostHeader.startsWith("127.0.0.1") ||
+    hostHeader.startsWith("0.0.0.0") ||
+    hostHeader.startsWith("[::1]");
+
+  // Default x-forwarded-for to req.ip if not provided
+  if (!req.headers["x-forwarded-for"]) {
+    req.headers["x-forwarded-for"] = req.ip || req.socket.remoteAddress || "127.0.0.1";
+  }
+  if (!req.headers["x-real-ip"]) {
+    req.headers["x-real-ip"] = req.ip || req.socket.remoteAddress || "127.0.0.1";
+  }
+
+  // Only set forwarded proto if behind reverse proxy in production (NOT on direct localhost/demo connections)
+  if (!isLoopback && process.env.APP_ORIGIN) {
     try {
       const parsedOrigin = new URL(process.env.APP_ORIGIN);
       if (parsedOrigin.protocol === "https:" && !req.headers["x-forwarded-proto"]) {
         req.headers["x-forwarded-proto"] = "https";
       }
-      if (!req.headers["x-forwarded-host"]) {
-        const hostHeader = req.headers["host"] || "";
-        if (hostHeader.startsWith("localhost") || hostHeader.startsWith("127.0.0.1") || hostHeader.startsWith("0.0.0.0")) {
-          req.headers["x-forwarded-host"] = parsedOrigin.host;
-        }
-      }
     } catch {
       // ignore URL parsing error
     }
+  }
+  next();
+});
+
+// CORS support for allowed origins and preflight OPTIONS handling
+app.use((req, res, next) => {
+  const origin = req.headers.origin;
+  if (origin) {
+    let allowed = false;
+    try {
+      const originUrl = new URL(origin);
+      const host = (req.headers["host"] || "").toLowerCase();
+      const isLoopbackHost = (h) => {
+        const clean = h.split(":")[0].toLowerCase();
+        return clean === "localhost" || clean === "127.0.0.1" || clean === "0.0.0.0" || clean === "::1";
+      };
+
+      if (
+        process.env.APP_ORIGIN &&
+        originUrl.origin.toLowerCase() === new URL(process.env.APP_ORIGIN).origin.toLowerCase()
+      ) {
+        allowed = true;
+      } else if (originUrl.host.toLowerCase() === host) {
+        allowed = true;
+      } else if (isLoopbackHost(originUrl.hostname) && (isLoopbackHost(host) || process.env.NODE_ENV !== "production")) {
+        allowed = true;
+      } else if (process.env.ALLOWED_ORIGINS) {
+        const extra = process.env.ALLOWED_ORIGINS.split(",").map((s) => s.trim().toLowerCase());
+        if (extra.includes(origin.toLowerCase()) || extra.includes(originUrl.host.toLowerCase())) {
+          allowed = true;
+        }
+      }
+    } catch {
+      allowed = false;
+    }
+
+    if (allowed) {
+      res.setHeader("Access-Control-Allow-Origin", origin);
+      res.setHeader("Access-Control-Allow-Credentials", "true");
+      res.setHeader("Access-Control-Allow-Methods", "GET, POST, PUT, PATCH, DELETE, OPTIONS");
+      res.setHeader("Access-Control-Allow-Headers", "Content-Type, Authorization, X-Requested-With, Accept, Origin");
+      res.setHeader("Vary", "Origin");
+    }
+  }
+
+  if (req.method === "OPTIONS") {
+    return res.sendStatus(204);
   }
   next();
 });

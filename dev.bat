@@ -1,10 +1,11 @@
 @echo off
+chcp 65001 >nul
 setlocal EnableDelayedExpansion
 cd /d "%~dp0"
-title PSG Tech Staff Recruitment Portal - Development
+title PSG Tech Staff Recruitment Portal - Development and Demo
 
 echo ================================================================================
-echo    PSG TECH STAFF RECRUITMENT PORTAL - DEVELOPMENT RUNNER
+echo    PSG TECH STAFF RECRUITMENT PORTAL - DEVELOPMENT AND DEMO RUNNER
 echo ================================================================================
 echo.
 
@@ -14,8 +15,8 @@ if not exist .env.development (
     )
 )
 
-echo [INFO] Copying .env.development to .env...
+echo [INFO] Activating Development / Demo environment (.env.development to .env)...
 copy /y .env.development .env >nul
-echo [OK] Active environment set to Development (http://localhost:6969)
+echo [OK] Active environment set to Development / Demo (http://localhost:6969)
 
-call run.bat %*
+call run.bat dev %*

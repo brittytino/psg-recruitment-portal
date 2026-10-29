@@ -5,6 +5,7 @@ const bool = z.enum(["true", "false"]).transform((v) => v === "true");
 const schema = z.object({
   NODE_ENV: z.enum(["development", "test", "production"]).default("development"),
   APP_ORIGIN: z.string().url(),
+  ALLOWED_ORIGINS: z.string().optional().default(""),
   DATABASE_URL: z.string().min(1),
   REDIS_URL: z.string().min(1),
   SESSION_SECRET: z.string().min(32, "SESSION_SECRET must be at least 32 characters"),

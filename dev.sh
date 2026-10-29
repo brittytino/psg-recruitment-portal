@@ -82,7 +82,9 @@ ensure_dev_env() {
         echo -e "${CYAN}[INFO] Configuring development environment (.env.development -> .env)...${NC}"
         if [ ! -f .env.development ]; then
             cat << 'EOF' > .env.development
+NODE_ENV=development
 APP_ORIGIN=http://localhost:6969
+ALLOWED_ORIGINS=http://localhost:6969,http://127.0.0.1:6969,http://localhost:3000,http://127.0.0.1:3000
 APP_HOST_PORT=6969
 POSTGRES_HOST_PORT=6543
 REDIS_HOST_PORT=63879
@@ -95,11 +97,11 @@ DB_VIEWER_PASSWORD=
 ADMINER_HOST_PORT=6981
 POSTGRES_DB=srportal
 POSTGRES_USER=srp_owner
-POSTGRES_PASSWORD=change-me-owner
+POSTGRES_PASSWORD=PsgTech_DbOwner_2026!
 APP_DB_USER=srp_app
-APP_DB_PASSWORD=change-me-app
-DATABASE_URL=postgresql://srp_app:change-me-app@db:5432/srportal?schema=public
-MIGRATION_DATABASE_URL=postgresql://srp_owner:change-me-owner@db:5432/srportal?schema=public
+APP_DB_PASSWORD=PsgTech_AppUser_2026!
+DATABASE_URL=postgresql://srp_app:PsgTech_AppUser_2026!@db:5432/srportal?schema=public
+MIGRATION_DATABASE_URL=postgresql://srp_owner:PsgTech_DbOwner_2026!@db:5432/srportal?schema=public
 REDIS_URL=redis://redis:6379
 SESSION_SECRET=e7b8a1c93f0d4529b68a4e1f7c2d8b5a9034ecbf186241a7d903e15b497c28fa
 COOKIE_SECURE=false
@@ -129,7 +131,7 @@ OTP_RESEND_COOLDOWN_SECONDS=60
 OTP_MAX_ATTEMPTS=5
 OTP_MAX_SENDS_PER_HOUR=5
 LOG_LEVEL=info
-DEV_LOG_OTP=false
+DEV_LOG_OTP=true
 EOF
         fi
         cp -f .env.development .env
@@ -505,7 +507,7 @@ case "$CMD" in
             xdg-open "http://localhost:6981" >/dev/null 2>&1 &
         fi
         ;;
-    up|start)
+    up|start|demo|dev|development)
         do_start
         ;;
     help|--help|-h|/\?)

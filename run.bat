@@ -1,20 +1,49 @@
 @echo off
+chcp 65001 >nul
 setlocal EnableDelayedExpansion
 cd /d "%~dp0"
 title PSG Tech Staff Recruitment Portal
 
 REM Read APP_HOST_PORT from .env (defaults to 6969)
 set "PORT=6969"
+set "PG_USER=srp_owner"
+set "PG_PASS=PsgTech_DbOwner_2026!"
+set "PG_DB=srportal"
+
 if exist .env (
     for /f "usebackq tokens=1,* delims==" %%A in (".env") do (
-        if "%%A"=="APP_HOST_PORT" (
-            set "PORT=%%B"
-            for /f "tokens=1" %%C in ("!PORT!") do set "PORT=%%C"
-        )
+        if "%%A"=="APP_HOST_PORT" set "PORT=%%B"
+        if "%%A"=="POSTGRES_USER" set "PG_USER=%%B"
+        if "%%A"=="POSTGRES_PASSWORD" set "PG_PASS=%%B"
+        if "%%A"=="POSTGRES_DB" set "PG_DB=%%B"
+    )
+)
+for /f "tokens=1" %%C in ("!PORT!") do set "PORT=%%C"
+for /f "tokens=1" %%C in ("!PG_USER!") do set "PG_USER=%%C"
+for /f "tokens=1" %%C in ("!PG_DB!") do set "PG_DB=%%C"
+
+REM Fallback search for Docker Desktop binary in standard locations
+where docker >nul 2>&1
+if errorlevel 1 (
+    if exist "%ProgramFiles%\Docker\Docker\resources\bin\docker.exe" (
+        set "PATH=%ProgramFiles%\Docker\Docker\resources\bin;!PATH!"
+    ) else if exist "%ProgramFiles(x86)%\Docker\Docker\resources\bin\docker.exe" (
+        set "PATH=%ProgramFiles(x86)%\Docker\Docker\resources\bin;!PATH!"
+    )
+)
+
+REM Detect Docker Compose syntax (docker compose vs docker-compose)
+set "COMPOSE_CMD=docker compose"
+docker compose version >nul 2>&1
+if errorlevel 1 (
+    where docker-compose >nul 2>&1
+    if not errorlevel 1 (
+        set "COMPOSE_CMD=docker-compose"
     )
 )
 
 REM CLI Arguments routing
+:cli_route
 if /i "%~1"=="help" goto do_help
 if /i "%~1"=="-h" goto do_help
 if /i "%~1"=="--help" goto do_help
@@ -36,6 +65,8 @@ if /i "%~1"=="db" goto do_open_db
 if /i "%~1"=="adminer" goto do_open_db
 if /i "%~1"=="pgweb" goto do_open_db
 if /i "%~1"=="viewer" goto do_open_db
+if /i "%~1"=="mail" goto do_open_mail
+if /i "%~1"=="mailpit" goto do_open_mail
 if /i "%~1"=="seed" goto do_seed
 if /i "%~1"=="rebuild" goto do_clean_rebuild
 if /i "%~1"=="--clean" goto do_clean_rebuild
@@ -46,6 +77,7 @@ if /i "%~1"=="prod" goto do_prod
 if /i "%~1"=="production" goto do_prod
 if /i "%~1"=="dev" goto do_dev
 if /i "%~1"=="development" goto do_dev
+if /i "%~1"=="demo" goto do_dev
 
 REM Unknown CLI argument handler
 if not "%~1"=="" (
@@ -79,26 +111,24 @@ if errorlevel 1 (
 )
 
 if not exist .env (
-    echo [INFO] Creating .env from .env.example...
-    if not exist .env.example (
-        echo [ERROR] .env.example not found.
-        if "%~1"=="" pause
-        exit /b 1
+    if exist .env.development (
+        echo [INFO] Creating .env from .env.development [Local / Demo]...
+        copy /y .env.development .env >nul
+    ) else if exist .env.example (
+        echo [INFO] Creating .env from .env.example...
+        copy /y .env.example .env >nul
     )
-    copy /y .env.example .env >nul
-    echo [OK] Successfully copied .env.example -^> .env
+    echo [OK] Initialized .env
 )
 
-REM Read APP_HOST_PORT from .env (defaults to 6969)
+REM Re-read APP_HOST_PORT from .env (defaults to 6969)
 set "PORT=6969"
 if exist .env (
     for /f "usebackq tokens=1,* delims==" %%A in (".env") do (
-        if "%%A"=="APP_HOST_PORT" (
-            set "PORT=%%B"
-            for /f "tokens=1" %%C in ("!PORT!") do set "PORT=%%C"
-        )
+        if "%%A"=="APP_HOST_PORT" set "PORT=%%B"
     )
 )
+for /f "tokens=1" %%C in ("!PORT!") do set "PORT=%%C"
 
 if not exist .deployed (
     echo [INFO] First-time deployment detected. Initializing stack via start.bat...
@@ -106,7 +136,7 @@ if not exist .deployed (
     exit /b !errorlevel!
 ) else (
     echo [INFO] Bringing up recruitment portal stack...
-    docker compose -f compose.yaml -f compose.dev.yaml up -d --remove-orphans
+    !COMPOSE_CMD! -f compose.yaml -f compose.dev.yaml up -d --remove-orphans
 )
 
 echo.
@@ -115,7 +145,12 @@ set /a attempts=0
 
 :health_loop
 set /a attempts+=1
-curl.exe -s -f http://127.0.0.1:!PORT!/healthz/ready >nul 2>&1
+where curl.exe >nul 2>&1
+if not errorlevel 1 (
+    curl.exe -s -f http://127.0.0.1:!PORT!/healthz/ready >nul 2>&1
+) else (
+    powershell -NoProfile -Command "try { $r = Invoke-WebRequest -Uri 'http://127.0.0.1:!PORT!/healthz/ready' -UseBasicParsing -TimeoutSec 2; if ($r.StatusCode -eq 200) { exit 0 } else { exit 1 } } catch { exit 1 }" >nul 2>&1
+)
 if not errorlevel 1 goto stack_healthy
 if !attempts! geq 35 goto stack_timeout
 ping 127.0.0.1 -n 3 >nul 2>&1
@@ -134,7 +169,7 @@ echo [OK] Recruitment Portal is healthy^!
 :show_summary
 cls
 echo ================================================================================
-echo    PSG TECH STAFF RECRUITMENT PORTAL — READY
+echo    PSG TECH STAFF RECRUITMENT PORTAL  READY
 echo ================================================================================
 echo.
 echo    [WEB PORTAL]      http://localhost:!PORT!
@@ -147,22 +182,22 @@ echo    AUTHENTICATION:
 echo    100%% Passwordless Email OTP (6-digit codes delivered via Mailpit / SMTP)
 echo.
 echo    APPROVED INITIAL PRIVILEGED ACCOUNTS:
-echo    • Super Admin (Tino):             brittytino08@gmail.com  (Full System Admin)
-echo    • Dean (Dr. S. Saravanan):        dean.admn@psgtech.ac.in (Recruitment Oversight)
-echo    • Principal (Dr. G. Thilagavathi): principal@psgtech.ac.in (Recruitment Oversight)
-echo    • HR-N4 Section:                  admin.n4@psgtech.ac.in  (Job Profiles ^& Screening)
-echo    • HOD (CSE):                      hod.cse@psgtech.ac.in   (CSE Review ^& Summary Sheet)
+echo    " Super Admin (Tino):             brittytino08@gmail.com  (Full System Admin)
+echo    " Dean (Dr. S. Saravanan):        dean.admn@psgtech.ac.in (Recruitment Oversight)
+echo    " Principal (Dr. G. Thilagavathi): principal@psgtech.ac.in (Recruitment Oversight)
+echo    " HR-N4 Section:                  admin.n4@psgtech.ac.in  (Job Profiles ^& Screening)
+echo    " HOD (CSE):                      hod.cse@psgtech.ac.in   (CSE Review ^& Summary Sheet)
 echo.
 echo    * Production starts cleanly with NO dummy applicants or fake recruitment data.
 echo ================================================================================
 echo.
 
-start "" "http://localhost:!PORT!"
-
 if /i "%~1"=="up" exit /b 0
 if /i "%~1"=="start" exit /b 0
 if /i "%~1"=="rebuild" exit /b 0
 if /i "%~1"=="--clean" exit /b 0
+
+start "" "http://localhost:!PORT!"
 
 set /a empty_inputs=0
 
@@ -173,6 +208,8 @@ echo   [B] Open Portal in Browser
 echo   [D] Open Database Viewer (pgweb)
 echo   [M] Open Mailbox Inbox (Mailpit)
 echo   [A] Seed / Register Form Templates ^& Staff Accounts
+echo   [O] Switch to Demo / Development Environment
+echo   [P] Switch to Production Environment
 echo   [E] Copy / Reset .env from .env.example
 echo   [S] Launch Prisma Studio GUI
 echo   [L] View Container Logs
@@ -182,7 +219,7 @@ echo   [Q] Quit menu (keep stack running)
 echo.
 
 set "choice="
-set /p choice="Enter choice [B/D/M/A/E/S/L/R/X/Q]: "
+set /p choice="Enter choice [B/D/M/A/O/P/E/S/L/R/X/Q]: "
 
 if not defined choice (
     set /a empty_inputs+=1
@@ -199,6 +236,8 @@ if /i "%choice%"=="B" goto do_open_portal
 if /i "%choice%"=="D" goto do_open_db
 if /i "%choice%"=="M" goto do_open_mail
 if /i "%choice%"=="A" goto do_seed
+if /i "%choice%"=="O" goto do_dev
+if /i "%choice%"=="P" goto do_prod
 if /i "%choice%"=="E" goto do_copy_env
 if /i "%choice%"=="S" goto do_studio
 if /i "%choice%"=="L" goto do_logs
@@ -215,6 +254,8 @@ goto interactive_loop
 
 :do_open_mail
 start "" "http://localhost:8025"
+if /i "%~1"=="mail" exit /b 0
+if /i "%~1"=="mailpit" exit /b 0
 goto interactive_loop
 
 :do_clean_rebuild
@@ -223,7 +264,7 @@ echo ===========================================================================
 echo    CLEAN REBUILD IN DOCKER
 echo ================================================================================
 echo Stopping containers...
-docker compose -f compose.yaml -f compose.dev.yaml down
+!COMPOSE_CMD! -f compose.yaml -f compose.dev.yaml down
 if errorlevel 1 (
     echo [ERROR] Failed to stop the stack.
     if /i "%~1"=="rebuild" exit /b 1
@@ -233,7 +274,7 @@ if errorlevel 1 (
 )
 
 echo Rebuilding images without cache...
-docker compose -f compose.yaml -f compose.dev.yaml build --no-cache app worker migrate converter
+!COMPOSE_CMD! -f compose.yaml -f compose.dev.yaml build --no-cache app worker migrate converter
 if errorlevel 1 (
     echo [ERROR] Rebuild failed.
     if /i "%~1"=="rebuild" exit /b 1
@@ -243,7 +284,7 @@ if errorlevel 1 (
 )
 
 echo Starting stack...
-docker compose -f compose.yaml -f compose.dev.yaml up -d --force-recreate --remove-orphans
+!COMPOSE_CMD! -f compose.yaml -f compose.dev.yaml up -d --force-recreate --remove-orphans
 if errorlevel 1 (
     echo [ERROR] Failed to start the stack.
     if /i "%~1"=="rebuild" exit /b 1
@@ -262,7 +303,7 @@ echo Seeding form templates and the approved institutional accounts...
 echo.
 
 echo [INFO] Running seed inside Docker migrate container...
-docker compose -f compose.yaml -f compose.dev.yaml run --rm migrate node build-worker/seed.js
+!COMPOSE_CMD! -f compose.yaml -f compose.dev.yaml run --rm migrate node build-worker/seed.js
 set "SEED_EXIT_CODE=!errorlevel!"
 
 if "!SEED_EXIT_CODE!"=="0" (
@@ -274,7 +315,7 @@ if "!SEED_EXIT_CODE!"=="0" (
     where npx >nul 2>&1
     if not errorlevel 1 (
         setlocal DisableDelayedExpansion
-        set "DATABASE_URL=postgresql://srp_owner:PsgTech_DbOwner_2026%%21@localhost:6543/srportal?schema=public"
+        set "DATABASE_URL=postgresql://%PG_USER%:%PG_PASS%@localhost:6543/%PG_DB%?schema=public"
         cmd /c "npx tsx prisma/seed.ts"
         set "HOST_SEED_CODE=%errorlevel%"
         endlocal & set "SEED_EXIT_CODE=%HOST_SEED_CODE%"
@@ -295,25 +336,27 @@ goto interactive_loop
 where npx >nul 2>&1
 if not errorlevel 1 (
     echo Starting Prisma Studio on host (port 5555)...
-    start "Prisma Studio" cmd /k "set \"DATABASE_URL=postgresql://srp_owner:PsgTech_DbOwner_2026%%21@localhost:6543/srportal?schema=public\" && npx prisma studio --port 5555"
+    setlocal DisableDelayedExpansion
+    start "Prisma Studio" cmd /k "set \"DATABASE_URL=postgresql://%PG_USER%:%PG_PASS%@localhost:6543/%PG_DB%?schema=public\" && npx prisma studio --port 5555"
+    endlocal
 ) else (
     echo [INFO] npx not found on host. Executing Prisma Studio via Docker app container...
-    start "Prisma Studio" docker compose -f compose.yaml -f compose.dev.yaml exec app npx prisma studio --port 5555 --hostname 0.0.0.0
+    start "Prisma Studio" !COMPOSE_CMD! -f compose.yaml -f compose.dev.yaml exec app npx prisma studio --port 5555 --hostname 0.0.0.0
 )
 if /i "%~1"=="studio" exit /b 0
 goto interactive_loop
 
 :do_logs
 if not "%~2"=="" (
-    docker compose -f compose.yaml -f compose.dev.yaml logs -f %2 %3 %4 %5 %6
+    !COMPOSE_CMD! -f compose.yaml -f compose.dev.yaml logs -f %2 %3 %4 %5 %6
 ) else (
-    docker compose -f compose.yaml -f compose.dev.yaml logs -f app worker db db-viewer
+    !COMPOSE_CMD! -f compose.yaml -f compose.dev.yaml logs -f app worker db db-viewer
 )
 if /i "%~1"=="logs" exit /b %errorlevel%
 goto interactive_loop
 
 :do_status
-docker compose -f compose.yaml -f compose.dev.yaml ps
+!COMPOSE_CMD! -f compose.yaml -f compose.dev.yaml ps
 exit /b %errorlevel%
 
 :do_open_db
@@ -326,14 +369,19 @@ goto interactive_loop
 
 :do_health
 echo Checking portal readiness (http://127.0.0.1:!PORT!/healthz/ready)...
-curl.exe -i http://127.0.0.1:!PORT!/healthz/ready
+where curl.exe >nul 2>&1
+if not errorlevel 1 (
+    curl.exe -i http://127.0.0.1:!PORT!/healthz/ready
+) else (
+    powershell -NoProfile -Command "Invoke-WebRequest -Uri 'http://127.0.0.1:!PORT!/healthz/ready' -UseBasicParsing | Select-Object -Property StatusCode, StatusDescription, Content"
+)
 exit /b %errorlevel%
 
 :do_shell
 set "TARGET_SVC=%~2"
 if "!TARGET_SVC!"=="" set "TARGET_SVC=app"
 echo [INFO] Opening shell inside container '!TARGET_SVC!'...
-docker compose -f compose.yaml -f compose.dev.yaml exec -it !TARGET_SVC! /bin/sh
+!COMPOSE_CMD! -f compose.yaml -f compose.dev.yaml exec -it !TARGET_SVC! /bin/sh
 exit /b !errorlevel!
 
 :do_copy_env
@@ -345,7 +393,7 @@ if not exist .env.example (
 )
 echo [INFO] Copying .env.example to .env...
 copy /y .env.example .env >nul
-echo [OK] Successfully copied .env.example -^> .env
+echo [OK] Successfully copied .env.example to .env
 if /i "%~1"=="env" exit /b 0
 if /i "%~1"=="copy-env" exit /b 0
 if /i "%~1"=="init-env" exit /b 0
@@ -357,10 +405,11 @@ if not exist .env.production (
     echo [ERROR] .env.production not found^!
     exit /b 1
 )
-echo [INFO] Copying .env.production to .env...
+echo [INFO] Activating Production environment (.env.production to .env)...
 copy /y .env.production .env >nul
 echo [OK] Active environment set to Production (https://recruitments.psgtech.ac.in)
 shift
+if not "%~1"=="" goto cli_route
 goto main_menu
 
 :do_dev
@@ -369,10 +418,11 @@ if not exist .env.development (
         copy /y .env.example .env.development >nul
     )
 )
-echo [INFO] Copying .env.development to .env...
+echo [INFO] Activating Development / Demo environment (.env.development to .env)...
 copy /y .env.development .env >nul
-echo [OK] Active environment set to Development (http://localhost:6969)
+echo [OK] Active environment set to Development / Demo (http://localhost:6969)
 shift
+if not "%~1"=="" goto cli_route
 goto main_menu
 
 :do_help
@@ -397,8 +447,9 @@ echo   rebuild, --clean  Rebuild Docker images without cache (--no-cache) and st
 echo   studio            Launch Prisma Studio GUI on port 5555
 echo   shell [svc]       Open interactive shell inside container (default: app)
 echo   prod              Switch active environment to Production and start
-echo   dev               Switch active environment to Development and start
+echo   dev, demo         Switch active environment to Development/Demo and start
 echo   db, viewer, pgweb Open Modern Database Viewer (pgweb) in browser
+echo   mail, mailpit     Open Mailpit mailbox in browser
 echo   help, -h, --help  Display this help reference
 echo.
 exit /b 0
@@ -407,16 +458,16 @@ exit /b 0
 goto main_menu
 
 :do_stop
-docker compose -f compose.yaml -f compose.dev.yaml stop
+!COMPOSE_CMD! -f compose.yaml -f compose.dev.yaml stop
 exit /b %errorlevel%
 
 :do_down
 echo Stopping and removing containers...
-docker compose -f compose.yaml -f compose.dev.yaml down
+!COMPOSE_CMD! -f compose.yaml -f compose.dev.yaml down
 exit /b %errorlevel%
 
 :do_restart
-docker compose -f compose.yaml -f compose.dev.yaml restart
+!COMPOSE_CMD! -f compose.yaml -f compose.dev.yaml restart
 goto health_loop
 
 :do_quit

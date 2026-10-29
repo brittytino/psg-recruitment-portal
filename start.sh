@@ -68,7 +68,7 @@ init_environment() {
     local mode="${1:-}"
     echo -e "${CYAN}[1/5] Setting up environment configuration...${NC}"
 
-    if [ "$mode" = "dev" ] || [ "$mode" = "development" ]; then
+    if [ "$mode" = "dev" ] || [ "$mode" = "development" ] || [ "$mode" = "demo" ]; then
         if [ -f .env.development ]; then
             cp -f .env.development .env
             echo -e "${GREEN}[OK] Initialized .env from .env.development${NC}"
@@ -79,9 +79,9 @@ init_environment() {
             echo -e "${GREEN}[OK] Initialized .env from .env.production${NC}"
         fi
     elif [ ! -f .env ] || [ ! -s .env ]; then
-        if [ -f .env.production ]; then
-            cp -f .env.production .env
-            echo -e "${GREEN}[OK] Initialized .env from .env.production${NC}"
+        if [ -f .env.development ]; then
+            cp -f .env.development .env
+            echo -e "${GREEN}[OK] Initialized .env from .env.development (Local / Demo)${NC}"
         elif [ -f .env.example ]; then
             cp -f .env.example .env
             echo -e "${GREEN}[OK] Initialized .env from .env.example${NC}"

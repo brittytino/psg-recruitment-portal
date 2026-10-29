@@ -5,8 +5,9 @@
 name: psg-srportal
 
 x-app-env: &app-env
-  NODE_ENV: production
+  NODE_ENV: ${NODE_ENV:-development}
   APP_ORIGIN: ${APP_ORIGIN:-http://localhost:6969}
+  ALLOWED_ORIGINS: ${ALLOWED_ORIGINS:-}
   DATABASE_URL: ${DATABASE_URL}
   REDIS_URL: ${REDIS_URL:-redis://redis:6379}
   SESSION_SECRET: ${SESSION_SECRET}
@@ -36,6 +37,7 @@ x-app-env: &app-env
   OTP_RESEND_COOLDOWN_SECONDS: ${OTP_RESEND_COOLDOWN_SECONDS:-60}
   OTP_MAX_ATTEMPTS: ${OTP_MAX_ATTEMPTS:-5}
   OTP_MAX_SENDS_PER_HOUR: ${OTP_MAX_SENDS_PER_HOUR:-5}
+  DEV_LOG_OTP: ${DEV_LOG_OTP:-false}
   LOG_LEVEL: ${LOG_LEVEL:-info}
 
 services:

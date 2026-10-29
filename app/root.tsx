@@ -66,7 +66,7 @@ function staffNav(grants: RoleGrant[]): { to: string; label: string; icon: Lucid
   return items;
 }
 import { csrfToken, getSessionUser } from "./modules/auth/session.server";
-import { env } from "./modules/core/env.server";
+import { isOriginAllowed } from "./lib/origin.server";
 import { CsrfInput } from "./components/forms";
 
 const SAFE_METHODS = new Set(["GET", "HEAD", "OPTIONS"]);
@@ -80,10 +80,9 @@ export const middleware: Route.MiddlewareFunction[] = [
     context.set(nonceContext, newNonce());
     if (!SAFE_METHODS.has(request.method.toUpperCase())) {
       const origin = request.headers.get("origin");
-      const allowed = new URL(env().APP_ORIGIN).origin;
-      const sameSite = request.headers.get("sec-fetch-site");
-      if (origin ? origin !== allowed : sameSite !== "same-origin")
+      if (!isOriginAllowed(origin, request)) {
         throw new Response("Cross-origin request blocked", { status: 403 });
+      }
     }
     context.set(userContext, await getSessionUser(request));
     return next();

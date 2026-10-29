@@ -32,6 +32,7 @@ describe("Authentication & Authorization Security Controls", () => {
     process.env.SMTP_PORT = "587";
     process.env.SMTP_USER = "recruitments@psgtech.ac.in";
     process.env.SMTP_PASSWORD = "app-specific-secret";
+    process.env.DEV_LOG_OTP = "false";
   });
 
   afterEach(() => {
@@ -225,6 +226,74 @@ describe("Authentication & Authorization Security Controls", () => {
       expect(bodyString).not.toContain("password");
       expect(bodyString).not.toContain("pass");
       expect(bodyString).not.toContain("secret");
+    });
+  });
+
+  describe("CORS & Origin Validation Controls", () => {
+    it("allows requests from the configured APP_ORIGIN", async () => {
+      process.env.APP_ORIGIN = "https://recruitments.psgtech.ac.in";
+      resetEnvCacheForTesting();
+
+      const { isOriginAllowed } = await import("~/lib/origin.server");
+      const req = new Request("https://recruitments.psgtech.ac.in/login", {
+        headers: { host: "recruitments.psgtech.ac.in" },
+      });
+      expect(isOriginAllowed("https://recruitments.psgtech.ac.in", req)).toBe(true);
+    });
+
+    it("allows requests from localhost / loopback during local development or demo", async () => {
+      process.env.APP_ORIGIN = "http://localhost:6969";
+      resetEnvCacheForTesting();
+
+      const { isOriginAllowed } = await import("~/lib/origin.server");
+      const req1 = new Request("http://localhost:6969/login", {
+        headers: { host: "localhost:6969" },
+      });
+      expect(isOriginAllowed("http://localhost:6969", req1)).toBe(true);
+
+      // Equivalence between 127.0.0.1 and localhost
+      const req2 = new Request("http://localhost:6969/login", {
+        headers: { host: "localhost:6969" },
+      });
+      expect(isOriginAllowed("http://127.0.0.1:6969", req2)).toBe(true);
+    });
+
+    it("allows loopback demo access even if APP_ORIGIN is production", async () => {
+      process.env.APP_ORIGIN = "https://recruitments.psgtech.ac.in";
+      process.env.NODE_ENV = "development";
+      resetEnvCacheForTesting();
+
+      const { isOriginAllowed } = await import("~/lib/origin.server");
+      const req = new Request("http://localhost:6969/login", {
+        headers: { host: "localhost:6969" },
+      });
+      expect(isOriginAllowed("http://localhost:6969", req)).toBe(true);
+      expect(isOriginAllowed("http://127.0.0.1:6969", req)).toBe(true);
+    });
+
+    it("allows explicitly configured ALLOWED_ORIGINS", async () => {
+      process.env.APP_ORIGIN = "https://recruitments.psgtech.ac.in";
+      process.env.ALLOWED_ORIGINS = "https://demo.psgtech.ac.in,http://localhost:3000";
+      resetEnvCacheForTesting();
+
+      const { isOriginAllowed } = await import("~/lib/origin.server");
+      const req = new Request("https://demo.psgtech.ac.in/login", {
+        headers: { host: "demo.psgtech.ac.in" },
+      });
+      expect(isOriginAllowed("https://demo.psgtech.ac.in", req)).toBe(true);
+      expect(isOriginAllowed("http://localhost:3000", req)).toBe(true);
+    });
+
+    it("strictly blocks malicious cross-origin forgery attacks", async () => {
+      process.env.APP_ORIGIN = "https://recruitments.psgtech.ac.in";
+      resetEnvCacheForTesting();
+
+      const { isOriginAllowed } = await import("~/lib/origin.server");
+      const req = new Request("https://recruitments.psgtech.ac.in/login", {
+        headers: { host: "recruitments.psgtech.ac.in" },
+      });
+      expect(isOriginAllowed("https://evil.attacker.com", req)).toBe(false);
+      expect(isOriginAllowed("https://phishing-psgtech.ac.in.attacker.org", req)).toBe(false);
     });
   });
 });

@@ -479,7 +479,7 @@ case "$CMD" in
         shift
         exec ./prod.sh "$@"
         ;;
-    dev|development)
+    dev|development|demo)
         shift
         exec ./dev.sh "$@"
         ;;
