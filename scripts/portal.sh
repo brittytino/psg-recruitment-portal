@@ -282,11 +282,49 @@ fix_volume_permissions() {
     "mkdir -p /var/lib/srportal/storage && chown -R 1000:1000 /var/lib/srportal/storage" >/dev/null 2>&1 || true
 }
 
+# PostgreSQL applies POSTGRES_PASSWORD only when the data volume is first created. If .env was
+# regenerated (or the volume comes from an earlier deployment) the stored passwords differ and
+# migrations fail with P1000. Reconcile on every start through the container's local socket
+# (trusted, no password); existing data is never touched.
+sync_db_passwords() {
+  info "Starting the database…"
+  dc up -d --wait db
+  local su owner_pw app_user app_pw db
+  su="$(env_get POSTGRES_USER)"; su="${su:-srp_owner}"
+  db="$(env_get POSTGRES_DB)"; db="${db:-srportal}"
+  owner_pw="$(env_get POSTGRES_PASSWORD)"
+  app_user="$(env_get APP_DB_USER)"; app_user="${app_user:-srp_app}"
+  app_pw="$(env_get APP_DB_PASSWORD)"
+  local login="$su"
+  dc exec -T db psql -U "$login" -d postgres -Atc "select 1" >/dev/null 2>&1 || login=postgres
+  dc exec -T db psql -v ON_ERROR_STOP=1 -U "$login" -d postgres -q \
+    -v owner="$su" -v owner_pw="$owner_pw" -v app="$app_user" -v app_pw="$app_pw" -v db="$db" <<'SQL' ||
+SELECT format('CREATE ROLE %I LOGIN SUPERUSER', :'owner') WHERE NOT EXISTS (SELECT FROM pg_roles WHERE rolname = :'owner') \gexec
+SELECT format('ALTER ROLE %I WITH LOGIN PASSWORD %L', :'owner', :'owner_pw') \gexec
+SELECT format('CREATE ROLE %I LOGIN', :'app') WHERE NOT EXISTS (SELECT FROM pg_roles WHERE rolname = :'app') \gexec
+SELECT format('ALTER ROLE %I WITH LOGIN PASSWORD %L', :'app', :'app_pw') \gexec
+SELECT format('CREATE DATABASE %I OWNER %I', :'db', :'owner') WHERE NOT EXISTS (SELECT FROM pg_database WHERE datname = :'db') \gexec
+SQL
+    die "Could not align the database passwords with .env (see the error above)."
+  # Least-privilege grants for the app role (idempotent; same as the first-start init script).
+  dc exec -T db psql -v ON_ERROR_STOP=1 -U "$login" -d "$db" -q -v owner="$su" -v app="$app_user" -v db="$db" <<'SQL' >/dev/null ||
+SELECT format('GRANT CONNECT ON DATABASE %I TO %I', :'db', :'app') \gexec
+SELECT format('GRANT USAGE ON SCHEMA public TO %I', :'app') \gexec
+SELECT format('GRANT SELECT, INSERT, UPDATE, DELETE ON ALL TABLES IN SCHEMA public TO %I', :'app') \gexec
+SELECT format('GRANT USAGE, SELECT ON ALL SEQUENCES IN SCHEMA public TO %I', :'app') \gexec
+SELECT format('ALTER DEFAULT PRIVILEGES FOR ROLE %I IN SCHEMA public GRANT SELECT, INSERT, UPDATE, DELETE ON TABLES TO %I', :'owner', :'app') \gexec
+SELECT format('ALTER DEFAULT PRIVILEGES FOR ROLE %I IN SCHEMA public GRANT USAGE, SELECT ON SEQUENCES TO %I', :'owner', :'app') \gexec
+SQL
+    die "Could not grant database privileges to $app_user."
+  ok "Database credentials match .env"
+}
+
 up() {
   check_env
   info "Building images ($MODE)…"
   dc build --pull app converter
   fix_volume_permissions
+  sync_db_passwords
   info "Starting services…"
   dc up -d --remove-orphans
   wait_healthy
@@ -309,8 +347,8 @@ case "$CMD" in
   logs) if [ $# -gt 0 ]; then dc logs -f --tail 200 "$@"; else dc logs -f --tail 200 app worker migrate; fi ;;
   status | ps) dc ps ;;
   health) health && echo || die "Not healthy" ;;
-  seed) check_env; dc run --rm migrate node build-worker/seed.js ;;
-  migrate) check_env; dc run --rm migrate npx prisma migrate deploy ;;
+  seed) check_env; sync_db_passwords; dc run --rm migrate node build-worker/seed.js ;;
+  migrate) check_env; sync_db_passwords; dc run --rm migrate npx prisma migrate deploy ;;
   rebuild) check_env; dc build --no-cache --pull app converter; fix_volume_permissions; dc up -d --force-recreate --remove-orphans; wait_healthy ;;
   backup)
     check_env
