@@ -6,7 +6,7 @@ host's Nginx with Let's Encrypt certificates.
 | Address                                 | Serves                  | Notes                                                     |
 | --------------------------------------- | ----------------------- | --------------------------------------------------------- |
 | `https://recruitments.psgtech.ac.in`    | Recruitment portal      | App listens on `127.0.0.1:6969` only                      |
-| `https://db.recruitments.psgtech.ac.in` | Database viewer (pgweb) | Read-only, password protected, optional; `127.0.0.1:6981` |
+| `https://recruitmentsdb.psgtech.ac.in` | Database viewer (pgweb) | Read-only, password protected, optional; `127.0.0.1:6981` |
 
 ## 1. DNS (ask the college IT team)
 
@@ -14,7 +14,7 @@ Create two **A records** pointing to the server's public IP:
 
 ```
 recruitments.psgtech.ac.in       A   <server IP>
-db.recruitments.psgtech.ac.in    A   <server IP>
+recruitmentsdb.psgtech.ac.in     A   <server IP>
 ```
 
 ## 2. Server requirements
