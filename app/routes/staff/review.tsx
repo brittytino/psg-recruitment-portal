@@ -1,4 +1,5 @@
 import { Form, Link, redirect, useSearchParams } from "react-router";
+import { ArrowLeftRight, CheckCircle2, Clock, FileText } from "lucide-react";
 import type { Position, Prisma } from "@prisma/client";
 import type { Route } from "./+types/review";
 import { Badge, formatDate, statusTone } from "~/components/forms";
@@ -188,14 +189,19 @@ export default function HodReview({ loaderData }: Route.ComponentProps) {
       />
 
       <section className="grid grid-cols-2 gap-3 md:grid-cols-4" aria-label="Totals">
-        <StatTile label="Assigned to you" value={counts.total} />
-        <StatTile label="Waiting for decision" value={counts.pending} tone="bg-tile-orange/40" />
-        <StatTile label="Accepted" value={counts.accepted} tone="bg-tile-green/50" />
-        <StatTile label="Position change / rejected" value={counts.otherDecided} tone="bg-tile-purple/50" />
+        <StatTile label="Assigned to you" value={counts.total} icon={FileText} accent="blue" />
+        <StatTile label="Waiting for decision" value={counts.pending} icon={Clock} accent="orange" />
+        <StatTile label="Accepted" value={counts.accepted} icon={CheckCircle2} accent="green" />
+        <StatTile
+          label="Position change / rejected"
+          value={counts.otherDecided}
+          icon={ArrowLeftRight}
+          accent="purple"
+        />
       </section>
 
       {counts.pending === 0 && counts.total > 0 && (
-        <div className="rounded-2xl bg-success-50 p-4 text-[15px] ring-1 ring-green-200">
+        <div className="rounded-xl bg-success-50 p-4 text-[15px] ring-1 ring-success/25">
           All applications are decided.{" "}
           <Link to="/staff/summary" className="font-semibold text-brand-700 underline">
             Generate and approve your summary sheet

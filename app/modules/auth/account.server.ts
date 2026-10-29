@@ -7,7 +7,7 @@ import { ValidationError } from "~/modules/core/errors";
 import { notify } from "~/modules/notifications/outbox.server";
 import { hashPassword, passwordProblems } from "./password.server";
 import { issueOtp, verifyOtp } from "./otp.server";
-import { rateLimit } from "./rate-limit.server";
+import { rateLimit, refundRateLimit } from "./rate-limit.server";
 import { createSession, destroyAllSessions, hashToken } from "./session.server";
 
 export { PRIVACY_NOTICE_VERSION } from "~/lib/privacy";
@@ -179,6 +179,8 @@ export async function requestLoginOtp(emailRaw: string, ip: string): Promise<Req
     const challengeId = await issueOtp(user.id, "LOGIN", ip);
     return { ok: true, challengeId, email };
   } catch (err) {
+    // The per-account login limit should only count codes that were actually sent.
+    await refundRateLimit("login-account", hashToken(email)).catch(() => undefined);
     return {
       ok: false,
       message: err instanceof Error ? err.message : "The code could not be sent. Please try again shortly.",

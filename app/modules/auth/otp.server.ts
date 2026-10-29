@@ -7,7 +7,7 @@ import { ConflictError } from "~/modules/core/errors";
 import { logger } from "~/modules/core/logger.server";
 import { redis } from "~/modules/core/redis.server";
 import { sendOtpEmail } from "~/modules/notifications/mailer.server";
-import { rateLimit } from "./rate-limit.server";
+import { rateLimit, refundRateLimit } from "./rate-limit.server";
 
 export const OTP_TTL_MINUTES = 5;
 export const OTP_MAX_ATTEMPTS = 5;
@@ -86,8 +86,13 @@ export async function issueOtp(userId: string, purpose: OtpPurpose, ip: string):
       })
       .catch(() => undefined);
     await r.del(cooldownKey).catch(() => undefined);
+    // A mail outage is not the user's fault: do not count this attempt against their limits.
+    await refundRateLimit(`otp-send-${purpose}`, userId).catch(() => undefined);
+    await refundRateLimit("otp-send-ip", ip).catch(() => undefined);
     if (!env().DEV_LOG_OTP)
-      throw new ConflictError("The verification code could not be e-mailed. Please try again shortly.");
+      throw new ConflictError(
+        "We could not send the sign-in code because the e-mail service is unreachable. Please try again in a few minutes or contact the recruitment office.",
+      );
   }
   await audit({
     actorId: userId,

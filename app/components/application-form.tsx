@@ -383,7 +383,7 @@ function SelectWithOther({
             id={otherInputId}
             name={`${path}_other`}
             type="text"
-            className="field-input bg-white"
+            className="field-input bg-paper"
             placeholder={field.otherPlaceholder ?? `Type your ${field.label.toLowerCase()} here`}
             maxLength={field.otherMaxLength ?? 60}
             value={customText}
@@ -509,7 +509,7 @@ function TableEditor({
     onChange(next);
   };
   return (
-    <fieldset className="space-y-3 rounded-2xl bg-soft p-5" aria-labelledby={headingId}>
+    <fieldset className="space-y-3 rounded-xl bg-soft p-5" aria-labelledby={headingId}>
       <legend id={headingId} className="px-1 text-base font-semibold">
         {field.label}
         {field.requirement === "required" && (
@@ -529,7 +529,7 @@ function TableEditor({
         </p>
         {field.countLabel && (
           <span
-            className="rounded-full bg-white px-3 py-1 text-sm font-semibold shadow-xs"
+            className="rounded-full bg-paper px-3 py-1 text-sm font-semibold shadow-xs"
             aria-live="polite"
           >
             {field.countLabel}: {rows.length}
@@ -545,7 +545,7 @@ function TableEditor({
       {rows.length === 0 && <p className="text-sm text-muted">No entries yet.</p>}
       <ol className="space-y-4">
         {rows.map((row, i) => (
-          <li key={i} className="rounded-2xl bg-white p-4 shadow-[var(--shadow-soft)]">
+          <li key={i} className="rounded-xl bg-paper p-4 shadow-[var(--shadow-soft)]">
             <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
               <p className="text-base font-semibold">
                 {item} {i + 1}
@@ -858,7 +858,7 @@ function ListEditor({
 }) {
   const headingId = `l-${field.key}`;
   return (
-    <fieldset className="space-y-3 rounded-2xl bg-soft p-5" aria-labelledby={headingId}>
+    <fieldset className="space-y-3 rounded-xl bg-soft p-5" aria-labelledby={headingId}>
       <legend id={headingId} className="px-1 text-base font-semibold">
         {field.label}
       </legend>

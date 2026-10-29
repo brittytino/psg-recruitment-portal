@@ -272,7 +272,7 @@ nano .env            # set APP_ORIGIN (https://…) and the SMTP_* settings
 ./prod.sh            # builds, migrates, seeds and starts
 ```
 
-Put Nginx with TLS in front (`infrastructure/nginx`) and keep `APP_BIND=127.0.0.1` so the app port is
+Full server guide (DNS, HTTPS, DB viewer): `docs/deployment/production-server.md`. Put Nginx with TLS in front (`infrastructure/nginx/host/setup-nginx.sh`) and keep `APP_BIND=127.0.0.1` so the app port is
 only reachable through the proxy. `.env` is never committed; `.env.example` and `.env.development` are
 the templates.
 

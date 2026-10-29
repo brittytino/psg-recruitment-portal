@@ -9,7 +9,7 @@ export default function Privacy() {
     <article className="max-w-4xl space-y-8">
       <div className="border-b border-line/70 pb-6">
         <p className="eyebrow">Data Governance</p>
-        <h1 className="mt-1.5 text-3xl sm:text-4xl lg:text-5xl font-extrabold text-ink">Privacy notice</h1>
+        <h1 className="mt-1.5 text-3xl sm:text-4xl lg:text-5xl font-semibold text-ink">Privacy notice</h1>
         <p className="mt-2 text-base text-muted">
           Information handling, data storage security, and audit transparency standards.
         </p>

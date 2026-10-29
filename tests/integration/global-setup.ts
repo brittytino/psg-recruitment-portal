@@ -1,8 +1,12 @@
 import { execSync } from "node:child_process";
+import { readFileSync } from "node:fs";
 
 /** Creates (if needed) and migrates the isolated integration-test database, then registers templates. */
 export default function setup() {
-  const owner = process.env.TEST_OWNER_URL ?? "postgresql://srp_owner:PsgTech_DbOwner_2026!@localhost:6543";
+  const ownerPassword = /^POSTGRES_PASSWORD=(.*)$/m
+    .exec(readFileSync(".env.development", "utf8"))?.[1]
+    ?.trim();
+  const owner = process.env.TEST_OWNER_URL ?? `postgresql://srp_owner:${ownerPassword}@localhost:6543`;
   const run = (cmd: string, env: Record<string, string> = {}) =>
     execSync(cmd, { stdio: "inherit", env: { ...process.env, ...env } });
   try {

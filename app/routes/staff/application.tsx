@@ -448,7 +448,7 @@ export default function StaffApplication({ loaderData, actionData }: Route.Compo
                 </p>
               )}
               {pending && (
-                <div className="space-y-3 rounded-2xl bg-warning-50 p-4 text-sm ring-1 ring-amber-200">
+                <div className="space-y-3 rounded-xl bg-warning-50 p-4 text-sm ring-1 ring-warning/25">
                   <p>
                     <strong>Recommendation awaiting approval:</strong> {POSITION_LABELS[pending.fromPosition]}{" "}
                     → <strong>{POSITION_LABELS[pending.toPosition]}</strong>
@@ -591,7 +591,7 @@ export default function StaffApplication({ loaderData, actionData }: Route.Compo
                 Status
               </h2>
               {transitions.map((t) => (
-                <Form key={t.to} method="post" className="space-y-2 rounded-2xl bg-soft p-3">
+                <Form key={t.to} method="post" className="space-y-2 rounded-xl bg-soft p-3">
                   <CsrfInput />
                   <input type="hidden" name="intent" value="transition" />
                   <input type="hidden" name="to" value={t.to} />

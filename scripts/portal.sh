@@ -57,7 +57,12 @@ else
 fi
 docker info >/dev/null 2>&1 || die "Cannot talk to the Docker daemon. Is it running? (Linux: add your user to the 'docker' group or use sudo.)"
 
-dc() { "${COMPOSE[@]}" --env-file .env "${FILES[@]}" "$@"; }
+dc() {
+  local profiles=()
+  # Production DB viewer (https://$DB_VIEWER_DOMAIN) runs only when explicitly enabled in .env.
+  if [ "$MODE" = prod ] && [ "$(env_get DB_VIEWER_ENABLED)" = true ]; then profiles=(--profile dbviewer); fi
+  "${COMPOSE[@]}" --env-file .env "${FILES[@]}" ${profiles[@]+"${profiles[@]}"} "$@"
+}
 
 # ---- .env handling ------------------------------------------------------------
 env_get() { # env_get KEY -> value from .env (quotes stripped, CR removed)
@@ -89,11 +94,25 @@ create_env() {
       -e "s|^MIGRATION_DATABASE_URL=.*|MIGRATION_DATABASE_URL=postgresql://srp_owner:$owner@db:5432/srportal?schema=public|" \
       -e "s|^SESSION_SECRET=.*|SESSION_SECRET=$(rand 48)|" \
       -e "s|^CONVERTER_TOKEN=.*|CONVERTER_TOKEN=$(rand 24)|" \
+      -e "s|^DB_VIEWER_PASSWORD=.*|DB_VIEWER_PASSWORD=$(rand 18)|" \
       .env.example > .env
   chmod 600 .env
   ok "Created .env with freshly generated database passwords and secrets"
   warn "Edit .env now: set APP_ORIGIN (your https:// address) and the SMTP_* mail settings, then run ./prod.sh again."
   exit 0
+}
+
+# Sign-in codes are e-mailed, so an unreachable mail server means nobody can sign in.
+smtp_check() {
+  local host port
+  host="$(env_get SMTP_HOST)"; port="$(env_get SMTP_PORT)"; port="${port:-587}"
+  if timeout 6 bash -c "exec 3<>/dev/tcp/$host/$port" 2>/dev/null; then
+    ok "Mail server reachable: $host:$port"
+  else
+    warn "Cannot reach the mail server $host:$port from this server."
+    warn "Sign-in codes will NOT be delivered. Ask the network/firewall team to allow outbound TCP $port,"
+    warn "or use the institution's own SMTP relay (set SMTP_HOST/SMTP_PORT in .env)."
+  fi
 }
 
 check_env() {
@@ -113,6 +132,12 @@ check_env() {
     [ "$(env_get EMAIL_PROVIDER)" != mailpit ] || die "EMAIL_PROVIDER=mailpit is for development. Set EMAIL_PROVIDER=smtp and the SMTP_* values."
     [ -n "$(env_get SMTP_HOST)" ] || die "SMTP_HOST is empty in .env"
     [ "$(env_get MALWARE_SCAN)" != disabled ] || die "MALWARE_SCAN=disabled is not allowed in production"
+    smtp_check
+    if [ "$(env_get DB_VIEWER_ENABLED)" = true ]; then
+      local vp
+      vp="$(env_get DB_VIEWER_PASSWORD)"
+      [ ${#vp} -ge 16 ] || die "DB_VIEWER_PASSWORD must be at least 16 characters when DB_VIEWER_ENABLED=true"
+    fi
     local secret
     secret="$(env_get SESSION_SECRET)"
     [ ${#secret} -ge 32 ] || die "SESSION_SECRET must be at least 32 characters"
@@ -149,7 +174,7 @@ wait_healthy() {
   for i in $(seq 1 90); do
     if health >/dev/null 2>&1; then
       echo
-      ok "Portal is up: $(env_get APP_ORIGIN)  (local: http://127.0.0.1:$(port))"
+      if [ "$MODE" = dev ]; then ok "Portal is up: http://localhost:$(port)"; else ok "Portal is up: $(env_get APP_ORIGIN)  (local: http://127.0.0.1:$(port))"; fi
       if [ "$MODE" = dev ]; then
         local mp
         mp="$(env_get MAILPIT_UI_HOST_PORT)"

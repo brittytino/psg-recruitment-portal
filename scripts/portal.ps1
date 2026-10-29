@@ -25,6 +25,7 @@ docker info *> $null
 if ($LASTEXITCODE -ne 0) { Die "Docker Desktop is not running. Start it, wait until it says 'Engine running', then try again." }
 
 $files = if ($Mode -eq "dev") { @("-f", "compose.yaml", "-f", "compose.dev.yaml") } else { @("-f", "compose.yaml") }
+if ($Mode -eq "prod" -and (Test-Path .env) -and (Select-String -Path .env -Pattern "^DB_VIEWER_ENABLED=true" -Quiet)) { $files += @("--profile", "dbviewer") }
 function Dc { & docker compose --env-file .env @files @args; if ($LASTEXITCODE -ne 0) { throw "docker compose $($args -join ' ') failed" } }
 
 function EnvGet($key) {
@@ -56,6 +57,7 @@ function CreateEnv {
   $t = $t -replace "(?m)^MIGRATION_DATABASE_URL=.*", "MIGRATION_DATABASE_URL=postgresql://srp_owner:$owner@db:5432/srportal?schema=public"
   $t = $t -replace "(?m)^SESSION_SECRET=.*", "SESSION_SECRET=$(Rand 48)"
   $t = $t -replace "(?m)^CONVERTER_TOKEN=.*", "CONVERTER_TOKEN=$(Rand 24)"
+  $t = $t -replace "(?m)^DB_VIEWER_PASSWORD=.*", "DB_VIEWER_PASSWORD=$(Rand 18)"
   Write-Lf ".env" $t
   Ok "Created .env with generated secrets"
   Warn "Edit .env: set APP_ORIGIN and the SMTP_* mail settings, then run prod.bat again."
@@ -73,6 +75,15 @@ function CheckEnv {
   if ($Mode -eq "prod") {
     if ((EnvGet "NODE_ENV") -ne "production") { Die "NODE_ENV must be production in .env" }
     if ((EnvGet "EMAIL_PROVIDER") -eq "mailpit") { Die "Set EMAIL_PROVIDER=smtp and SMTP_* values for production" }
+    $smtpHost = EnvGet "SMTP_HOST"; $smtpPort = EnvGet "SMTP_PORT"; if (-not $smtpPort) { $smtpPort = "587" }
+    $client = New-Object Net.Sockets.TcpClient
+    try {
+      if ($client.ConnectAsync($smtpHost, [int]$smtpPort).Wait(6000) -and $client.Connected) { Ok "Mail server reachable: ${smtpHost}:$smtpPort" }
+      else { throw "unreachable" }
+    } catch {
+      Warn "Cannot reach the mail server ${smtpHost}:$smtpPort. Sign-in codes will NOT be delivered."
+      Warn "Allow outbound TCP $smtpPort in the firewall/antivirus, or use the institution's SMTP relay."
+    } finally { $client.Dispose() }
   } elseif ((EnvGet "NODE_ENV") -eq "production") {
     Warn ".env holds production settings. Run 'dev.bat env' for development settings."
   }

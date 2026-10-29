@@ -76,12 +76,12 @@ export async function loader({ request, params, context }: Route.LoaderArgs) {
   return {
     sheet: { ...sheet, rows },
     approver: approver?.profile?.fullName ?? approver?.email ?? "—",
-    canReopen: hasPermission(user.grants, "settings:manage") && sheet.status === "APPROVED",
+    canReopen: hasPermission(user.grants, "summary:reopen") && sheet.status === "APPROVED",
   };
 }
 
 export async function action({ request, params, context }: Route.ActionArgs) {
-  const user = requireStaff(context, request, "settings:manage");
+  const user = requireStaff(context, request, "summary:reopen");
   const form = await readForm(request, context);
   return handleAction(async () => {
     await reopenSummarySheet(user, params.id, String(form.get("reason") ?? ""), clientIp(request));

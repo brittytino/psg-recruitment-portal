@@ -153,9 +153,9 @@ describe("v2 application", () => {
     expect(bundle.pageCount).toBe(report.applicationPages + report.indexPages + 6);
     expect((await PDFDocument.load(await getFile(bundle.storageKey!))).getPageCount()).toBe(bundle.pageCount);
 
-    // Candidates download the form, not the office bundle.
+    // Candidates can download both their application form and their consolidated bundle.
     expect((await authorizeGeneratedDownload(a.cand, form.id)).id).toBe(form.id);
-    await expect(authorizeGeneratedDownload(a.cand, bundle.id)).rejects.toThrow(/not found/i);
+    expect((await authorizeGeneratedDownload(a.cand, bundle.id)).id).toBe(bundle.id);
   });
 
   it("concurrent submissions in one department get distinct references", async () => {

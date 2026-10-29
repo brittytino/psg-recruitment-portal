@@ -95,7 +95,7 @@ export default function Documents({ loaderData, actionData }: Route.ComponentPro
         <Alert tone="danger">{actionData.formError}</Alert>
       )}
 
-      <div className="rounded-2xl border border-line bg-soft/70 p-4 text-sm text-muted">
+      <div className="rounded-xl border border-line bg-soft/70 p-4 text-sm text-muted">
         <span className="font-semibold text-ink">Qualification &amp; experience certificates:</span>{" "}
         Supporting documents for academic qualifications (degree certificates, mark sheets) and employment
         experience testimonials are attached directly to each entry in the respective sections of your form.

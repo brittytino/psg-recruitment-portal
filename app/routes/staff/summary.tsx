@@ -161,7 +161,7 @@ export default function Summary({ loaderData, actionData }: Route.ComponentProps
             ) : (
               <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
                 {L.departments.map((d) => (
-                  <div key={d.id} className="rounded-2xl border border-line bg-white p-4 shadow-xs">
+                  <div key={d.id} className="rounded-xl border border-line bg-paper p-4 shadow-xs">
                     <p className="font-semibold">
                       {d.name} <span className="text-muted">({d.code})</span>
                     </p>
@@ -193,7 +193,7 @@ export default function Summary({ loaderData, actionData }: Route.ComponentProps
               </h2>
               <ul className="space-y-3">
                 {L.approvals.map((p) => (
-                  <li key={p.id} className="rounded-2xl border border-line p-4">
+                  <li key={p.id} className="rounded-xl border border-line p-4">
                     <div className="flex flex-wrap items-start justify-between gap-3">
                       <div className="min-w-0">
                         <Link to={`/staff/applications/${p.application.id}`} className="font-semibold">
@@ -545,7 +545,7 @@ function OfficeSummary({ L }: { L: OfficeData }) {
             </div>
             <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
               {groups.map((g) => (
-                <fieldset key={g} className="rounded-2xl border border-line p-4">
+                <fieldset key={g} className="rounded-xl border border-line p-4">
                   <legend className="px-1 text-sm font-semibold">{g}</legend>
                   <div className="mt-1 space-y-1.5">
                     {EXPORT_COLUMNS.filter((c) => c.group === g).map((c) => (
@@ -573,7 +573,7 @@ function OfficeSummary({ L }: { L: OfficeData }) {
             </div>
 
             {/* Export Preview Area */}
-            <div className="rounded-2xl border border-line bg-soft/60 p-4 space-y-3">
+            <div className="rounded-xl border border-line bg-soft/60 p-4 space-y-3">
               <div className="flex items-center justify-between">
                 <div>
                   <h3 className="text-sm font-semibold text-ink">Export Preview</h3>

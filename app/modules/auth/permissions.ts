@@ -27,6 +27,7 @@ export type Permission =
   | "review:record"
   | "summary:generate"
   | "summary:read"
+  | "summary:reopen"
   | "position:approve"
   | "document:download"
   | "document:regenerate"
@@ -68,6 +69,7 @@ export const ROLE_PERMISSIONS: Record<RoleName, readonly Permission[]> = {
     "application:assign",
     "application:export",
     "summary:read",
+    "summary:reopen",
     "position:approve",
     "document:download",
     "document:regenerate",
@@ -80,6 +82,7 @@ export const ROLE_PERMISSIONS: Record<RoleName, readonly Permission[]> = {
     "application:assign",
     "application:export",
     "summary:read",
+    "summary:reopen",
     "position:approve",
     "document:download",
     "document:regenerate",

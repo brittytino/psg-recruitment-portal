@@ -142,7 +142,7 @@ function GroupCard({
   const done = docs.length > 0;
   return (
     <div
-      className={`rounded-2xl border p-5 ${error ? "border-danger/60 bg-danger-50" : done ? "border-success/30 bg-success-50/40" : "border-line bg-white"}`}
+      className={`rounded-xl border p-5 ${error ? "border-danger/60 bg-danger-50" : done ? "border-success/30 bg-success-50/40" : "border-line bg-paper"}`}
     >
       <div className="flex items-start justify-between gap-3">
         <div>
@@ -173,7 +173,7 @@ function GroupCard({
           {docs.map((d) => (
             <li
               key={d.id}
-              className="flex flex-wrap items-center justify-between gap-2 rounded-xl bg-white p-3 text-sm shadow-xs"
+              className="flex flex-wrap items-center justify-between gap-2 rounded-xl bg-paper p-3 text-sm shadow-xs"
             >
               <span className="min-w-0">
                 <a href={`/files/documents/${d.id}`} className="block truncate font-medium" title={d.name}>

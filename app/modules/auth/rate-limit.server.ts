@@ -21,6 +21,13 @@ export async function rateLimit(
   }
 }
 
+/** Gives back one unit of a bucket, e.g. when the action failed for reasons outside the user's control. */
+export async function refundRateLimit(bucket: string, key: string): Promise<void> {
+  const k = `rl:${bucket}:${key}`;
+  const r = redis();
+  if ((await r.decr(k)) <= 0) await r.del(k);
+}
+
 /** Client IP as forwarded by Nginx (the application is never exposed directly in production). */
 export function clientIp(request: Request): string {
   return (

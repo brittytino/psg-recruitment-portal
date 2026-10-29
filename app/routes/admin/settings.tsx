@@ -40,7 +40,7 @@ export default function Settings({ loaderData, actionData }: Route.ComponentProp
       <Form method="post" className="card space-y-4">
         <CsrfInput />
         {keys.map((k) => (
-          <label key={k} className="flex items-start gap-3 rounded-2xl border border-line p-4">
+          <label key={k} className="flex items-start gap-3 rounded-xl border border-line p-4">
             <input type="checkbox" name={k} defaultChecked={loaderData.values[k]} className="mt-1 h-5 w-5" />
             <span>
               <span className="block font-semibold">{SETTINGS[k].label}</span>

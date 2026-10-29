@@ -70,107 +70,89 @@ export default function Home({ loaderData }: Route.ComponentProps) {
   return (
     <div className="space-y-14 sm:space-y-20">
       {/* Hero */}
-      <motion.section
-        {...fade}
-        aria-labelledby="hero"
-        className="hero-gradient relative -mx-4 overflow-hidden px-5 py-12 sm:mx-0 sm:rounded-2xl sm:px-10 sm:py-16 lg:px-14 lg:py-20"
-      >
-        <div className="paper-grid pointer-events-none absolute inset-0 opacity-40 [mask-image:linear-gradient(to_bottom,black,transparent)]" />
-        <div className="relative grid gap-10 lg:grid-cols-[1.4fr_1fr] lg:items-end">
+      <motion.section {...fade} aria-labelledby="hero" className="relative">
+        <div className="grid gap-10 lg:grid-cols-[1.25fr_1fr] lg:items-center lg:gap-14">
           <div>
-            <p className="inline-flex items-center gap-2 rounded-full border border-white/20 bg-white/5 px-3 py-1 text-xs font-medium text-white/80">
-              <span className="h-1.5 w-1.5 rounded-full bg-gold-400" aria-hidden="true" />
-              PSG College of Technology, Coimbatore
+            <p className="inline-flex items-center gap-2 rounded-full border border-brand-100 bg-brand-50 px-3 py-1 text-xs font-semibold text-brand-700">
+              <span className="h-1.5 w-1.5 rounded-full bg-brand-600" aria-hidden="true" />
+              {total > 0
+                ? `${total} position${total === 1 ? "" : "s"} open now`
+                : "PSG College of Technology, Coimbatore"}
             </p>
             <h1
               id="hero"
-              className="mt-5 max-w-2xl text-4xl leading-[1.08] font-semibold sm:text-5xl lg:text-6xl"
+              className="mt-5 max-w-2xl text-4xl leading-[1.1] font-semibold text-navy-800 sm:text-5xl lg:text-[3.4rem]"
             >
-              Join the faculty that shapes engineers.
+              Join the faculty that <span className="text-brand-600">shapes engineers</span>.
             </h1>
-            <p className="mt-5 max-w-xl text-base text-white/75 sm:text-lg">
-              Apply online for faculty and research positions, upload your documents securely and follow your
-              application through to the decision.
+            <p className="mt-5 max-w-xl text-base text-muted sm:text-lg">
+              Apply online for faculty and research positions at PSG College of Technology. Upload your
+              documents securely and follow your application through to the decision.
             </p>
 
             <div className="mt-8 flex flex-col gap-3 sm:flex-row sm:flex-wrap">
-              {notice ? (
-                <a
-                  href="/open-positions.pdf"
-                  target="_blank"
-                  rel="noreferrer"
-                  className="btn btn-lg bg-gold-400 text-navy-900 shadow-sm hover:bg-[#e2b85c] hover:text-navy-900"
-                >
+              {notice && (
+                <a href="/open-positions.pdf" target="_blank" rel="noreferrer" className="btn-primary btn-lg">
                   <FileDown className="h-5 w-5" aria-hidden="true" /> Open positions (PDF)
                 </a>
-              ) : null}
-              <Link
-                to="/vacancies"
-                className={
-                  notice
-                    ? "btn btn-lg border border-white/30 text-white hover:bg-white/10 hover:text-white"
-                    : "btn btn-lg bg-gold-400 text-navy-900 hover:bg-[#e2b85c] hover:text-navy-900"
-                }
-              >
+              )}
+              <Link to="/vacancies" className={notice ? "btn-secondary btn-lg" : "btn-primary btn-lg"}>
                 Browse vacancies <ArrowRight className="h-4 w-4" aria-hidden="true" />
               </Link>
             </div>
             {notice && (
-              <p className="mt-3 text-xs text-white/55">
+              <p className="mt-3 text-xs text-muted">
                 {notice.title} · published {formatDate(notice.uploadedAt)}
               </p>
             )}
           </div>
 
-          <Form
-            method="get"
-            action="/vacancies"
-            role="search"
-            className="rounded-xl bg-paper p-4 text-ink shadow-[var(--shadow-float)] sm:p-5"
-          >
-            <label htmlFor="hero-q" className="block text-sm font-semibold">
-              Search vacancies
-            </label>
-            <div className="mt-2 flex flex-col gap-2 sm:flex-row lg:flex-col xl:flex-row">
-              <div className="relative flex-1">
-                <Search
-                  className="pointer-events-none absolute top-1/2 left-3 h-4 w-4 -translate-y-1/2 text-muted"
-                  aria-hidden="true"
-                />
-                <input
-                  id="hero-q"
-                  name="q"
-                  type="search"
-                  placeholder="e.g. Assistant Professor, CSE"
-                  className="field-input pl-9"
-                />
+          <div className="rounded-xl border border-line bg-paper p-5 shadow-[var(--shadow-soft)] sm:p-6">
+            <Form method="get" action="/vacancies" role="search">
+              <label htmlFor="hero-q" className="block font-display text-lg font-semibold text-ink">
+                Find a position
+              </label>
+              <p className="mt-1 text-sm text-muted">Search by position, department or research area.</p>
+              <div className="mt-4 flex flex-col gap-2 sm:flex-row">
+                <div className="relative flex-1">
+                  <Search
+                    className="pointer-events-none absolute top-1/2 left-3 h-4 w-4 -translate-y-1/2 text-muted"
+                    aria-hidden="true"
+                  />
+                  <input
+                    id="hero-q"
+                    name="q"
+                    type="search"
+                    placeholder="e.g. Assistant Professor, CSE"
+                    className="field-input pl-9"
+                  />
+                </div>
+                <button type="submit" className="btn-dark">
+                  Search
+                </button>
               </div>
-              <button type="submit" className="btn-primary">
-                Search
-              </button>
-            </div>
-            <div className="mt-3 flex flex-wrap gap-1.5">
-              <Link to="/vacancies?category=FACULTY" className="chip">
-                Faculty
-              </Link>
-              <Link to="/vacancies?category=RESEARCH" className="chip">
-                Research
-              </Link>
-              <Link to="/vacancies?position=ASSISTANT_PROFESSOR" className="chip">
-                Assistant Professor
-              </Link>
-            </div>
-          </Form>
+              <div className="mt-3 flex flex-wrap gap-1.5">
+                <Link to="/vacancies?category=FACULTY" className="chip">
+                  Faculty
+                </Link>
+                <Link to="/vacancies?category=RESEARCH" className="chip">
+                  Research
+                </Link>
+                <Link to="/vacancies?position=ASSISTANT_PROFESSOR" className="chip">
+                  Assistant Professor
+                </Link>
+              </div>
+            </Form>
+            <dl className="mt-6 grid grid-cols-2 gap-3 border-t border-line pt-5">
+              {stats.map(([label, value]) => (
+                <div key={label} className="rounded-lg bg-canvas px-3 py-2.5">
+                  <dt className="text-xs text-muted">{label}</dt>
+                  <dd className="mt-0.5 text-xl font-bold text-navy-800 tabular-nums">{value}</dd>
+                </div>
+              ))}
+            </dl>
+          </div>
         </div>
-
-        <dl className="relative mt-12 grid grid-cols-2 gap-px overflow-hidden rounded-xl bg-white/10 ring-1 ring-white/10 sm:grid-cols-4">
-          {stats.map(([label, value]) => (
-            <div key={label} className="bg-navy-900/40 px-4 py-4 sm:px-5">
-              <dt className="text-xs text-white/60">{label}</dt>
-              <dd className="mt-1 font-display text-2xl font-semibold text-white sm:text-3xl">{value}</dd>
-            </div>
-          ))}
-        </dl>
       </motion.section>
 
       {/* Open positions */}
@@ -252,7 +234,7 @@ export default function Home({ loaderData }: Route.ComponentProps) {
       {/* Call to action */}
       <section
         aria-labelledby="cta"
-        className="flex flex-col items-start justify-between gap-6 rounded-2xl border border-line bg-paper p-6 sm:p-10 md:flex-row md:items-center"
+        className="flex flex-col items-start justify-between gap-6 rounded-xl border border-line bg-paper p-6 sm:p-10 md:flex-row md:items-center"
       >
         <div className="max-w-xl">
           <h2 id="cta" className="text-2xl sm:text-3xl">

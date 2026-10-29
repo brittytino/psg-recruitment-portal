@@ -493,7 +493,7 @@ export async function reopenSummarySheet(
   reason: string,
   ip?: string,
 ) {
-  const u = requirePermission(user, "settings:manage");
+  const u = requirePermission(user, "summary:reopen");
   if (reason.trim().length < 5) throw new ValidationError("Give a reason (at least 5 characters)");
   const sheet = await prisma.summarySheet.findUnique({ where: { id: sheetId } });
   if (!sheet || sheet.status !== "APPROVED") throw new NotFoundError("Approved summary sheet");

@@ -294,7 +294,7 @@ export default function ApplicationEditor({ loaderData }: Route.ComponentProps) 
           <span>{pct}% complete</span>
         </div>
         <progress className="mt-2 h-2 w-full" max={100} value={pct} aria-label="Application progress" />
-        <details className="mt-3 rounded-2xl border border-line bg-white p-3">
+        <details className="mt-3 rounded-xl border border-line bg-paper p-3">
           <summary className="cursor-pointer text-sm font-semibold">All steps</summary>
           <StepList
             sections={sections}
@@ -458,7 +458,7 @@ function StepList({
                     ? "bg-success text-white"
                     : st === "errors"
                       ? "bg-danger text-white"
-                      : "border border-line bg-white text-muted"
+                      : "border border-line bg-paper text-muted"
                 }`}
               >
                 {st === "complete" ? "✓" : st === "errors" ? "!" : i + 1}

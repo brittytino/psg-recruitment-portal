@@ -161,7 +161,7 @@ export default function Review({ loaderData: L, actionData }: Route.ComponentPro
         <iframe
           title="Preview of your application (PDF)"
           src={`/applications/${L.id}/preview.pdf#view=FitH`}
-          className="h-[75vh] min-h-[480px] w-full rounded-2xl border border-line bg-soft"
+          className="h-[75vh] min-h-[480px] w-full rounded-xl border border-line bg-soft"
         />
         <p className="text-sm text-muted">
           Cannot view the embedded PDF?{" "}
@@ -201,7 +201,7 @@ export default function Review({ loaderData: L, actionData }: Route.ComponentPro
         <Form method="post" className="space-y-4">
           <CsrfInput />
           <input type="hidden" name="version" value={L.version} />
-          <label className="flex items-start gap-3 rounded-2xl border border-line bg-soft p-4 text-[15px]">
+          <label className="flex items-start gap-3 rounded-xl border border-line bg-soft p-4 text-[15px]">
             <input
               type="checkbox"
               name="declaration"
