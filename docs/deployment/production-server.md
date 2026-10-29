@@ -71,3 +71,34 @@ git pull && ./prod.sh      # update: rebuild, migrate, restart
 ```
 
 Backups go to `backups/<timestamp>/` (database dump + uploaded files). Copy them off the server.
+
+## Where files are stored
+
+| What | Where |
+| --- | --- |
+| Uploaded documents (photos, signatures, certificates, PDFs) | Docker volume `psg-srportal_storage`, folder `uploads/<2 chars>/<random id>.<pdf, jpg or png>` |
+| Generated application PDFs and consolidated bundles | Same volume, folder `generated/<application id>/` |
+| Open-positions notice PDFs | Same volume, folder `generated/notices/` |
+| Which file belongs to whom | Database tables `application_documents` and `generated_documents`; readable views `reports.documents` and `reports.generated_pdfs` |
+
+On the server the volume is at `/var/lib/docker/volumes/psg-srportal_storage/_data/` (inside the app
+container: `/var/lib/srportal/storage/`). Files get random names, are never served directly by Nginx
+and can only be downloaded through the portal by the candidate or authorised staff. PDFs that were
+locked without a password (DigiLocker etc.) are stored as unlocked copies so they merge into the
+application bundle. `./prod.sh backup` copies the database and this volume to `backups/<timestamp>/`.
+
+## Upload size limit (413 errors)
+
+Nginx's default request limit is 1 MB, which rejects most PDFs with **413 Request Entity Too Large**.
+`./prod.sh` sets `client_max_body_size 25m` for every site on this server
+(`/etc/nginx/conf.d/psg-uploads.conf`). Check from any computer:
+
+```sh
+head -c 3000000 /dev/urandom > /tmp/3mb.bin
+curl -s -o /dev/null -w "%{http_code}\n" -F "file=@/tmp/3mb.bin" \
+  https://recruitments.psgtech.ac.in/applications/00000000-0000-0000-0000-000000000000/attachments
+```
+
+`401`, `403` or `404` means the upload reached the portal (fine). `413` means a proxy in front still has
+the 1 MB default: if the college routes traffic through a separate gateway / reverse proxy, the IT team
+must add `client_max_body_size 25m;` there as well.

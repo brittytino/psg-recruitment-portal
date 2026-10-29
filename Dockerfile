@@ -22,7 +22,7 @@ RUN set -eux; \
       -e 's|deb.debian.org/debian-security|security.debian.org/debian-security|g' \
       -e 's|deb.debian.org/debian|ftp.debian.org/debian|g' {} +; \
     apt-get update \
- && apt-get install -y --no-install-recommends ca-certificates openssl tini \
+ && apt-get install -y --no-install-recommends ca-certificates openssl tini qpdf \
  && rm -rf /var/lib/apt/lists/*
 WORKDIR /app
 

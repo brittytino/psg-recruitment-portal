@@ -24,6 +24,7 @@ import {
   LogOut,
   Menu,
   Search,
+  UserRound,
   Settings,
   ShieldCheck,
   Users,
@@ -220,8 +221,10 @@ function PublicHeader() {
   if (user && !staff) links.push(["/account", "My applications"]);
   if (staff) links.push(["/staff", "Staff workspace"]);
   const linkCls = ({ isActive }: { isActive: boolean }) =>
-    `rounded-md px-3 py-2 text-sm font-medium no-underline transition-colors ${
-      isActive ? "bg-soft text-ink" : "text-muted hover:bg-soft hover:text-ink"
+    `relative px-3 py-2 text-[15px] no-underline transition-colors after:absolute after:inset-x-3 after:-bottom-[13px] after:h-0.5 after:rounded-full ${
+      isActive
+        ? "font-semibold text-ink after:bg-brand-600"
+        : "text-muted hover:text-ink after:bg-transparent"
     }`;
 
   return (
@@ -243,11 +246,14 @@ function PublicHeader() {
             <SignOut className="btn-secondary btn-sm" />
           ) : (
             <>
-              <Link to="/login" className="btn-ghost btn-sm">
-                Sign in
-              </Link>
-              <Link to="/register" className="btn-primary btn-sm">
+              <Link to="/register" className="btn-ghost btn-sm text-muted">
                 Create account
+              </Link>
+              <Link
+                to="/login"
+                className="btn border border-brand-600 px-5 text-brand-700 hover:bg-brand-50 hover:text-brand-800"
+              >
+                <UserRound className="h-4 w-4" aria-hidden="true" /> Sign in
               </Link>
             </>
           )}

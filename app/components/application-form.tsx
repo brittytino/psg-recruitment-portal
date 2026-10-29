@@ -1,4 +1,5 @@
 import { useEffect, useId, useMemo, useRef, useState } from "react";
+import { postUpload } from "~/lib/upload-client";
 import { useParams } from "react-router";
 import { useCsrf } from "~/components/forms";
 import { DOCUMENT_TYPE_LABELS, type DocType } from "~/modules/documents/policy";
@@ -682,11 +683,7 @@ function InlineAttachmentEditor({
       fd.append("_csrf", effectiveCsrf);
       fd.append("documentType", selectedDocType);
       fd.append("file", file);
-      const res = await fetch(`/applications/${effectiveAppId}/attachments`, {
-        method: "POST",
-        body: fd,
-      });
-      const data = await res.json();
+      const data = await postUpload(`/applications/${effectiveAppId}/attachments`, fd, maxUploadMb ?? 10);
       if (data.ok && data.document) {
         onAttached(data.document);
       } else {

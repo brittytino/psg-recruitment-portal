@@ -19,7 +19,14 @@ if ! command -v nginx >/dev/null 2>&1 || ! command -v certbot >/dev/null 2>&1; t
   apt-get install -y nginx certbot python3-certbot-nginx
 fi
 
-install -d /etc/nginx/snippets
+install -d /etc/nginx/snippets /etc/nginx/conf.d
+# Upload limit at http level: applies to every site on this Nginx, including any server block the
+# IT team configured for the same domain. Nginx's default is 1 MB, which rejects most PDFs (413).
+cat > /etc/nginx/conf.d/psg-uploads.conf <<'EOF'
+client_max_body_size 25m;
+client_body_timeout 300s;
+proxy_request_buffering on;
+EOF
 cat > /etc/nginx/snippets/psg-proxy.conf <<'EOF'
 proxy_http_version 1.1;
 proxy_set_header Host $host;

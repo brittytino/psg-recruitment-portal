@@ -1,4 +1,5 @@
 import { useRef, useState } from "react";
+import { postUpload } from "~/lib/upload-client";
 import { useRevalidator } from "react-router";
 import { Badge, useCsrf } from "~/components/forms";
 import { DOCUMENT_TYPE_LABELS, IMAGE_ONLY_TYPES, type DocType } from "~/modules/documents/policy";
@@ -108,8 +109,7 @@ function GroupCard({
     setError(null);
     try {
       fd.append("_csrf", csrf);
-      const res = await fetch(`/applications/${applicationId}/attachments`, { method: "POST", body: fd });
-      const data = (await res.json()) as { ok: boolean; formError?: string };
+      const data = await postUpload(`/applications/${applicationId}/attachments`, fd, maxUploadMb);
       if (!data.ok) setError(data.formError ?? "The file could not be uploaded.");
       revalidator.revalidate();
     } catch {

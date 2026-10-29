@@ -202,7 +202,7 @@ describe("candidate submission and document pipeline", () => {
         "DEGREE_CERTIFICATE",
         file(new Uint8Array([0x25, 0x50, 0x44, 0x46, 0x2d, 0x31, 0x2e, 0x34, 0x0a, 0x00]), "broken.pdf"),
       ),
-    ).rejects.toThrow(/damaged/);
+    ).rejects.toThrow(/could not be read/);
   });
 
   it("ClamAV detects the EICAR test signature", async () => {

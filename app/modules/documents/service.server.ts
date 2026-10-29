@@ -1,5 +1,4 @@
 import { fileTypeFromBuffer } from "file-type";
-import { PDFDocument } from "pdf-lib";
 import { getOwnApplication } from "~/modules/applications/service.server";
 import { EDITABLE, type AppStatus } from "~/modules/applications/workflow";
 import { audit } from "~/modules/audit/audit.server";
@@ -19,6 +18,7 @@ import {
   sanitizeFilename,
   type DocType,
 } from "./policy";
+import { normalizePdf, pdfHeaderOffset } from "./pdf-normalize.server";
 import { newKey, putFile } from "./storage.server";
 
 const SINGLE_FILE_TYPES: readonly DocType[] = ["PHOTOGRAPH", "SIGNATURE", "RESUME"];
@@ -26,12 +26,15 @@ const SINGLE_FILE_TYPES: readonly DocType[] = ["PHOTOGRAPH", "SIGNATURE", "RESUM
 export interface DetectedFile {
   mime: "application/pdf" | "image/jpeg" | "image/png";
   ext: "pdf" | "jpg" | "png";
+  /** Normalised bytes to store instead of the upload (PDFs that were unlocked or repaired). */
+  data?: Uint8Array;
 }
 
 /** Determines the real file type from its signature and checks it is structurally valid. */
 export async function inspectUpload(data: Uint8Array, type: DocType): Promise<DetectedFile> {
   const ft = await fileTypeFromBuffer(data);
-  const mime = ft?.mime;
+  // Some scanner apps put a few bytes before the PDF header; PDF readers accept that, so do we.
+  const mime = ft?.mime ?? (pdfHeaderOffset(data) >= 0 ? "application/pdf" : undefined);
   if (mime !== "application/pdf" && mime !== "image/jpeg" && mime !== "image/png")
     throw new ValidationError(
       "Only PDF, JPEG or PNG files are accepted. The file content does not match an allowed type.",
@@ -45,18 +48,14 @@ export async function inspectUpload(data: Uint8Array, type: DocType): Promise<De
           : "This file type is not allowed for this document",
     );
   if (mime === "application/pdf") {
-    try {
-      const pdf = await PDFDocument.load(data, { updateMetadata: false });
-      if (pdf.getPageCount() < 1) throw new Error("no pages");
-    } catch (e) {
-      const msg = String((e as Error).message ?? "");
+    const pdf = await normalizePdf(data);
+    if (!pdf.ok)
       throw new ValidationError(
-        /encrypt/i.test(msg)
-          ? "Password-protected PDFs cannot be accepted. Please upload an unprotected copy."
-          : "The PDF appears to be damaged and could not be read.",
+        pdf.reason === "password"
+          ? "This PDF needs a password to open. Please upload a copy that opens without a password."
+          : "The PDF could not be read. Open it on your device, use Print → Save as PDF, and upload the new file.",
       );
-    }
-    return { mime, ext: "pdf" };
+    return { mime, ext: "pdf", data: pdf.data };
   }
   try {
     const info = imageInfo(data);
@@ -93,7 +92,8 @@ export async function uploadDocument(
   const data = new Uint8Array(await file.arrayBuffer());
   const detected = await inspectUpload(data, type);
   const key = newKey("uploads", detected.ext);
-  const { sha256, size } = await putFile(key, data);
+  // PDFs are stored as normalised (unlocked / repaired) copies so the bundle can include them.
+  const { sha256, size } = await putFile(key, detected.data ?? data);
   return prisma.$transaction(async (tx) => {
     // A new photograph, signature or resume replaces the previous one.
     if (SINGLE_FILE_TYPES.includes(type))
