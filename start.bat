@@ -98,10 +98,12 @@ echo [4/5] Deploying database schema and bootstrapping institutional accounts...
 docker compose -f compose.yaml -f compose.dev.yaml up -d --remove-orphans db redis
 
 echo [INFO] Waiting for PostgreSQL readiness...
-timeout /t 4 /nobreak >nul
+ping 127.0.0.1 -n 5 >nul 2>&1
 
+setlocal DisableDelayedExpansion
 docker compose -f compose.yaml -f compose.dev.yaml exec -T db psql -U srp_owner -d srportal -c "ALTER USER srp_owner WITH PASSWORD 'PsgTech_DbOwner_2026!'; ALTER USER srp_app WITH PASSWORD 'PsgTech_AppUser_2026!';" >nul 2>&1
 docker compose -f compose.yaml -f compose.dev.yaml exec -T db psql -U srp_owner -d srportal -c "UPDATE \"_prisma_migrations\" SET finished_at = NOW(), applied_steps_count = 1 WHERE migration_name = '20261028100000_add_qualification_mode_of_study' AND finished_at IS NULL;" >nul 2>&1
+endlocal
 
 echo [INFO] Running database migrations and seed runner...
 docker compose -f compose.yaml -f compose.dev.yaml run --rm migrate
@@ -130,7 +132,7 @@ set /a attempts+=1
 curl.exe -s -f http://127.0.0.1:6969/healthz/ready >nul 2>&1
 if not errorlevel 1 goto stack_ready
 if !attempts! geq 35 goto stack_pending
-timeout /t 2 /nobreak >nul
+ping 127.0.0.1 -n 3 >nul 2>&1
 goto health_loop
 
 :stack_pending
@@ -162,8 +164,8 @@ echo    APPROVED PRIVILEGED ACCOUNTS BOOTSTRAPPED:
 echo    • Super Admin (Tino):             brittytino08@gmail.com  (Full System Access)
 echo    • Dean (Dr. S. Saravanan):        dean.admn@psgtech.ac.in (Recruitment Oversight)
 echo    • Principal (Dr. G. Thilagavathi): principal@psgtech.ac.in (Recruitment Oversight)
-echo    • HR-N4 Section:                  admin.n4@psgtech.ac.in  (Job Profiles & Screening)
-echo    • HOD (CSE):                      hod.cse@psgtech.ac.in   (CSE Review & Summary Sheet)
+echo    • HR-N4 Section:                  admin.n4@psgtech.ac.in  (Job Profiles ^& Screening)
+echo    • HOD (CSE):                      hod.cse@psgtech.ac.in   (CSE Review ^& Summary Sheet)
 echo.
 echo    ROUTINE OPERATIONS NOTE:
 echo    Initial deployment is complete. For subsequent launches, simply execute:
