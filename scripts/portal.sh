@@ -129,19 +129,41 @@ create_env() {
   ok "Created .env with freshly generated passwords and secrets (kept only on this server)"
 }
 
-# New settings added to the template in later versions are copied into an existing .env.
+# Secrets that live only on the server: generated once (or entered once) and never overwritten.
+SERVER_SECRETS=" POSTGRES_PASSWORD APP_DB_PASSWORD DATABASE_URL MIGRATION_DATABASE_URL SESSION_SECRET CONVERTER_TOKEN SMTP_PASSWORD DB_VIEWER_PASSWORD "
+
+# The committed template is the source of truth for every non-secret setting: after `git pull`,
+# ./prod.sh applies changed values (e.g. a new domain) to .env. Secrets are kept. Server-only
+# overrides can be placed in secrets/override.env (KEY=value lines, never committed).
 sync_env() {
   [ "$MODE" = prod ] && [ -f "$TEMPLATE" ] || return 0
-  local key line added=0
-  while IFS= read -r line; do
+  local key line current changed=()
+  while IFS= read -r line || [ -n "$line" ]; do
+    line="${line%$'\r'}"
+    case "$line" in ''|'#'*|*=*) ;; *) continue ;; esac
     case "$line" in ''|'#'*) continue ;; esac
     key="${line%%=*}"
-    grep -q "^$key=" .env && continue
-    case "$line" in *__GENERATED__*) line="$key=$(rand 24)" ;; esac
-    printf '%s\n' "$line" >> .env
-    added=1
+    if ! grep -q "^$key=" .env; then
+      case "$line" in *__GENERATED__*) line="$key=$(rand 24)" ;; esac
+      printf '%s\n' "$line" >> .env
+      changed+=("$key")
+      continue
+    fi
+    case "$SERVER_SECRETS" in *" $key "*) continue ;; esac
+    current="$(grep "^$key=" .env | tail -n1)"
+    if [ "$current" != "$line" ]; then
+      env_set "$key" "${line#*=}"
+      changed+=("$key")
+    fi
   done < "$TEMPLATE"
-  [ "$added" = 0 ] || ok "Added new settings from $TEMPLATE to .env"
+  if [ -f secrets/override.env ]; then
+    while IFS= read -r line || [ -n "$line" ]; do
+      line="${line%$'\r'}"
+      case "$line" in ''|'#'*) continue ;; esac
+      env_set "${line%%=*}" "${line#*=}"
+    done < secrets/override.env
+  fi
+  [ ${#changed[@]} -eq 0 ] || ok "Updated .env from $TEMPLATE: ${changed[*]}"
 }
 
 # The Gmail app password is the only secret that cannot be generated. Sources, in order:
@@ -176,7 +198,8 @@ setup_https() {
   local app_domain db_domain
   app_domain="$(env_get APP_ORIGIN)"; app_domain="${app_domain#https://}"; app_domain="${app_domain#http://}"; app_domain="${app_domain%%/*}"
   db_domain="$(env_get DB_VIEWER_DOMAIN)"
-  bash infrastructure/nginx/host/setup-nginx.sh "$app_domain" "${db_domain:-db.$app_domain}" "$(env_get LETSENCRYPT_EMAIL)" ||
+  DB_VIEWER_ALLOW_IPS="$(env_get DB_VIEWER_ALLOW_IPS)" \
+    bash infrastructure/nginx/host/setup-nginx.sh "$app_domain" "${db_domain:-db.$app_domain}" "$(env_get LETSENCRYPT_EMAIL)" ||
     warn "HTTPS set-up did not finish (usually DNS not pointing here yet). Re-run ./prod.sh once DNS is ready."
 }
 
@@ -333,7 +356,10 @@ up() {
     echo
     ok "Portal:    $(env_get APP_ORIGIN)"
     if [ "$(env_get DB_VIEWER_ENABLED)" = true ]; then
-      ok "DB viewer: https://$(env_get DB_VIEWER_DOMAIN)  (user $(env_get DB_VIEWER_USER); password: grep DB_VIEWER_PASSWORD .env)"
+      ok "DB viewer: https://$(env_get DB_VIEWER_DOMAIN)"
+      ok "           user:     $(env_get DB_VIEWER_USER)"
+      ok "           password: $(env_get DB_VIEWER_PASSWORD)"
+      ok "           allowed from: $(env_get DB_VIEWER_ALLOW_IPS)"
     fi
   fi
 }

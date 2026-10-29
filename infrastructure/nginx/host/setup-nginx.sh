@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # One-time Nginx + HTTPS setup on the production Linux server (Debian/Ubuntu).
 #
-#   sudo infrastructure/nginx/host/setup-nginx.sh recruitments.psgtech.ac.in db.recruitments.psgtech.ac.in admin@psgtech.ac.in
+#   sudo infrastructure/nginx/host/setup-nginx.sh recruitments.psgtech.ac.in recruitmentsdb.psgtech.ac.in admin@psgtech.ac.in
 #
 # Before running: both DNS A records must point to this server, and ports 80 and 443 must be open.
 # Re-running is safe: it rewrites the site config and lets certbot renew/expand the certificate.
@@ -29,8 +29,18 @@ proxy_set_header X-Forwarded-Proto $scheme;
 proxy_set_header X-Forwarded-Host $host;
 proxy_read_timeout 120s;
 EOF
-# Keep an existing IP allow-list; create an empty (allow everyone) one the first time.
-[ -f /etc/nginx/snippets/psg-db-allow.conf ] || echo "# allow 1.2.3.4; deny all;" > /etc/nginx/snippets/psg-db-allow.conf
+# DB viewer access list. DB_VIEWER_ALLOW_IPS (space/comma separated IPs or CIDRs, from .env) is
+# written on every run; when it is empty the existing file is kept, or everyone is denied.
+ALLOW_FILE=/etc/nginx/snippets/psg-db-allow.conf
+if [ -n "${DB_VIEWER_ALLOW_IPS:-}" ]; then
+  {
+    echo "# Managed by ./prod.sh from DB_VIEWER_ALLOW_IPS in .env.production"
+    for ip in ${DB_VIEWER_ALLOW_IPS//,/ }; do echo "allow $ip;"; done
+    echo "deny all;"
+  } > "$ALLOW_FILE"
+elif [ ! -f "$ALLOW_FILE" ]; then
+  echo "deny all;  # set DB_VIEWER_ALLOW_IPS in .env.production" > "$ALLOW_FILE"
+fi
 
 sed -e "s/__APP_DOMAIN__/$APP_DOMAIN/g" -e "s/__DB_DOMAIN__/$DB_DOMAIN/g" \
   "$HERE/psg-recruitment.conf" > /etc/nginx/sites-available/psg-recruitment.conf
@@ -41,16 +51,19 @@ nginx -t
 systemctl enable --now nginx
 systemctl reload nginx
 
-# HTTPS for both names (certbot edits the server blocks and adds the HTTP -> HTTPS redirect).
-if [ -n "$EMAIL" ]; then
-  certbot --nginx --non-interactive --agree-tos --redirect -m "$EMAIL" -d "$APP_DOMAIN" -d "$DB_DOMAIN"
-else
-  certbot --nginx --non-interactive --agree-tos --redirect --register-unsafely-without-email -d "$APP_DOMAIN" -d "$DB_DOMAIN"
-fi
+# HTTPS: one certificate per name, so a DNS problem with the DB name never removes HTTPS from the
+# portal. Existing valid certificates are reused (no Let's Encrypt rate-limit issues on re-runs).
+if [ -n "$EMAIL" ]; then ACCOUNT=(-m "$EMAIL"); else ACCOUNT=(--register-unsafely-without-email); fi
+status=0
+for d in "$APP_DOMAIN" "$DB_DOMAIN"; do
+  certbot --nginx --non-interactive --agree-tos --redirect --keep-until-expiring     "${ACCOUNT[@]}" --cert-name "$d" -d "$d" || { echo "HTTPS for $d failed (does its DNS A record point here?)" >&2; status=1; }
+done
 nginx -t && systemctl reload nginx
 
 echo
 echo "Done:"
 echo "  https://$APP_DOMAIN      -> recruitment portal"
 echo "  https://$DB_DOMAIN   -> database viewer (needs DB_VIEWER_ENABLED=true in .env, then ./prod.sh)"
-echo "Restrict the DB viewer to campus IPs in /etc/nginx/snippets/psg-db-allow.conf, then: sudo systemctl reload nginx"
+echo "DB viewer allowed from: $(grep -o 'allow [^;]*' "$ALLOW_FILE" | cut -d' ' -f2 | tr '
+' ' ')"
+exit "$status"
