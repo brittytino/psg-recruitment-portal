@@ -12,7 +12,10 @@ import {
 } from "~/modules/applications/workflow";
 import { prisma } from "~/modules/core/db.server";
 
-export const meta: Route.MetaFunction = () => [{ title: "Application status — PSG Tech Recruitment" }];
+export const meta: Route.MetaFunction = () => [
+  { title: "Application status — PSG Tech Recruitment" },
+  { name: "robots", content: "noindex, nofollow" },
+];
 
 export async function loader({ request, params, context }: Route.LoaderArgs) {
   const user = requireUser(context, request);

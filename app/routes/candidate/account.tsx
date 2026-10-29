@@ -14,7 +14,10 @@ import { hasRole } from "~/modules/auth/permissions";
 import { POSITION_LABELS } from "~/lib/labels";
 import { redirect } from "react-router";
 
-export const meta: Route.MetaFunction = () => [{ title: "My applications — PSG Tech Careers" }];
+export const meta: Route.MetaFunction = () => [
+  { title: "My applications — PSG Tech Careers" },
+  { name: "robots", content: "noindex, nofollow" },
+];
 
 export async function loader({ request, context }: Route.LoaderArgs) {
   const user = requireUser(context, request);

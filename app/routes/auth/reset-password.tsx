@@ -3,7 +3,10 @@ import { AuthShell } from "~/components/auth-shell";
 import type { Route } from "./+types/reset-password";
 import { Alert } from "~/components/forms";
 
-export const meta: Route.MetaFunction = () => [{ title: "Passwordless Sign In — PSG Tech Recruitment" }];
+export const meta: Route.MetaFunction = () => [
+  { title: "Passwordless Sign In — PSG Tech Recruitment" },
+  { name: "robots", content: "noindex, nofollow" },
+];
 
 export function loader() {
   // Passwords are not used; redirect directly to passwordless OTP login

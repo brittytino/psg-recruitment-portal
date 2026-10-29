@@ -27,7 +27,10 @@ import { PAGE_SIZES } from "~/modules/reporting/constants";
 import { assignToHod } from "~/modules/reviews/service.server";
 import { hodsForDepartment } from "~/modules/users/service.server";
 
-export const meta: Route.MetaFunction = () => [{ title: "Applications — PSG Tech Recruitment" }];
+export const meta: Route.MetaFunction = () => [
+  { title: "Applications — PSG Tech Recruitment" },
+  { name: "robots", content: "noindex, nofollow" },
+];
 
 export async function loader({ request, context }: Route.LoaderArgs) {
   const user = requireStaff(context, request, "application:list");

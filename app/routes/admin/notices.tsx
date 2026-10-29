@@ -15,7 +15,10 @@ import {
   uploadNotice,
 } from "~/modules/notices/service.server";
 
-export const meta: Route.MetaFunction = () => [{ title: "Open positions PDFs — PSG Tech Recruitment" }];
+export const meta: Route.MetaFunction = () => [
+  { title: "Open positions PDFs — PSG Tech Recruitment" },
+  { name: "robots", content: "noindex, nofollow" },
+];
 
 export async function loader({ request, context }: Route.LoaderArgs) {
   const user = requireStaff(context, request, "notice:manage");

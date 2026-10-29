@@ -12,7 +12,10 @@ import { prisma } from "~/modules/core/db.server";
 import { formatYearsMonths, splitMonths } from "~/modules/forms/experience";
 import { hodScope } from "~/modules/reviews/service.server";
 
-export const meta: Route.MetaFunction = () => [{ title: "Department review — PSG Tech Recruitment" }];
+export const meta: Route.MetaFunction = () => [
+  { title: "Department review — PSG Tech Recruitment" },
+  { name: "robots", content: "noindex, nofollow" },
+];
 
 const TABS = [
   ["pending", "Waiting for your decision"],

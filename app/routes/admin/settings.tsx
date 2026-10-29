@@ -6,7 +6,10 @@ import { handleAction, readForm, requireStaff } from "~/lib/http.server";
 import { SETTINGS, type SettingKey } from "~/modules/settings/definitions";
 import { allSettings, saveSetting } from "~/modules/settings/service.server";
 
-export const meta: Route.MetaFunction = () => [{ title: "Settings — PSG Tech Recruitment" }];
+export const meta: Route.MetaFunction = () => [
+  { title: "Settings — PSG Tech Recruitment" },
+  { name: "robots", content: "noindex, nofollow" },
+];
 
 export async function loader({ request, context }: Route.LoaderArgs) {
   requireStaff(context, request, "settings:manage");

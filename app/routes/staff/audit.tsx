@@ -4,7 +4,10 @@ import { formatDateTime } from "~/components/forms";
 import { requireStaff } from "~/lib/http.server";
 import { auditLog } from "~/modules/reporting/applications.server";
 
-export const meta: Route.MetaFunction = () => [{ title: "Audit log — Recruitment workspace" }];
+export const meta: Route.MetaFunction = () => [
+  { title: "Audit log — Recruitment workspace" },
+  { name: "robots", content: "noindex, nofollow" },
+];
 
 export async function loader({ request, context }: Route.LoaderArgs) {
   const user = requireStaff(context, request, "audit:read");

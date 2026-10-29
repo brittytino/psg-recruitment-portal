@@ -19,7 +19,10 @@ import { getFormDefinition, isDocxForm } from "~/modules/forms/registry";
 import type { Answers, FormCode } from "~/modules/forms/types";
 import { conditionMet, withDerived } from "~/modules/forms/validation";
 
-export const meta: Route.MetaFunction = () => [{ title: "Review and submit — PSG Tech Recruitment" }];
+export const meta: Route.MetaFunction = () => [
+  { title: "Review and submit — PSG Tech Recruitment" },
+  { name: "robots", content: "noindex, nofollow" },
+];
 
 export async function loader({ request, params, context }: Route.LoaderArgs) {
   const user = requireUser(context, request);

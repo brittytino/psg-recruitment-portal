@@ -1,3 +1,4 @@
+import { jsonLd } from "~/lib/json-ld";
 import { Form, Link } from "react-router";
 import { ArrowLeft, CalendarClock, Check, Clock, Users } from "lucide-react";
 import type { Route } from "./+types/vacancy";
@@ -8,9 +9,31 @@ import { userContext } from "~/context";
 import { getPublishedVacancy } from "~/modules/recruitment/service.server";
 import { prisma } from "~/modules/core/db.server";
 
-export const meta: Route.MetaFunction = ({ data }) => [
-  { title: data ? `${data.vacancy.title} — PSG Tech Recruitment` : "Vacancy" },
-];
+export const meta: Route.MetaFunction = ({ data }) => {
+  if (!data) return [{ title: "Vacancy — PSG Tech Recruitment" }, { name: "robots", content: "noindex" }];
+  const v = data.vacancy;
+  const where = v.department?.name ?? v.researchSpecialisation?.name ?? "PSG College of Technology";
+  const pos =
+    v.researchPositionTitle ??
+    (v.position ? (POSITION_LABELS[v.position] ?? v.position) : "Faculty position");
+  const desc = v.description
+    ? v.description.slice(0, 155).replace(/\s+/g, " ").trim()
+    : `Apply for ${pos} in ${where} at PSG College of Technology, Coimbatore. Online applications close on ${new Date(v.closesAt).toLocaleDateString("en-IN")}.`;
+
+  return [
+    { title: `${pos} — ${where} | PSG Tech Recruitment` },
+    { name: "description", content: desc },
+    { name: "robots", content: "index, follow, max-snippet:-1, max-image-preview:large" },
+    { property: "og:title", content: `${pos} — ${where} | PSG College of Technology` },
+    { property: "og:description", content: desc },
+    { property: "og:type", content: "article" },
+    { property: "og:image", content: "/images/psg_logo.png" },
+    { name: "twitter:card", content: "summary" },
+    { name: "twitter:title", content: `${pos} — ${where}` },
+    { name: "twitter:description", content: desc },
+    { name: "twitter:image", content: "/images/psg_logo.png" },
+  ];
+};
 
 export async function loader({ params, context }: Route.LoaderArgs) {
   const vacancy = await getPublishedVacancy(params.code);
@@ -44,6 +67,45 @@ export default function Vacancy({ loaderData }: Route.ComponentProps) {
 
   return (
     <article className="page-stack">
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{
+          __html: jsonLd({
+            "@context": "https://schema.org",
+            "@type": "JobPosting",
+            title: `${position} - ${where}`,
+            description:
+              v.description ||
+              `PSG College of Technology invites applications for the position of ${position} in ${where}. Apply online through the official recruitment portal before ${formatDateTime(v.closesAt)}.`,
+            identifier: {
+              "@type": "PropertyValue",
+              name: "PSG College of Technology",
+              value: v.code,
+            },
+            datePosted: new Date(v.opensAt).toISOString(),
+            validThrough: new Date(v.closesAt).toISOString(),
+            employmentType: "FULL_TIME",
+            hiringOrganization: {
+              "@type": "EducationalOrganization",
+              name: "PSG College of Technology",
+              sameAs: "https://www.psgtech.edu",
+              logo: "https://recruitment.psgtech.edu/images/psg_logo.png",
+            },
+            jobLocation: {
+              "@type": "Place",
+              address: {
+                "@type": "PostalAddress",
+                streetAddress: "Avinashi Road, Peelamedu",
+                addressLocality: "Coimbatore",
+                addressRegion: "Tamil Nadu",
+                postalCode: "641004",
+                addressCountry: "IN",
+              },
+            },
+            industry: "Higher Education",
+          }),
+        }}
+      />
       <Link to="/vacancies" className="back-link">
         <ArrowLeft className="h-4 w-4" aria-hidden="true" /> All vacancies
       </Link>

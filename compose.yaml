@@ -83,6 +83,8 @@ services:
       dockerfile: infrastructure/docker/converter.Dockerfile
     image: psg-srp-converter:local
     restart: unless-stopped
+    # Reaps LibreOffice child processes (memory and process limits are under deploy.resources).
+    init: true
     environment:
       CONVERTER_TOKEN: ${CONVERTER_TOKEN}
       CONVERTER_CONCURRENCY: 2

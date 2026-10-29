@@ -73,3 +73,23 @@ export async function storageWritable(): Promise<boolean> {
     return false;
   }
 }
+
+/**
+ * Opens a stored file for streaming. Returns null (and logs) when the file is missing or unreadable
+ * instead of failing after the response headers were sent. The size comes from disk, so
+ * Content-Length is always correct.
+ */
+export async function openStoredFile(
+  key: string,
+): Promise<{ stream: ReturnType<typeof createReadStream>; size: number } | null> {
+  try {
+    const p = pathFor(key);
+    const st = await stat(p);
+    if (!st.isFile()) throw new Error("not a regular file");
+    return { stream: createReadStream(p), size: st.size };
+  } catch (err) {
+    const { logger } = await import("~/modules/core/logger.server");
+    logger.error({ key, err: (err as Error).message }, "stored file missing or unreadable");
+    return null;
+  }
+}

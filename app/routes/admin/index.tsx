@@ -8,7 +8,10 @@ import { POSITION_LABELS } from "~/lib/labels";
 import { ValidationError } from "~/modules/core/errors";
 import { adminOverview, setVacancyStatus } from "~/modules/recruitment/service.server";
 
-export const meta: Route.MetaFunction = () => [{ title: "Job profiles — PSG Tech Recruitment" }];
+export const meta: Route.MetaFunction = () => [
+  { title: "Job profiles — PSG Tech Recruitment" },
+  { name: "robots", content: "noindex, nofollow" },
+];
 
 export async function loader({ request, context }: Route.LoaderArgs) {
   const user = requireStaff(context, request, "recruitment:manage");

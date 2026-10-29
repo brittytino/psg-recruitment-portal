@@ -7,6 +7,7 @@ export default [
   route("vacancies/:code", "routes/vacancy.tsx"),
   route("help", "routes/help.tsx"),
   route("privacy", "routes/privacy.tsx"),
+  route("sitemap.xml", "routes/sitemap.ts"),
   route("open-positions.pdf", "routes/files/notice.ts"),
   route("research-positions.pdf", "routes/files/notice.ts", { id: "research-notice" }),
 

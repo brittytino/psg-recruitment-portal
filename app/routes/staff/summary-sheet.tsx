@@ -10,7 +10,10 @@ import { csvCell } from "~/modules/reporting/applications.server";
 import { listSummarySheets, reopenSummarySheet, type SummaryRow } from "~/modules/reviews/service.server";
 import { SummaryTable } from "~/components/summary-table";
 
-export const meta: Route.MetaFunction = () => [{ title: "Summary sheet — PSG Tech Recruitment" }];
+export const meta: Route.MetaFunction = () => [
+  { title: "Summary sheet — PSG Tech Recruitment" },
+  { name: "robots", content: "noindex, nofollow" },
+];
 
 async function loadSheet(user: Parameters<typeof listSummarySheets>[0], id: string) {
   // listSummarySheets applies the role scope (HODs see only their own departments).

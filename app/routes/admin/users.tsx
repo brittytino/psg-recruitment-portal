@@ -32,7 +32,10 @@ import {
   signOutEverywhere,
 } from "~/modules/users/service.server";
 
-export const meta: Route.MetaFunction = () => [{ title: "Users and roles — PSG Tech Recruitment" }];
+export const meta: Route.MetaFunction = () => [
+  { title: "Users and roles — PSG Tech Recruitment" },
+  { name: "robots", content: "noindex, nofollow" },
+];
 
 export async function loader({ request, context }: Route.LoaderArgs) {
   const user = requireStaff(context, request, "user:manage");

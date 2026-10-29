@@ -9,6 +9,7 @@ import {
   Outlet,
   Scripts,
   ScrollRestoration,
+  useFetchers,
   useLocation,
   useNavigation,
   useRouteLoaderData,
@@ -91,8 +92,14 @@ const SAFE_METHODS = new Set(["GET", "HEAD", "OPTIONS"]);
  * depth together with SameSite cookies and the synchroniser token), and session resolution.
  */
 export const middleware: Route.MiddlewareFunction[] = [
-  async ({ request, context }, next) => {
+  async ({ request, context, params }, next) => {
     context.set(nonceContext, newNonce());
+    // Record ids are UUIDs: anything else is a 404, never a database error.
+    if (
+      params.id !== undefined &&
+      !/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(params.id)
+    )
+      throw new Response("Not found", { status: 404 });
     if (!SAFE_METHODS.has(request.method.toUpperCase())) {
       const origin = request.headers.get("origin");
       if (!isOriginAllowed(origin, request)) {
@@ -120,8 +127,31 @@ export async function loader({ context }: Route.LoaderArgs) {
   };
 }
 
+export const meta: Route.MetaFunction = () => [
+  { title: "PSG College of Technology — Faculty & Staff Recruitment Portal" },
+  {
+    name: "description",
+    content:
+      "Official faculty and research recruitment portal of PSG College of Technology, Coimbatore. Explore teaching vacancies, eligibility, and apply online.",
+  },
+  {
+    name: "keywords",
+    content:
+      "PSG College of Technology, PSG Tech recruitment, faculty positions Coimbatore, engineering faculty vacancies, assistant professor jobs, Anna University autonomous colleges, research fellow recruitment",
+  },
+  { name: "author", content: "PSG College of Technology" },
+  { property: "og:site_name", content: "PSG College of Technology Recruitment Portal" },
+  { property: "og:type", content: "website" },
+  { property: "og:image", content: "/images/psg_logo.png" },
+  { property: "og:locale", content: "en_IN" },
+  { name: "twitter:card", content: "summary" },
+  { name: "twitter:image", content: "/images/psg_logo.png" },
+];
+
 export const links: Route.LinksFunction = () => [
-  { rel: "icon", href: "/images/psg_logo.png", type: "image/png" },
+  { rel: "icon", href: "/favicon.ico", sizes: "any" },
+  { rel: "icon", href: "/favicon.png", type: "image/png" },
+  { rel: "apple-touch-icon", href: "/favicon.png" },
 ];
 
 export function Layout({ children }: { children: React.ReactNode }) {
@@ -132,7 +162,6 @@ export function Layout({ children }: { children: React.ReactNode }) {
         <meta charSet="utf-8" />
         <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
         <meta name="theme-color" content="#10223b" />
-        <meta name="robots" content="noindex" />
         <Meta />
         <Links />
       </head>
@@ -168,7 +197,15 @@ function Brand({ to, subtitle, inverted }: { to: string; subtitle: string; inver
       className="flex min-w-0 items-center gap-3 no-underline"
       aria-label="PSG College of Technology — home"
     >
-      <img src="/images/psg_logo.png" alt="" className="h-9 w-auto shrink-0 sm:h-10" />
+      <span
+        className={
+          inverted
+            ? "flex shrink-0 items-center justify-center rounded-lg bg-white p-1 shadow-sm ring-1 ring-white/10"
+            : "flex shrink-0 items-center justify-center"
+        }
+      >
+        <img src="/images/psg_logo.png" alt="" className="h-9 w-auto shrink-0 sm:h-10" />
+      </span>
       <span className="min-w-0 leading-tight">
         <span
           className={`block truncate font-display text-[15px] font-semibold sm:text-base ${inverted ? "text-white" : "text-ink"}`}
@@ -570,7 +607,43 @@ function Shell({ children }: { children: React.ReactNode }) {
   );
 }
 
+/**
+ * Double-submit guard for every POST form on the site: while a submission is in flight, further
+ * submits of the same form are ignored and its buttons are dimmed (form[data-submitting] in CSS).
+ * Cleared when navigation and fetchers are idle again, with a safety timeout.
+ */
+function useSubmitGuard() {
+  const navigation = useNavigation();
+  const fetchers = useFetchers();
+  const busy = navigation.state !== "idle" || fetchers.some((f) => f.state !== "idle");
+  useEffect(() => {
+    const onSubmit = (e: SubmitEvent) => {
+      const form = e.target;
+      if (!(form instanceof HTMLFormElement) || form.method.toLowerCase() !== "post") return;
+      if (form.dataset.submitting) {
+        e.preventDefault();
+        e.stopImmediatePropagation();
+        return;
+      }
+      form.dataset.submitting = "1";
+      window.setTimeout(() => delete form.dataset.submitting, 20_000);
+    };
+    document.addEventListener("submit", onSubmit, true);
+    return () => document.removeEventListener("submit", onSubmit, true);
+  }, []);
+  useEffect(() => {
+    if (busy) return;
+    const t = window.setTimeout(() => {
+      document
+        .querySelectorAll<HTMLFormElement>("form[data-submitting]")
+        .forEach((f) => delete f.dataset.submitting);
+    }, 150);
+    return () => window.clearTimeout(t);
+  }, [busy]);
+}
+
 export default function App() {
+  useSubmitGuard();
   return (
     <Shell>
       <Outlet />
@@ -600,7 +673,12 @@ export function ErrorBoundary({ error }: Route.ErrorBoundaryProps) {
         <h1 className="mt-4">{title}</h1>
         <p className="mt-3 text-muted">{detail}</p>
         <div className="mt-8 flex flex-col justify-center gap-3 sm:flex-row">
-          <Link to="/" className="btn-primary">
+          {status >= 500 && (
+            <button type="button" className="btn-primary" onClick={() => window.location.reload()}>
+              Try again
+            </button>
+          )}
+          <Link to="/" className={status >= 500 ? "btn-secondary" : "btn-primary"}>
             Back to home
           </Link>
           <Link to="/help#contact" className="btn-secondary">

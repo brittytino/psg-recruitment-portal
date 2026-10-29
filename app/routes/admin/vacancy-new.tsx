@@ -9,7 +9,10 @@ import { POSITION_LABELS } from "~/lib/labels";
 import { prisma } from "~/modules/core/db.server";
 import { createResearchVacancy, createVacancy } from "~/modules/recruitment/service.server";
 
-export const meta: Route.MetaFunction = () => [{ title: "New job opening — PSG Tech Recruitment" }];
+export const meta: Route.MetaFunction = () => [
+  { title: "New job opening — PSG Tech Recruitment" },
+  { name: "robots", content: "noindex, nofollow" },
+];
 
 export async function loader({ request, context }: Route.LoaderArgs) {
   requireStaff(context, request, "recruitment:manage");

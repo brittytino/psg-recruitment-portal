@@ -31,7 +31,10 @@ import {
   type FieldIssue,
 } from "~/modules/forms/validation";
 
-export const meta: Route.MetaFunction = () => [{ title: "Application form — PSG Tech Recruitment" }];
+export const meta: Route.MetaFunction = () => [
+  { title: "Application form — PSG Tech Recruitment" },
+  { name: "robots", content: "noindex, nofollow" },
+];
 
 export async function loader({ request, params, context }: Route.LoaderArgs) {
   const user = requireUser(context, request);

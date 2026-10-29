@@ -26,7 +26,10 @@ import {
   pendingPositionChanges,
 } from "~/modules/reviews/service.server";
 
-export const meta: Route.MetaFunction = () => [{ title: "Summary — PSG Tech Recruitment" }];
+export const meta: Route.MetaFunction = () => [
+  { title: "Summary — PSG Tech Recruitment" },
+  { name: "robots", content: "noindex, nofollow" },
+];
 
 export async function loader({ request, context }: Route.LoaderArgs) {
   const user = requireStaff(context, request, "application:list");

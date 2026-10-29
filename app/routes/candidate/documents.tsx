@@ -14,7 +14,10 @@ import {
 } from "~/modules/documents/policy";
 import { removeDocument, uploadDocument } from "~/modules/documents/service.server";
 
-export const meta: Route.MetaFunction = () => [{ title: "Documents — PSG Tech Recruitment" }];
+export const meta: Route.MetaFunction = () => [
+  { title: "Documents — PSG Tech Recruitment" },
+  { name: "robots", content: "noindex, nofollow" },
+];
 
 const SCAN_LABEL: Record<string, string> = {
   PENDING: "Scan pending",

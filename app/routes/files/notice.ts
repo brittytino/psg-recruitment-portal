@@ -1,7 +1,7 @@
 import { Readable } from "node:stream";
 import type { Route } from "./+types/notice";
 import { currentNotice, type NoticeCategory } from "~/modules/notices/service.server";
-import { streamFile } from "~/modules/documents/storage.server";
+import { openStoredFile } from "~/modules/documents/storage.server";
 
 /**
  * Public: the "open positions" PDFs uploaded by HR – N4 Section, opened inline in the browser.
@@ -17,10 +17,12 @@ export async function loader({ request }: Route.LoaderArgs) {
       `No ${category === "RESEARCH" ? "research" : "faculty"} positions notice has been published yet.`,
       { status: 404 },
     );
-  return new Response(Readable.toWeb(streamFile(n.storageKey)) as ReadableStream, {
+  const file = await openStoredFile(n.storageKey);
+  if (!file) throw new Response("The notice is temporarily unavailable.", { status: 404 });
+  return new Response(Readable.toWeb(file.stream) as ReadableStream, {
     headers: {
       "Content-Type": "application/pdf",
-      "Content-Length": String(n.sizeBytes),
+      "Content-Length": String(file.size),
       "Content-Disposition": `inline; filename="psg-tech-${category === "RESEARCH" ? "research" : "faculty"}-positions.pdf"`,
       "Cache-Control": "public, max-age=300",
       ETag: `"${n.sha256.slice(0, 32)}"`,

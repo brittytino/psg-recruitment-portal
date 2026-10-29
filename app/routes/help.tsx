@@ -1,8 +1,27 @@
+import { jsonLd } from "~/lib/json-ld";
 import { ChevronDown, Mail, MapPin } from "lucide-react";
 import type { Route } from "./+types/help";
 import { env } from "~/modules/core/env.server";
 
-export const meta: Route.MetaFunction = () => [{ title: "Help and FAQ — PSG Tech Recruitment" }];
+export const meta: Route.MetaFunction = () => [
+  { title: "Help & Frequently Asked Questions (FAQ) — PSG Tech Recruitment" },
+  {
+    name: "description",
+    content:
+      "Frequently asked questions and candidate help for PSG College of Technology faculty and research applications, forms, certificate uploads, and selection process.",
+  },
+  { name: "robots", content: "index, follow" },
+  { property: "og:title", content: "Help & FAQ — PSG Tech Recruitment" },
+  {
+    property: "og:description",
+    content:
+      "Answers about application forms, document requirements, drafts, and submission for PSG Tech recruitment.",
+  },
+  { property: "og:type", content: "website" },
+  { property: "og:image", content: "/images/psg_logo.png" },
+  { name: "twitter:card", content: "summary" },
+  { name: "twitter:image", content: "/images/psg_logo.png" },
+];
 
 export function loader() {
   return { email: env().SMTP_FROM_EMAIL };
@@ -42,6 +61,23 @@ const FAQ: [string, string][] = [
 export default function Help({ loaderData }: Route.ComponentProps) {
   return (
     <div className="page-stack mx-auto max-w-5xl">
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{
+          __html: jsonLd({
+            "@context": "https://schema.org",
+            "@type": "FAQPage",
+            mainEntity: FAQ.map(([q, a]) => ({
+              "@type": "Question",
+              name: q,
+              acceptedAnswer: {
+                "@type": "Answer",
+                text: a,
+              },
+            })),
+          }),
+        }}
+      />
       <header className="border-b border-line pb-6">
         <p className="eyebrow">Help</p>
         <h1 className="mt-1">How to apply</h1>

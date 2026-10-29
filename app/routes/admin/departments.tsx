@@ -22,7 +22,10 @@ import {
 } from "~/modules/recruitment/service.server";
 import { inviteHod, removeHod, resendHodInvite } from "~/modules/users/service.server";
 
-export const meta: Route.MetaFunction = () => [{ title: "Departments & HODs — PSG Tech Recruitment" }];
+export const meta: Route.MetaFunction = () => [
+  { title: "Departments & HODs — PSG Tech Recruitment" },
+  { name: "robots", content: "noindex, nofollow" },
+];
 
 export async function loader({ request, context }: Route.LoaderArgs) {
   const user = requireStaff(context, request, "department:manage");

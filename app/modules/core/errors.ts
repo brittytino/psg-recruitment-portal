@@ -8,6 +8,13 @@ export class DomainError extends Error {
   ) {
     super(message);
     this.name = new.target.name;
+    // Shaped like React Router's data(): a DomainError thrown from a loader renders the error page
+    // with its real status (404, 403, 409 …) and safe message, instead of a logged 500.
+    Object.defineProperties(this, {
+      type: { value: "DataWithResponseInit", enumerable: false },
+      data: { value: message, enumerable: false },
+      init: { value: { status }, enumerable: false },
+    });
   }
 }
 

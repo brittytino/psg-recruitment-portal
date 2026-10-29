@@ -18,11 +18,19 @@ const log = (level, msg, extra = {}) =>
 
 function run(cmd, args, timeoutMs) {
   return new Promise((resolve, reject) => {
-    const p = spawn(cmd, args, { stdio: ["ignore", "pipe", "pipe"] });
+    // Own process group, so a timeout kills LibreOffice's child (soffice.bin) too. stdout is not
+    // read, so it is discarded (an unread pipe can fill up and hang the conversion).
+    const p = spawn(cmd, args, { stdio: ["ignore", "ignore", "pipe"], detached: true });
     let err = "";
-    p.stderr.on("data", (d) => (err += d));
+    p.stderr.on("data", (d) => {
+      if (err.length < 4000) err += d;
+    });
     const t = setTimeout(() => {
-      p.kill("SIGKILL");
+      try {
+        process.kill(-p.pid, "SIGKILL");
+      } catch {
+        p.kill("SIGKILL");
+      }
       reject(new Error("conversion timed out"));
     }, timeoutMs);
     p.on("close", (code) => {

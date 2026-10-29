@@ -1,3 +1,4 @@
+import { jsonLd } from "~/lib/json-ld";
 import { Form, Link } from "react-router";
 import { Search, X } from "lucide-react";
 import type { Route } from "./+types/vacancies";
@@ -6,7 +7,30 @@ import { EmptyState } from "~/components/staff";
 import { POSITION_LABELS } from "~/lib/labels";
 import { listDepartments, listPublishedVacancies } from "~/modules/recruitment/service.server";
 
-export const meta: Route.MetaFunction = () => [{ title: "Open vacancies — PSG Tech Recruitment" }];
+export const meta: Route.MetaFunction = () => [
+  { title: "Current Vacancies & Faculty Openings — PSG Tech Recruitment" },
+  {
+    name: "description",
+    content:
+      "Browse current open teaching and research vacancies at PSG College of Technology across engineering, sciences, and management departments. Apply online.",
+  },
+  { name: "robots", content: "index, follow, max-snippet:-1, max-image-preview:large" },
+  { property: "og:title", content: "Open Faculty Vacancies — PSG College of Technology" },
+  {
+    property: "og:description",
+    content:
+      "Explore open positions and eligibility requirements for teaching faculty and research positions at PSG Tech.",
+  },
+  { property: "og:type", content: "website" },
+  { property: "og:image", content: "/images/psg_logo.png" },
+  { name: "twitter:card", content: "summary" },
+  { name: "twitter:title", content: "Open Faculty Vacancies — PSG College of Technology" },
+  {
+    name: "twitter:description",
+    content: "Current faculty and research vacancies at PSG College of Technology, Coimbatore.",
+  },
+  { name: "twitter:image", content: "/images/psg_logo.png" },
+];
 
 const FACULTY_POSITIONS = ["ASSISTANT_PROFESSOR", "ASSOCIATE_PROFESSOR", "PROFESSOR"] as const;
 
@@ -49,6 +73,24 @@ export default function Vacancies({ loaderData }: Route.ComponentProps) {
 
   return (
     <div className="page-stack">
+      {vacancies.length > 0 && (
+        <script
+          type="application/ld+json"
+          dangerouslySetInnerHTML={{
+            __html: jsonLd({
+              "@context": "https://schema.org",
+              "@type": "ItemList",
+              name: "PSG College of Technology Faculty and Research Vacancies",
+              itemListElement: vacancies.map((v, i) => ({
+                "@type": "ListItem",
+                position: i + 1,
+                name: v.title,
+                url: `/vacancies/${encodeURIComponent(v.code)}`,
+              })),
+            }),
+          }}
+        />
+      )}
       <header className="max-w-3xl">
         <p className="eyebrow">Careers at PSG Tech</p>
         <h1 className="mt-2">Open vacancies</h1>

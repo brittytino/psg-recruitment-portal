@@ -36,7 +36,10 @@ import {
 } from "~/modules/reviews/service.server";
 import { hodsForDepartment } from "~/modules/users/service.server";
 
-export const meta: Route.MetaFunction = () => [{ title: "Application — PSG Tech Recruitment" }];
+export const meta: Route.MetaFunction = () => [
+  { title: "Application — PSG Tech Recruitment" },
+  { name: "robots", content: "noindex, nofollow" },
+];
 
 export async function loader({ request, params, context }: Route.LoaderArgs) {
   const user = requireStaff(context, request, "application:read");

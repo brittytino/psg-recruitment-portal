@@ -8,7 +8,10 @@ import { requestLoginOtp } from "~/modules/auth/account.server";
 import { pendingCookie } from "~/modules/auth/otp.server";
 import { homePath } from "~/modules/auth/permissions";
 
-export const meta: Route.MetaFunction = () => [{ title: "Sign in — PSG Tech Recruitment" }];
+export const meta: Route.MetaFunction = () => [
+  { title: "Sign in — PSG Tech Recruitment" },
+  { name: "robots", content: "noindex, nofollow" },
+];
 
 export function loader({ context }: Route.LoaderArgs) {
   const user = context.get(userContext);

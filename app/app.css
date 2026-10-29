@@ -358,3 +358,10 @@
     transform: translateX(300%);
   }
 }
+
+/* Double-submit guard (see useSubmitGuard in root.tsx). */
+form[data-submitting] [type="submit"] {
+  pointer-events: none;
+  opacity: 0.6;
+  cursor: progress;
+}

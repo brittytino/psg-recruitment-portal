@@ -8,7 +8,10 @@ import { userContext } from "~/context";
 import { registerCandidate } from "~/modules/auth/account.server";
 import { pendingCookie } from "~/modules/auth/otp.server";
 
-export const meta: Route.MetaFunction = () => [{ title: "Register — PSG Tech Recruitment" }];
+export const meta: Route.MetaFunction = () => [
+  { title: "Register — PSG Tech Recruitment" },
+  { name: "robots", content: "noindex, nofollow" },
+];
 
 export function loader({ context }: Route.LoaderArgs) {
   if (context.get(userContext)) throw redirect("/account");

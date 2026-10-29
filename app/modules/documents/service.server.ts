@@ -95,6 +95,12 @@ export async function uploadDocument(
   // PDFs are stored as normalised (unlocked / repaired) copies so the bundle can include them.
   const { sha256, size } = await putFile(key, detected.data ?? data);
   return prisma.$transaction(async (tx) => {
+    // Lock the application row (submit() takes the same lock) and re-check that it is still
+    // editable, so a file can never be attached after the application was submitted.
+    const locked = await tx.$queryRaw<{ status: string }[]>`
+      SELECT status FROM applications WHERE id = ${applicationId}::uuid FOR UPDATE`;
+    if (!locked[0] || !EDITABLE.includes(locked[0].status as AppStatus))
+      throw new ConflictError("Documents can only be changed while the application is editable");
     // A new photograph, signature or resume replaces the previous one.
     if (SINGLE_FILE_TYPES.includes(type))
       await tx.applicationDocument.updateMany({
@@ -135,6 +141,10 @@ export async function removeDocument(user: SessionUser, applicationId: string, d
   const doc = app.documents.find((d) => d.id === documentId);
   if (!doc) throw new NotFoundError("Document");
   await prisma.$transaction(async (tx) => {
+    const locked = await tx.$queryRaw<{ status: string }[]>`
+      SELECT status FROM applications WHERE id = ${applicationId}::uuid FOR UPDATE`;
+    if (!locked[0] || !EDITABLE.includes(locked[0].status as AppStatus))
+      throw new ConflictError("Documents can only be changed while the application is editable");
     await tx.applicationDocument.update({ where: { id: documentId }, data: { removedAt: new Date() } });
     await audit(
       {

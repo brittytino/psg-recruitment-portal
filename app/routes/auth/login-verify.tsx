@@ -9,7 +9,10 @@ import { clearPendingCookie, pendingCookie, readPending } from "~/modules/auth/o
 import { homePath } from "~/modules/auth/permissions";
 import { prisma } from "~/modules/core/db.server";
 
-export const meta: Route.MetaFunction = () => [{ title: "Enter your sign-in code — PSG Tech Recruitment" }];
+export const meta: Route.MetaFunction = () => [
+  { title: "Enter your sign-in code — PSG Tech Recruitment" },
+  { name: "robots", content: "noindex, nofollow" },
+];
 
 export function loader({ request }: Route.LoaderArgs) {
   if (!readPending(request)) throw redirect("/login");

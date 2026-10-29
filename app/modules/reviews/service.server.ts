@@ -362,6 +362,7 @@ export async function pendingPositionChanges(user: SessionUser | null) {
   return prisma.positionChangeRequest.findMany({
     where: { status: "PENDING" },
     orderBy: { createdAt: "asc" },
+    take: 500,
     include: {
       application: {
         select: {
@@ -535,6 +536,7 @@ export async function listSummarySheets(user: SessionUser | null, departmentId?:
       ...(fullAccess ? {} : { departmentId: { in: hodDepts } }),
     },
     orderBy: [{ approvedAt: "desc" }],
+    take: 300,
     include: { department: { select: { id: true, name: true, code: true } } },
   });
 }

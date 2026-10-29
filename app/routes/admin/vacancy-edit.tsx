@@ -7,7 +7,10 @@ import { handleAction, readForm, requireStaff } from "~/lib/http.server";
 import { POSITION_LABELS } from "~/lib/labels";
 import { getVacancyForEdit, updateVacancy } from "~/modules/recruitment/service.server";
 
-export const meta: Route.MetaFunction = () => [{ title: "Edit job opening — PSG Tech Recruitment" }];
+export const meta: Route.MetaFunction = () => [
+  { title: "Edit job opening — PSG Tech Recruitment" },
+  { name: "robots", content: "noindex, nofollow" },
+];
 
 /** datetime-local value in IST. */
 const local = (d: Date | string) =>

@@ -7,7 +7,10 @@ import { clientIp, handleAction, readForm } from "~/lib/http.server";
 import { verifyEmail, verifyEmailByOtp } from "~/modules/auth/account.server";
 import { clearPendingCookie, readPending } from "~/modules/auth/otp.server";
 
-export const meta: Route.MetaFunction = () => [{ title: "Verify e-mail — PSG Tech Recruitment" }];
+export const meta: Route.MetaFunction = () => [
+  { title: "Verify e-mail — PSG Tech Recruitment" },
+  { name: "robots", content: "noindex, nofollow" },
+];
 
 export async function loader({ request }: Route.LoaderArgs) {
   const token = new URL(request.url).searchParams.get("token");
