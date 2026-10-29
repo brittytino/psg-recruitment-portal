@@ -314,8 +314,16 @@ const SECTIONS: SectionDef[] = [
       select("phdStatus", "Ph.D. status", 5, "Ph.D. status", [...PHD_STATUS_OPTIONS], {
         requirement: "required",
       }),
-      text("phdTitle", "Ph.D. thesis title", 5, "Ph.D. title", {
+      // Thesis title only once the Ph.D. is awarded; the research domain for every Ph.D. status.
+      text("phdResearchDomain", "Ph.D. research domain", 5, "Research domain", {
         when: HAS_PHD,
+        requirement: "required",
+        maxLength: 200,
+        wide: true,
+      }),
+      text("phdTitle", "Ph.D. thesis title", 5, "Ph.D. title", {
+        when: { key: "phdStatus", in: ["Awarded"] },
+        requirement: "required",
         maxLength: 300,
         wide: true,
       }),

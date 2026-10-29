@@ -374,10 +374,11 @@ function commonSections(): SectionDef[] {
           "count.collegeOthers",
         ),
         select("phdStatus", "Ph.D. status", 5, "Ph.D.", [...PHD_STATUS_OPTIONS], { requirement: "required" }),
+        // Thesis title only once the Ph.D. is awarded; the research domain for every Ph.D. status.
         text("phdTitle", "Ph.D. thesis title", 5, "Thesis", {
           maxLength: 400,
           wide: true,
-          when: HAS_PHD,
+          when: { key: "phdStatus", in: ["Awarded"] },
           requirement: "required",
         }),
         text("phdUniversity", "Ph.D. university", 5, "University", {
@@ -386,13 +387,21 @@ function commonSections(): SectionDef[] {
           requirement: "required",
         }),
         text("phdSupervisor", "Ph.D. supervisor", 5, "Supervisor", { maxLength: 150, when: HAS_PHD }),
-        select("phdSpecialisation", "Ph.D. specialisation", 5, "Specialisation", [...ACADEMIC_DISCIPLINES], {
-          when: HAS_PHD,
-          allowOther: true,
-          otherOptionValue: "Other",
-          otherLabel: "Specify Ph.D. specialisation",
-          otherMaxLength: 150,
-        }),
+        select(
+          "phdSpecialisation",
+          "Ph.D. research domain",
+          5,
+          "Research domain",
+          [...ACADEMIC_DISCIPLINES],
+          {
+            when: HAS_PHD,
+            requirement: "required",
+            allowOther: true,
+            otherOptionValue: "Other",
+            otherLabel: "Specify the research domain",
+            otherMaxLength: 150,
+          },
+        ),
         num("phdRegistrationYear", "Year of registration", 5, "Registration", { ...YEAR, when: HAS_PHD }),
         monthYear("phdAwardDate", "Month & year of award / thesis submission", 5, "Award", {
           when: { key: "phdStatus", in: ["Awarded", "Thesis submitted"] },

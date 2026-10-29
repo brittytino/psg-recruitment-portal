@@ -21,6 +21,7 @@
 #   env            Create .env (dev: copy .env.development; prod: generate secrets)
 #   mailtest [to]  Check e-mail delivery (firewall, Gmail login); optionally send a test e-mail
 #   smtp-password  Replace the Gmail app password (asks for it), then restart the app
+#   mail-account   Switch to another sending mailbox (asks address + app password), then test
 # ==============================================================================
 set -Eeuo pipefail
 
@@ -397,14 +398,42 @@ case "$CMD" in
     check_env
     dc exec -T app node --input-type=module - "${1:-}" < scripts/mail-test.mjs
     ;;
+  mail-account)
+    [ -f .env ] || die "No .env yet. Run ./prod.sh first."
+    addr="${MAIL_ACCOUNT:-}"
+    if [ -z "$addr" ]; then read -rp "    Sending mailbox (e.g. recruitment.office@psgtech.ac.in): " addr; fi
+    addr="$(printf '%s' "$addr" | tr -d ' \r\n')"
+    case "$addr" in *@*.*) ;; *) die "That is not an e-mail address." ;; esac
+    pw="${SMTP_PASSWORD:-}"
+    if [ -z "$pw" ]; then
+      info "App password of $addr (Google Account → Security → 2-Step Verification → App passwords)"
+      read -rsp "    App password: " pw; echo
+    fi
+    pw="$(printf '%s' "$pw" | tr -d ' \r\n')"
+    [ ${#pw} -ge 8 ] || die "That does not look like an app password."
+    # Server-only setting: kept in secrets/override.env so a git pull never reverts it.
+    mkdir -p secrets; touch secrets/override.env; chmod 600 secrets/override.env
+    grep -Ev '^(SMTP_USER|SMTP_FROM_EMAIL|MAIL_FROM)=' secrets/override.env > secrets/override.env.tmp || true
+    {
+      echo "SMTP_USER=$addr"
+      echo "SMTP_FROM_EMAIL=$addr"
+      echo "MAIL_FROM=\"PSG College of Technology Recruitment <$addr>\""
+    } >> secrets/override.env.tmp
+    mv secrets/override.env.tmp secrets/override.env
+    env_set SMTP_USER "$addr"; env_set SMTP_FROM_EMAIL "$addr"; env_set SMTP_PASSWORD "$pw"
+    env_set MAIL_FROM "\"PSG College of Technology Recruitment <$addr>\""
+    ok "Sending mailbox is now $addr. Restarting the app…"
+    dc up -d --force-recreate app worker
+    wait_healthy
+    dc exec -T app node --input-type=module - "${1:-$addr}" < scripts/mail-test.mjs || true
+    ;;
   smtp-password)
     [ -f .env ] || die "No .env yet. Run ./prod.sh first."
     if [ -n "${SMTP_PASSWORD:-}" ]; then pw="$SMTP_PASSWORD"; else
       info "New Gmail app password for $(env_get SMTP_USER) (16 letters, spaces are ignored)"
       read -rsp "    App password: " pw; echo
     fi
-    pw="$(printf '%s' "$pw" | tr -d ' 
-')"
+    pw="$(printf '%s' "$pw" | tr -d ' \r\n')"
     [ ${#pw} -ge 8 ] || die "That does not look like an app password."
     env_set SMTP_PASSWORD "$pw"
     ok "Saved. Restarting the app with the new password…"
@@ -412,6 +441,6 @@ case "$CMD" in
     wait_healthy
     dc exec -T app node --input-type=module - < scripts/mail-test.mjs || true
     ;;
-  help | -h | --help) sed -n '2,26p' "$0" | sed 's/^# \{0,1\}//' ;;
+  help | -h | --help) sed -n '2,27p' "$0" | sed 's/^# \{0,1\}//' ;;
   *) die "Unknown command '$CMD'. Run: ${0##*/} help" ;;
 esac
