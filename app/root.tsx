@@ -1,3 +1,4 @@
+import { consoleHello } from "~/lib/console-hello";
 import { useEffect, useState } from "react";
 import { newNonce } from "./lib/nonce.server";
 import {
@@ -644,6 +645,7 @@ function useSubmitGuard() {
 
 export default function App() {
   useSubmitGuard();
+  useEffect(() => consoleHello(), []);
   return (
     <Shell>
       <Outlet />

@@ -1,7 +1,17 @@
 {
   "name": "psg-staff-recruitment",
   "private": true,
-  "version": "0.1.0",
+  "version": "1.0.0",
+  "description": "Institutional staff and faculty recruitment management portal for PSG College of Technology",
+  "author": "Tino Britty J (https://github.com/brittytino)",
+  "contributors": [
+    "Hari Anand Balaji (https://www.linkedin.com/in/hari-anand-balaji/)"
+  ],
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/brittytino/psg-recruitment-portal.git"
+  },
   "type": "module",
   "engines": {
     "node": ">=22"

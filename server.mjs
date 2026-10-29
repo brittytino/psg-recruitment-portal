@@ -1,3 +1,8 @@
+/**
+ * PSG College of Technology — Staff & Faculty Recruitment Portal: production HTTP server.
+ * Copyright (c) 2026 Tino Britty J and contributors. MIT License (see LICENSE).
+ */
+
 import express from "express";
 import compression from "compression";
 import morgan from "morgan";
@@ -5,6 +10,12 @@ import { createRequestHandler } from "@react-router/express";
 
 const app = express();
 app.disable("x-powered-by");
+
+// Credits header (visible in browser DevTools → Network).
+app.use((_req, res, next) => {
+  res.setHeader("X-Engineered-By", "Tino Britty J (@brittytino)");
+  next();
+});
 
 // Crucial: trust upstream reverse proxy (Nginx / Cloudflare / Load Balancers)
 // This ensures req.protocol ('https') and req.hostname are accurate from X-Forwarded-* headers
@@ -63,7 +74,10 @@ app.use((req, res, next) => {
         allowed = true;
       } else if (originUrl.host.toLowerCase() === host) {
         allowed = true;
-      } else if (isLoopbackHost(originUrl.hostname) && (isLoopbackHost(host) || process.env.NODE_ENV !== "production")) {
+      } else if (
+        isLoopbackHost(originUrl.hostname) &&
+        (isLoopbackHost(host) || process.env.NODE_ENV !== "production")
+      ) {
         allowed = true;
       } else if (process.env.ALLOWED_ORIGINS) {
         const extra = process.env.ALLOWED_ORIGINS.split(",").map((s) => s.trim().toLowerCase());
@@ -79,7 +93,10 @@ app.use((req, res, next) => {
       res.setHeader("Access-Control-Allow-Origin", origin);
       res.setHeader("Access-Control-Allow-Credentials", "true");
       res.setHeader("Access-Control-Allow-Methods", "GET, POST, PUT, PATCH, DELETE, OPTIONS");
-      res.setHeader("Access-Control-Allow-Headers", "Content-Type, Authorization, X-Requested-With, Accept, Origin");
+      res.setHeader(
+        "Access-Control-Allow-Headers",
+        "Content-Type, Authorization, X-Requested-With, Accept, Origin",
+      );
       res.setHeader("Vary", "Origin");
     }
   }
@@ -91,10 +108,7 @@ app.use((req, res, next) => {
 });
 
 // Static assets
-app.use(
-  "/assets",
-  express.static("build/client/assets", { immutable: true, maxAge: "1y" })
-);
+app.use("/assets", express.static("build/client/assets", { immutable: true, maxAge: "1y" }));
 app.use(express.static("build/client", { maxAge: "1h" }));
 app.use(express.static("public", { maxAge: "1h" }));
 
@@ -107,7 +121,7 @@ app.all(
   createRequestHandler({
     build,
     mode: process.env.NODE_ENV || "production",
-  })
+  }),
 );
 
 const port = Number(process.env.PORT) || 3000;

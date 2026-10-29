@@ -1,27 +1,30 @@
 # Production server setup (single Linux server)
 
 This is the supported way to run the portal in production: Docker Compose (`./prod.sh`) behind the
-host's Nginx with Let's Encrypt certificates.
+host's Nginx. HTTPS uses **PSG Tech's own SSL certificate** (no Let's Encrypt / certbot).
 
 | Address                                 | Serves                  | Notes                                                     |
 | --------------------------------------- | ----------------------- | --------------------------------------------------------- |
 | `https://recruitments.psgtech.ac.in`    | Recruitment portal      | App listens on `127.0.0.1:6969` only                      |
 | `https://recruitmentsdb.psgtech.ac.in` | Database viewer (pgweb) | Read-only, password protected, optional; `127.0.0.1:6981` |
 
-## 1. DNS (ask the college IT team)
+## 1. DNS and HTTPS (college IT team)
 
-Create two **A records** pointing to the server's public IP:
+Both names must reach this server: `recruitments.psgtech.ac.in` and `recruitmentsdb.psgtech.ac.in`.
+HTTPS is provided with the college certificate in one of two ways:
 
-```
-recruitments.psgtech.ac.in       A   <server IP>
-recruitmentsdb.psgtech.ac.in     A   <server IP>
-```
+| Setup | What to do |
+| --- | --- |
+| **College HTTPS gateway** (default) — the gateway holds the certificate and forwards HTTP to this server's port 80 | Nothing on this server. Set the gateway's IP in `TRUSTED_PROXY_IPS` (`.env.production`, currently `10.1.10.162`) so the real visitor IP is used. The gateway must send `X-Forwarded-For` and `X-Forwarded-Proto: https`, and allow uploads of 25 MB (`client_max_body_size 25m`). |
+| **Certificate installed on this server** | Copy the certificate chain and key to the server, then add to `secrets/override.env`:<br>`SSL_CERTIFICATE=/etc/ssl/psgtech/fullchain.pem`<br>`SSL_CERTIFICATE_KEY=/etc/ssl/psgtech/private.key`<br>and run `sudo ./prod.sh`. Nginx then serves HTTPS on 443 and redirects HTTP. |
+
+When the certificate is renewed, replace the files and run `sudo systemctl reload nginx`.
 
 ## 2. Server requirements
 
 - Ubuntu 22.04+ / Debian 12, 4 GB RAM minimum (ClamAV needs ~2 GB), 40 GB disk, a user with sudo.
-- Inbound **80** and **443** open. Outbound **TCP 587 to smtp.gmail.com** open (sign-in codes are e-mailed).
-- Nothing else: Docker, Nginx and HTTPS certificates are installed by `./prod.sh`.
+- Inbound **80** open (and **443** when the certificate is installed on this server). Outbound **TCP 587 to smtp.gmail.com** open (sign-in codes are e-mailed).
+- Nothing else: Docker and Nginx are installed by `./prod.sh`.
 
 ## 3. Install (the only steps)
 
@@ -39,16 +42,15 @@ On the first run `./prod.sh`:
 3. asks **once** for the Gmail app password of recruitments@psgtech.ac.in (hidden input). To run
    without any prompt: `SMTP_PASSWORD='xxxx xxxx xxxx xxxx' ./prod.sh`, or put it in `secrets/smtp_password`,
 4. builds, migrates the database, creates the staff accounts and starts everything,
-5. configures Nginx + Let's Encrypt for both domains and prints the URLs.
+5. configures Nginx for both domains (with the college certificate if configured) and prints the URLs.
 
 The Gmail password is not in the repository because the repository is public.
 
-To restrict the DB viewer to campus/admin IPs (recommended):
+The DB viewer only opens from the IPs in `DB_VIEWER_ALLOW_IPS` (`.env.production`).
 
-```sh
-echo "allow 14.139.0.0/16; deny all;" | sudo tee /etc/nginx/snippets/psg-db-allow.conf   # use your real ranges
-sudo nginx -t && sudo systemctl reload nginx
-```
+Servers set up earlier with Let's Encrypt keep using those certificates (no longer renewed) until the
+college certificate is configured, so HTTPS never drops during the switch. After that they can be
+removed: `sudo certbot delete --cert-name recruitments.psgtech.ac.in` (same for `recruitmentsdb…`).
 
 ## 4. Staff accounts created by the seed
 

@@ -333,5 +333,15 @@ All quality gates pass cleanly:
 
 - **TypeScript Typecheck**: `npm run typecheck` passes with 0 errors across all routes and modules.
 - **ESLint Code Quality**: `npm run lint` passes with 0 errors and 0 warnings.
-- **Unit & Security Tests**: `npm test` passes all 84 unit tests across 7 test suites covering passwordless OTP expiry, reference number formatting, role permission boundaries (`SUPER_ADMIN` vs `ADMIN`), CSV formula injection protection, arrear calculations, qualification document rules, and structured input master options with department-scoped filtering.
+- **Unit & Security Tests**: `npm test` passes all unit tests across test suites covering passwordless OTP expiry, reference number formatting, role permission boundaries (`SUPER_ADMIN` vs `ADMIN`), CSV formula injection protection, arrear calculations, qualification document rules, and structured input master options with department-scoped filtering.
 - **Production Build**: `npm run build` compiles client bundles, SSR server builds, and background worker bundles without errors.
+
+---
+
+## 14. Authors and licence
+
+- **Tino Britty J** ([GitHub](https://github.com/brittytino) · [LinkedIn](https://www.linkedin.com/in/brittytino/)) — lead developer and architect
+- **Hari Anand Balaji** ([LinkedIn](https://www.linkedin.com/in/hari-anand-balaji/)) — developer
+
+Built for **PSG College of Technology**, Coimbatore. Released under the [MIT License](./LICENSE),
+Copyright (c) 2026 Tino Britty J and contributors. See [CONTRIBUTORS.md](./CONTRIBUTORS.md) for maintainer guidelines.

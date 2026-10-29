@@ -190,7 +190,8 @@ ensure_smtp_password() {
   ok "Saved the mail password in .env (this server only)"
 }
 
-# HTTPS for the portal and the DB viewer (Nginx + Let's Encrypt), when running as root on Linux.
+# Nginx for the portal and the DB viewer, when running as root on Linux. HTTPS uses the college's own
+# certificate: at the college gateway (default) or via SSL_CERTIFICATE/SSL_CERTIFICATE_KEY.
 setup_https() {
   [ "$MODE" = prod ] || return 0
   [ "$(env_get SETUP_NGINX)" != false ] || return 0
@@ -202,8 +203,11 @@ setup_https() {
   app_domain="$(env_get APP_ORIGIN)"; app_domain="${app_domain#https://}"; app_domain="${app_domain#http://}"; app_domain="${app_domain%%/*}"
   db_domain="$(env_get DB_VIEWER_DOMAIN)"
   DB_VIEWER_ALLOW_IPS="$(env_get DB_VIEWER_ALLOW_IPS)" \
-    bash infrastructure/nginx/host/setup-nginx.sh "$app_domain" "${db_domain:-db.$app_domain}" "$(env_get LETSENCRYPT_EMAIL)" ||
-    warn "HTTPS set-up did not finish (usually DNS not pointing here yet). Re-run ./prod.sh once DNS is ready."
+    TRUSTED_PROXY_IPS="$(env_get TRUSTED_PROXY_IPS)" \
+    SSL_CERTIFICATE="$(env_get SSL_CERTIFICATE)" \
+    SSL_CERTIFICATE_KEY="$(env_get SSL_CERTIFICATE_KEY)" \
+    bash infrastructure/nginx/host/setup-nginx.sh "$app_domain" "${db_domain:-db.$app_domain}" ||
+    warn "Nginx set-up did not finish. Check the message above, then re-run ./prod.sh."
 }
 
 # Sign-in codes are e-mailed, so an unreachable mail server means nobody can sign in.

@@ -19,7 +19,7 @@ export function securityHeaders(headers: Headers, nonce: string) {
       `script-src 'self' 'nonce-${nonce}'${dev ? " 'unsafe-eval'" : ""}`,
       `style-src 'self'${dev ? " 'unsafe-inline'" : ""}`,
       "img-src 'self' data: blob:",
-      "font-src 'self'",
+      "font-src 'self' data:",
       `connect-src 'self'${dev ? " ws: wss:" : ""}`,
       "frame-ancestors 'none'",
       "form-action 'self'",
