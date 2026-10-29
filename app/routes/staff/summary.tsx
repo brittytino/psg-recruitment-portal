@@ -7,7 +7,7 @@ import { SummaryTable } from "~/components/summary-table";
 import { clientIp, handleAction, readForm, requireStaff } from "~/lib/http.server";
 import { POSITION_LABELS } from "~/lib/labels";
 import { STATUS_LABELS, type AppStatus } from "~/modules/applications/workflow";
-import { hasPermission, hodDepartments, isHodReviewer } from "~/modules/auth/permissions";
+import { hasPermission, hodDepartments, isHodReviewer, isSuperAdmin } from "~/modules/auth/permissions";
 import { prisma } from "~/modules/core/db.server";
 import { ValidationError } from "~/modules/core/errors";
 import {
@@ -31,7 +31,17 @@ export const meta: Route.MetaFunction = () => [{ title: "Summary — PSG Tech Re
 export async function loader({ request, context }: Route.LoaderArgs) {
   const user = requireStaff(context, request, "application:list");
   const office = hasPermission(user.grants, "summary:read");
-  const hodDepts = isHodReviewer(user.grants) ? hodDepartments(user.grants) : [];
+  const hodDepts = isSuperAdmin(user.grants)
+    ? (
+        await prisma.application.findMany({
+          where: { assignedHodId: { not: null }, departmentId: { not: null } },
+          distinct: ["departmentId"],
+          select: { departmentId: true },
+        })
+      ).map((a) => a.departmentId!)
+    : isHodReviewer(user.grants)
+      ? hodDepartments(user.grants)
+      : [];
   const hod = await Promise.all(
     hodDepts.map(async (id) => {
       const dept = await prisma.department.findUniqueOrThrow({

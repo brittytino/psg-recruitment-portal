@@ -25,6 +25,7 @@ import {
 } from "~/modules/reviews/service.server";
 import { inviteForInterview } from "~/modules/applications/interview.server";
 import { createDepartment, updateVacancy } from "~/modules/recruitment/service.server";
+import { revokeRole, setUserStatus } from "~/modules/users/service.server";
 import { facultyV2Minimal, testPhotoPng } from "../fixtures/applications";
 
 const tag = randomUUID()
@@ -352,5 +353,87 @@ describe("HR – N4 flows", () => {
         where: { userId: a.candidateId, type: "application.interview_call" },
       }),
     ).toBe(2);
+  });
+});
+
+describe("visibility and Super Admin powers", () => {
+  it("a new application is visible to HR, Dean/Principal and Super Admin; a HOD only once assigned", async () => {
+    const { app } = await submitted();
+    const q = listQuerySchema.parse({ size: 100, q: app.referenceNo! });
+    for (const role of ["HR", "ADMIN", "SUPER_ADMIN"] as const) {
+      const viewer = await makeUser(role);
+      const list = await listApplications(viewer, q);
+      expect(
+        list.rows.map((r) => r.id),
+        role,
+      ).toContain(app.id);
+      expect((await getStaffApplication(viewer, app.id)).id).toBe(app.id);
+    }
+    const hod = await makeUser("HOD", deptId);
+    await expect(getStaffApplication(hod, app.id)).rejects.toThrow(/not found/i);
+    await assignToHod(await makeUser("ADMIN"), { hodId: hod.id, applicationIds: [app.id] });
+    expect((await getStaffApplication(hod, app.id)).id).toBe(app.id);
+  });
+
+  it("HOD lowers the cadre; it takes effect only after Dean/Principal approval", async () => {
+    const { app } = await submitted();
+    const hod = await makeUser("HOD", deptId);
+    await assignToHod(await makeUser("HR"), { hodId: hod.id, applicationIds: [app.id] });
+    await recordHodDecision(hod, app.id, {
+      decision: "RECOMMEND_CHANGE",
+      toPosition: "ASSISTANT_PROFESSOR",
+      reason: "Fits the Assistant Professor cadre.",
+    });
+    expect(
+      (await prisma.application.findUniqueOrThrow({ where: { id: app.id } })).effectivePosition,
+    ).toBeNull();
+    const req = await prisma.positionChangeRequest.findFirstOrThrow({ where: { applicationId: app.id } });
+    await decidePositionChange(await makeUser("ADMIN"), req.id, true, "Agreed");
+    expect((await prisma.application.findUniqueOrThrow({ where: { id: app.id } })).effectivePosition).toBe(
+      "ASSISTANT_PROFESSOR",
+    );
+  });
+
+  it("Super Admin can record the department decision on behalf of the HOD (audited)", async () => {
+    const { app } = await submitted();
+    const hod = await makeUser("HOD", deptId);
+    const sa = await makeUser("SUPER_ADMIN");
+    await assignToHod(sa, { hodId: hod.id, applicationIds: [app.id] });
+    await recordHodDecision(sa, app.id, { decision: "REJECT", reason: "Does not meet the criteria." });
+    expect((await prisma.application.findUniqueOrThrow({ where: { id: app.id } })).status).toBe(
+      "HOD_REJECTED",
+    );
+    const ev = await prisma.auditEvent.findFirstOrThrow({
+      where: { entityId: app.id, action: "review.hod_decision" },
+    });
+    expect((ev.metadata as Record<string, unknown>).onBehalfOfHod).toBe(hod.id);
+    // A Dean (Admin) cannot record department decisions.
+    await expect(recordHodDecision(await makeUser("ADMIN"), app.id, { decision: "ACCEPT" })).rejects.toThrow(
+      /permission/,
+    );
+  });
+
+  it("the last active Super Admin can never be removed or disabled", async () => {
+    const sa = await makeUser("SUPER_ADMIN");
+    const others = await prisma.user.findMany({
+      where: { id: { not: sa.id }, status: "ACTIVE", roles: { some: { role: "SUPER_ADMIN" } } },
+      select: { id: true },
+    });
+    await prisma.user.updateMany({
+      where: { id: { in: others.map((o) => o.id) } },
+      data: { status: "DISABLED" },
+    });
+    try {
+      const sa2 = await makeUser("SUPER_ADMIN");
+      await setUserStatus(sa2, sa.id, "DISABLED");
+      await expect(setUserStatus(sa, sa2.id, "DISABLED")).rejects.toThrow(/Super Admin must remain/);
+      const role = await prisma.userRole.findFirstOrThrow({ where: { userId: sa2.id, role: "SUPER_ADMIN" } });
+      await expect(revokeRole(sa2, role.id)).rejects.toThrow(/own Super Admin/);
+    } finally {
+      await prisma.user.updateMany({
+        where: { id: { in: others.map((o) => o.id) } },
+        data: { status: "ACTIVE" },
+      });
+    }
   });
 });

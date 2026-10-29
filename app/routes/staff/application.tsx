@@ -17,7 +17,7 @@ import {
   STATUS_LABELS,
   type AppStatus,
 } from "~/modules/applications/workflow";
-import { hasPermission, hodDepartments } from "~/modules/auth/permissions";
+import { hasPermission, hodDepartments, isSuperAdmin } from "~/modules/auth/permissions";
 import { hrScope } from "~/modules/auth/policy.server";
 import { audit } from "~/modules/audit/audit.server";
 import { ValidationError } from "~/modules/core/errors";
@@ -50,9 +50,11 @@ export async function loader({ request, params, context }: Route.LoaderArgs) {
   });
   const isOffice = !!hrScope(user);
   const isAssignedHod =
-    app.assignedHodId === user.id &&
-    !!app.vacancy.departmentId &&
-    hodDepartments(user.grants).includes(app.vacancy.departmentId);
+    (app.assignedHodId === user.id &&
+      !!app.vacancy.departmentId &&
+      hodDepartments(user.grants).includes(app.vacancy.departmentId)) ||
+    // Super Admin can record or correct the department decision on behalf of the HOD.
+    (isSuperAdmin(user.grants) && app.recruitmentCategory === "FACULTY" && !!app.assignedHodId);
   const applied = app.appliedPosition
     ? (POSITION_LABELS[app.appliedPosition] ?? app.appliedPosition)
     : (app.vacancy.researchPositionTitle ??

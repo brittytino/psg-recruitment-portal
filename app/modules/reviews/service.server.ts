@@ -1,7 +1,7 @@
 import type { Position, Prisma } from "@prisma/client";
 import { z } from "zod";
 import { audit } from "~/modules/audit/audit.server";
-import { hodDepartments, isAdmin, isHrOfficer } from "~/modules/auth/permissions";
+import { hodDepartments, isAdmin, isHrOfficer, isSuperAdmin } from "~/modules/auth/permissions";
 import { hrScope, requirePermission } from "~/modules/auth/policy.server";
 import type { SessionUser } from "~/modules/auth/session.server";
 import { prisma, type Tx } from "~/modules/core/db.server";
@@ -153,6 +153,13 @@ export async function unassign(user: SessionUser | null, applicationId: string, 
 
 /** Applications a HOD can see: assigned to them and in one of their departments. */
 export function hodScope(user: SessionUser): Prisma.ApplicationWhereInput {
+  // Super Admin can act for any department's HOD (every such action is audited as on-behalf).
+  if (isSuperAdmin(user.grants))
+    return {
+      recruitmentCategory: "FACULTY",
+      assignedHodId: { not: null },
+      status: { in: [...HOD_STAGE, "SHORTLISTED", "REJECTED", "APPROVED", "WITHDRAWN"] },
+    };
   return {
     assignedHodId: user.id,
     vacancy: { departmentId: { in: hodDepartments(user.grants) } },
@@ -278,7 +285,7 @@ export async function recordHodDecision(
       },
     });
     await tx.reviewAssignment.updateMany({
-      where: { applicationId: app.id, reviewerId: u.id, stage: "DEPARTMENT" },
+      where: { applicationId: app.id, reviewerId: app.assignedHodId ?? u.id, stage: "DEPARTMENT" },
       data: { completedAt: new Date() },
     });
     await history(tx, app.id, app.status as AppStatus, to, u.id, d.reason || null);
@@ -289,7 +296,11 @@ export async function recordHodDecision(
         entityType: "application",
         entityId: app.id,
         ip,
-        metadata: { decision: d.decision, toPosition: d.toPosition },
+        metadata: {
+          decision: d.decision,
+          toPosition: d.toPosition,
+          ...(app.assignedHodId !== u.id ? { onBehalfOfHod: app.assignedHodId } : {}),
+        },
       },
       tx,
     );
@@ -432,7 +443,7 @@ export async function departmentSummary(departmentId: string) {
 /** The HOD generates the department summary from their decisions and approves it in one step. */
 export async function approveSummarySheet(user: SessionUser | null, departmentId: string, ip?: string) {
   const u = requirePermission(user, "summary:generate");
-  if (!hodDepartments(u.grants).includes(departmentId)) throw new ForbiddenError();
+  if (!hodDepartments(u.grants).includes(departmentId) && !isSuperAdmin(u.grants)) throw new ForbiddenError();
   const { rows, pending, academicYear } = await departmentSummary(departmentId);
   if (!rows.length) throw new ConflictError("No applications have been assigned to your department yet");
   if (pending.length)

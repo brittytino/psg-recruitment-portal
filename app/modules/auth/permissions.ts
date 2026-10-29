@@ -39,6 +39,28 @@ export type Permission =
   | "audit:read"
   | "system:manage";
 
+/** Every permission except the candidate-only one. */
+export const ALL_STAFF_PERMISSIONS: readonly Permission[] = [
+  "application:list",
+  "application:read",
+  "application:transition",
+  "application:assign",
+  "application:export",
+  "review:record",
+  "summary:generate",
+  "summary:read",
+  "summary:reopen",
+  "position:approve",
+  "document:download",
+  "document:regenerate",
+  "recruitment:manage",
+  "department:manage",
+  "notice:manage",
+  "user:manage",
+  "settings:manage",
+  "audit:read",
+  "system:manage",
+];
 export const ROLE_PERMISSIONS: Record<RoleName, readonly Permission[]> = {
   CANDIDATE: ["application:own"],
   HR: [
@@ -75,25 +97,8 @@ export const ROLE_PERMISSIONS: Record<RoleName, readonly Permission[]> = {
     "document:regenerate",
     "recruitment:manage",
   ],
-  SUPER_ADMIN: [
-    "application:list",
-    "application:read",
-    "application:transition",
-    "application:assign",
-    "application:export",
-    "summary:read",
-    "summary:reopen",
-    "position:approve",
-    "document:download",
-    "document:regenerate",
-    "recruitment:manage",
-    "department:manage",
-    "notice:manage",
-    "user:manage",
-    "settings:manage",
-    "audit:read",
-    "system:manage",
-  ],
+  // Super Admin holds every staff permission, including ones added later (see ALL_STAFF_PERMISSIONS).
+  SUPER_ADMIN: ALL_STAFF_PERMISSIONS,
 };
 
 export const ROLE_LABELS: Record<RoleName, string> = {

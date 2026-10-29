@@ -19,7 +19,8 @@ function requireUserAdmin(user: SessionUser | null): SessionUser {
   return user;
 }
 
-export async function listStaff(actor: SessionUser | null, q?: string, role?: StaffRole) {
+/** Lists staff accounts, or candidate accounts when role = "CANDIDATE" (Super Admin manages every user). */
+export async function listStaff(actor: SessionUser | null, q?: string, role?: StaffRole | "CANDIDATE") {
   requireUserAdmin(actor);
   return prisma.user.findMany({
     where: {
@@ -39,11 +40,12 @@ export async function listStaff(actor: SessionUser | null, q?: string, role?: St
   });
 }
 
+/** Active Super Admins other than the given user. The system must always keep at least one. */
 async function activeAdminCount(tx: Tx, excludingUserId?: string) {
   return tx.user.count({
     where: {
       status: "ACTIVE",
-      roles: { some: { role: { in: ["ADMIN", "SUPER_ADMIN"] } } },
+      roles: { some: { role: "SUPER_ADMIN" } },
       ...(excludingUserId ? { id: { not: excludingUserId } } : {}),
     },
   });
@@ -167,16 +169,10 @@ export async function revokeRole(actor: SessionUser | null, roleId: string) {
   const r = await prisma.userRole.findUnique({ where: { id: roleId } });
   if (!r || r.role === "CANDIDATE") throw new NotFoundError("Role assignment");
   await prisma.$transaction(async (tx) => {
-    if (r.role === "ADMIN" || r.role === "SUPER_ADMIN") {
-      if (r.userId === a.id) throw new ConflictError("You cannot remove your own Admin role");
-      const others = await tx.userRole.count({
-        where: {
-          role: { in: ["ADMIN", "SUPER_ADMIN"] },
-          userId: { not: r.userId },
-          user: { status: "ACTIVE" },
-        },
-      });
-      if (others === 0) throw new ConflictError("At least one active Admin must remain");
+    if (r.role === "SUPER_ADMIN") {
+      if (r.userId === a.id) throw new ConflictError("You cannot remove your own Super Admin role");
+      if ((await activeAdminCount(tx, r.userId)) === 0)
+        throw new ConflictError("At least one active Super Admin must remain");
     }
     await tx.userRole.delete({ where: { id: roleId } });
     await audit(
@@ -204,10 +200,10 @@ export async function setUserStatus(
     if (!target) throw new NotFoundError("User");
     if (
       status === "DISABLED" &&
-      target.roles.some((r) => r.role === "ADMIN" || r.role === "SUPER_ADMIN") &&
+      target.roles.some((r) => r.role === "SUPER_ADMIN") &&
       (await activeAdminCount(tx, userId)) === 0
     )
-      throw new ConflictError("At least one active Admin must remain");
+      throw new ConflictError("At least one active Super Admin must remain");
     await tx.user.update({ where: { id: userId }, data: { status } });
     if (status === "DISABLED") await tx.session.deleteMany({ where: { userId } });
     await audit(
@@ -382,5 +378,43 @@ export async function hodsForDepartment(departmentId: string) {
     where: { status: "ACTIVE", roles: { some: { role: "HOD", departmentId } } },
     select: { id: true, email: true, profile: { select: { fullName: true } } },
     orderBy: { email: "asc" },
+  });
+}
+
+/** Ends every session of a user (e.g. lost device). The user can sign in again with a new code. */
+export async function signOutEverywhere(actor: SessionUser | null, userId: string) {
+  const a = requireUserAdmin(actor);
+  if (userId === a.id) throw new ConflictError("Use Sign out for your own account");
+  await prisma.$transaction(async (tx) => {
+    if (!(await tx.user.findUnique({ where: { id: userId }, select: { id: true } })))
+      throw new NotFoundError("User");
+    const { count } = await tx.session.deleteMany({ where: { userId } });
+    await audit(
+      {
+        actorId: a.id,
+        action: "user.sessions_revoked",
+        entityType: "user",
+        entityId: userId,
+        metadata: { count },
+      },
+      tx,
+    );
+  });
+}
+
+/** Corrects the display name of any account. Submitted applications keep their own snapshot. */
+export async function renameUser(actor: SessionUser | null, userId: string, nameRaw: unknown) {
+  const a = requireUserAdmin(actor);
+  const name = z.string().trim().min(2).max(120).safeParse(nameRaw);
+  if (!name.success) throw new ValidationError("Enter the full name", { fullName: ["Enter the full name"] });
+  await prisma.$transaction(async (tx) => {
+    if (!(await tx.user.findUnique({ where: { id: userId }, select: { id: true } })))
+      throw new NotFoundError("User");
+    await tx.candidateProfile.upsert({
+      where: { userId },
+      create: { userId, fullName: name.data, privacyVersion: "staff", privacyAcceptedAt: new Date() },
+      update: { fullName: name.data },
+    });
+    await audit({ actorId: a.id, action: "user.renamed", entityType: "user", entityId: userId }, tx);
   });
 }

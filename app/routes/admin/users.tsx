@@ -25,9 +25,11 @@ import {
   createStaffUser,
   grantRole,
   listStaff,
+  renameUser,
   resendInvite,
   revokeRole,
   setUserStatus,
+  signOutEverywhere,
 } from "~/modules/users/service.server";
 
 export const meta: Route.MetaFunction = () => [{ title: "Users and roles — PSG Tech Recruitment" }];
@@ -36,7 +38,8 @@ export async function loader({ request, context }: Route.LoaderArgs) {
   const user = requireStaff(context, request, "user:manage");
   const url = new URL(request.url);
   const q = url.searchParams.get("q")?.slice(0, 100) || undefined;
-  const role = STAFF_ROLES.find((r) => r === url.searchParams.get("role"));
+  const rawRole = url.searchParams.get("role");
+  const role = rawRole === "CANDIDATE" ? "CANDIDATE" : STAFF_ROLES.find((r) => r === rawRole);
   const [users, departments, counts] = await Promise.all([
     listStaff(user, q, role),
     prisma.department.findMany({
@@ -46,7 +49,7 @@ export async function loader({ request, context }: Route.LoaderArgs) {
     }),
     prisma.userRole.groupBy({
       by: ["role"],
-      where: { role: { in: [...STAFF_ROLES] } },
+      where: { role: { in: [...STAFF_ROLES, "CANDIDATE"] } },
       _count: { _all: true },
     }),
   ]);
@@ -85,6 +88,12 @@ export async function action({ request, context }: Route.ActionArgs) {
           form.get("status") === "DISABLED" ? "DISABLED" : "ACTIVE",
         );
         return { message: "Account status updated." };
+      case "signout":
+        await signOutEverywhere(user, String(form.get("userId")));
+        return { message: "All sessions of this account were ended." };
+      case "rename":
+        await renameUser(user, String(form.get("userId")), form.get("fullName"));
+        return { message: "Name updated." };
       case "invite":
         await resendInvite(user, String(form.get("userId")));
         return { message: "Sign-in instructions e-mailed again." };
@@ -173,8 +182,7 @@ export default function Users({ loaderData, actionData }: Route.ComponentProps) 
               </legend>
               {departments.length === 0 ? (
                 <p className="mt-2 text-sm text-warning">
-                  Create the department first under{" "}
-                  <a href="/admin?tab=departments">Job profiles → Departments</a>.
+                  Create the department first under <a href="/admin/departments">Departments &amp; HODs</a>.
                 </p>
               ) : (
                 <div className="mt-2 grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
@@ -205,6 +213,12 @@ export default function Users({ loaderData, actionData }: Route.ComponentProps) 
               active: role === r,
               count: counts[r] ?? 0,
             })),
+            {
+              to: "?role=CANDIDATE",
+              label: "Candidates",
+              active: role === "CANDIDATE",
+              count: counts.CANDIDATE ?? 0,
+            },
           ]}
         />
         <Form method="get" className="flex items-end gap-2">
@@ -229,11 +243,14 @@ export default function Users({ loaderData, actionData }: Route.ComponentProps) 
       </div>
 
       {users.length === 0 ? (
-        <EmptyState title="No staff accounts found" />
+        <EmptyState
+          title={role === "CANDIDATE" ? "No candidate accounts found" : "No staff accounts found"}
+        />
       ) : (
         <ul className="space-y-3">
           {users.map((u) => {
             const staffRoles = u.roles.filter((r) => r.role !== "CANDIDATE");
+            const isCandidate = staffRoles.length === 0;
             return (
               <li key={u.id} className="card space-y-4 p-5">
                 <div className="flex flex-wrap items-start justify-between gap-3">
@@ -247,7 +264,23 @@ export default function Users({ loaderData, actionData }: Route.ComponentProps) 
                     <Badge tone={u.status === "ACTIVE" ? "success" : "danger"}>
                       {u.status === "ACTIVE" ? "Active" : "Disabled"}
                     </Badge>
-                    {!u.lastLoginAt && (
+                    {isCandidate && <Badge tone="info">Candidate</Badge>}
+                    {u.id !== selfId && (
+                      <Form method="post">
+                        <CsrfInput />
+                        <input type="hidden" name="intent" value="signout" />
+                        <input type="hidden" name="userId" value={u.id} />
+                        <ConfirmDialog
+                          trigger="Sign out everywhere"
+                          triggerClassName="btn-secondary btn-sm"
+                          title={`End every session of ${u.profile?.fullName ?? u.email}?`}
+                          confirmLabel="Sign out"
+                        >
+                          <p>They are signed out on every device and need a new e-mail code to sign in.</p>
+                        </ConfirmDialog>
+                      </Form>
+                    )}
+                    {!u.lastLoginAt && !isCandidate && (
                       <Form method="post">
                         <CsrfInput />
                         <input type="hidden" name="intent" value="invite" />
@@ -284,74 +317,100 @@ export default function Users({ loaderData, actionData }: Route.ComponentProps) 
                     )}
                   </div>
                 </div>
-                <ul className="flex flex-wrap gap-2" aria-label="Roles">
-                  {staffRoles.map((r) => (
-                    <li
-                      key={r.id}
-                      className="flex items-center gap-2 rounded-full border border-line bg-soft py-1 pl-3 pr-1 text-sm"
-                    >
-                      <span className="font-medium">
-                        {ROLE_LABELS[r.role as RoleName]}
-                        {r.department ? ` — ${r.department.code}` : ""}
-                      </span>
-                      <Form method="post">
-                        <CsrfInput />
-                        <input type="hidden" name="intent" value="revoke" />
-                        <input type="hidden" name="roleId" value={r.id} />
-                        <ConfirmDialog
-                          trigger="Remove"
-                          triggerClassName="rounded-full px-2 py-0.5 text-xs font-semibold text-danger hover:bg-danger-50"
-                          tone="danger"
-                          title="Remove this role?"
-                          confirmLabel="Remove role"
-                        >
-                          <p>
-                            {ROLE_LABELS[r.role as RoleName]}
-                            {r.department ? ` (${r.department.name})` : ""} will be removed from {u.email}.
-                          </p>
-                        </ConfirmDialog>
-                      </Form>
-                    </li>
-                  ))}
-                </ul>
                 <details>
-                  <summary className="cursor-pointer text-sm font-semibold text-brand-700">
-                    Add a role
-                  </summary>
-                  <Form method="post" className="mt-3 grid gap-3 sm:grid-cols-[1fr_1fr_auto] sm:items-end">
+                  <summary className="cursor-pointer text-sm font-semibold text-brand-700">Edit name</summary>
+                  <Form method="post" className="mt-3 flex flex-col gap-2 sm:flex-row sm:items-end">
                     <CsrfInput />
-                    <input type="hidden" name="intent" value="grant" />
+                    <input type="hidden" name="intent" value="rename" />
                     <input type="hidden" name="userId" value={u.id} />
-                    <div>
-                      <label htmlFor={`role-${u.id}`} className="block text-sm font-semibold">
-                        Role
-                      </label>
-                      <select id={`role-${u.id}`} name="role" className="field-input mt-1">
-                        {STAFF_ROLES.map((r) => (
-                          <option key={r} value={r}>
-                            {ROLE_LABELS[r]}
-                          </option>
-                        ))}
-                      </select>
-                    </div>
-                    <div>
-                      <label htmlFor={`dept-${u.id}`} className="block text-sm font-semibold">
-                        Department (for HOD)
-                      </label>
-                      <select id={`dept-${u.id}`} name="departmentId" className="field-input mt-1">
-                        <option value="">—</option>
-                        {departments.map((d) => (
-                          <option key={d.id} value={d.id}>
-                            {d.name}
-                          </option>
-                        ))}
-                      </select>
-                    </div>
-                    <button type="submit" className="btn-secondary">
-                      Add role
+                    <label htmlFor={`name-${u.id}`} className="sr-only">
+                      Full name
+                    </label>
+                    <input
+                      id={`name-${u.id}`}
+                      name="fullName"
+                      required
+                      minLength={2}
+                      defaultValue={u.profile?.fullName ?? ""}
+                      className="field-input sm:max-w-sm"
+                    />
+                    <button type="submit" className="btn-secondary btn-sm">
+                      Save name
                     </button>
                   </Form>
                 </details>
+                {!isCandidate && (
+                  <ul className="flex flex-wrap gap-2" aria-label="Roles">
+                    {staffRoles.map((r) => (
+                      <li
+                        key={r.id}
+                        className="flex items-center gap-2 rounded-full border border-line bg-soft py-1 pl-3 pr-1 text-sm"
+                      >
+                        <span className="font-medium">
+                          {ROLE_LABELS[r.role as RoleName]}
+                          {r.department ? ` — ${r.department.code}` : ""}
+                        </span>
+                        <Form method="post">
+                          <CsrfInput />
+                          <input type="hidden" name="intent" value="revoke" />
+                          <input type="hidden" name="roleId" value={r.id} />
+                          <ConfirmDialog
+                            trigger="Remove"
+                            triggerClassName="rounded-full px-2 py-0.5 text-xs font-semibold text-danger hover:bg-danger-50"
+                            tone="danger"
+                            title="Remove this role?"
+                            confirmLabel="Remove role"
+                          >
+                            <p>
+                              {ROLE_LABELS[r.role as RoleName]}
+                              {r.department ? ` (${r.department.name})` : ""} will be removed from {u.email}.
+                            </p>
+                          </ConfirmDialog>
+                        </Form>
+                      </li>
+                    ))}
+                  </ul>
+                )}
+                {!isCandidate && (
+                  <details>
+                    <summary className="cursor-pointer text-sm font-semibold text-brand-700">
+                      Add a role
+                    </summary>
+                    <Form method="post" className="mt-3 grid gap-3 sm:grid-cols-[1fr_1fr_auto] sm:items-end">
+                      <CsrfInput />
+                      <input type="hidden" name="intent" value="grant" />
+                      <input type="hidden" name="userId" value={u.id} />
+                      <div>
+                        <label htmlFor={`role-${u.id}`} className="block text-sm font-semibold">
+                          Role
+                        </label>
+                        <select id={`role-${u.id}`} name="role" className="field-input mt-1">
+                          {STAFF_ROLES.map((r) => (
+                            <option key={r} value={r}>
+                              {ROLE_LABELS[r]}
+                            </option>
+                          ))}
+                        </select>
+                      </div>
+                      <div>
+                        <label htmlFor={`dept-${u.id}`} className="block text-sm font-semibold">
+                          Department (for HOD)
+                        </label>
+                        <select id={`dept-${u.id}`} name="departmentId" className="field-input mt-1">
+                          <option value="">—</option>
+                          {departments.map((d) => (
+                            <option key={d.id} value={d.id}>
+                              {d.name}
+                            </option>
+                          ))}
+                        </select>
+                      </div>
+                      <button type="submit" className="btn-secondary">
+                        Add role
+                      </button>
+                    </Form>
+                  </details>
+                )}
               </li>
             );
           })}

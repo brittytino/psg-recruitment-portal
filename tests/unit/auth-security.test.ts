@@ -297,3 +297,13 @@ describe("Authentication & Authorization Security Controls", () => {
     });
   });
 });
+
+describe("Super Admin holds every staff permission", () => {
+  it("has every permission that any other staff role has", async () => {
+    const { ROLE_PERMISSIONS, STAFF_ROLES, hasPermission } = await import("~/modules/auth/permissions");
+    const sa = [{ role: "SUPER_ADMIN" as const, departmentId: null }];
+    for (const r of STAFF_ROLES)
+      for (const p of ROLE_PERMISSIONS[r]) expect(hasPermission(sa, p), `${r}:${p}`).toBe(true);
+    expect(hasPermission(sa, "application:own")).toBe(false);
+  });
+});
