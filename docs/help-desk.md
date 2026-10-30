@@ -2,7 +2,7 @@
 
 ## Help desk
 
-Candidates raise support tickets; HR – N4 Section and the Super Admin answer them. It is part of the
+Candidates raise support tickets; HR – N4 Section and senior administrators answer them. It is part of the
 same application (same sign-in, database, storage and e-mail), not a separate system.
 
 ### Routes
@@ -15,9 +15,9 @@ same application (same sign-in, database, storage and e-mail), not a separate sy
 | `/help-desk/tickets/:id` | Candidate (owner) | Conversation and reply. |
 | `/help-desk/articles`, `/help-desk/articles/:slug` | Everyone | Published help articles (none ship with the system). |
 | `/help-desk/files/:id` | Owner or support staff | Attachment download (authorised every time). |
-| `/staff/help-desk` | HR – N4, Super Admin | Ticket queue: views, counts, filters, bulk assign / status. |
-| `/staff/help-desk/:id` | HR – N4, Super Admin | Conversation, reply / request information / internal note, status, assignment, priority, escalation, history. |
-| `/staff/help-desk/settings` | Super Admin | Default assignment, staff e-mail on new tickets, help articles. |
+| `/staff/help-desk` | HR – N4, Admin, owner | Ticket queue: views, counts, filters, bulk assign / status. |
+| `/staff/help-desk/:id` | HR – N4, Admin, owner | Conversation, reply / request information / internal note, status, assignment, priority, escalation, history. |
+| `/staff/help-desk/settings` | Owner | Default assignment, staff e-mail on new tickets, help articles. |
 
 Signed-out visitors who open a ticket page are sent through the normal e-mail-code sign-in and returned
 to the page afterwards.
@@ -26,8 +26,8 @@ to the page afterwards.
 
 | Permission | Roles | Allows |
 | --- | --- | --- |
-| `helpdesk:handle` | HR, Super Admin | Read and work on every ticket. |
-| `helpdesk:admin` | Super Admin | Help desk settings, help articles, reopening closed tickets. |
+| `helpdesk:handle` | HR, Admin, owner | Read and work on every ticket. |
+| `helpdesk:admin` | Admin, owner | Help desk settings, help articles, reopening closed tickets. |
 
 Admin (Dean / Principal) and HODs have no help desk access. Candidates only ever see their own tickets,
 public messages and attachments of public messages. Every rule is checked on the server.
@@ -39,10 +39,10 @@ public messages and attachments of public messages. Every rule is checked on the
 | Who | Change |
 | --- | --- |
 | Candidate | Creates (Open). Replying to *Awaiting candidate* returns it to the team (Open / In progress). Replying to *Resolved* within 14 days reopens it. Cannot reply to *Closed*. |
-| Staff | Any change allowed by `STAFF_TRANSITIONS` in `app/modules/helpdesk/definitions.ts`. *Resolved* and *Closed* need a resolution summary. Only the Super Admin reopens a *Closed* ticket. Replying to an unassigned ticket assigns it to the replier. |
+| Staff | Any change allowed by `STAFF_TRANSITIONS` in `app/modules/helpdesk/definitions.ts`. *Resolved* and *Closed* need a resolution summary. Only a senior administrator reopens a *Closed* ticket. Replying to an unassigned ticket assigns it to the replier. |
 
 Priority (Low / Normal / High / Urgent) is set by staff only; candidates describe the urgency in their
-own words. Escalation flags the ticket for the Super Admin (priority at least High) and keeps its history.
+own words. Escalation flags the ticket for senior administrators (priority at least High) and keeps its history.
 Every change is stored in `support_ticket_events` and in the audit log.
 
 References are `PSGHD-<year>-<000001>` from `support_counters` (atomic, unique under concurrency).

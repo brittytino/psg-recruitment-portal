@@ -86,7 +86,7 @@ app/
 │   ├── reviews/          # HOD reviews, cadre change recommendations, department summary sheets
 │   └── users/            # User account provisioning, staff creation, department mapping, audit
 └── routes/               # Framework route modules focused on loaders, actions, and page rendering
-    ├── admin/            # Super Admin & Admin management routes (users, audit, vacancies)
+    ├── admin/            # Admin management routes (users, audit, vacancies)
     ├── auth/             # Passwordless authentication routes (login, verify OTP, register)
     ├── candidate/        # Candidate recruitment portal, multi-step application wizard, receipt, PDFs
     └── staff/            # HR & HOD screening, multi-criteria review queues, approved summary sheets
@@ -114,13 +114,12 @@ The application and supporting containers run on documented non-default external
 ## 5. Roles and the first account
 
 No real account or e-mail address is stored in this repository. A new installation creates only the
-**first Super Admin**, from `BOOTSTRAP_SUPER_ADMIN_EMAIL` in the server-only file
+**first owner account**, from `BOOTSTRAP_OWNER_EMAIL` in the server-only file
 `secrets/override.env`; everyone else is added in the application (**Users & roles**). There are no
 demo candidates, vacancies or applications.
 
 | Role | Who | Can do |
 | :--- | :--- | :--- |
-| `SUPER_ADMIN` | System owner (hidden from every other user) | Everything: users and every role, system settings, control centre, system logs, audit log. |
 | `MANAGER` — **Admin** | Recruitment and support lead | Everything HR and Dean / Principal can do, the help desk (including settings), and adding HR, HOD and Viewer accounts. No system settings, logs or audit log. |
 | `ADMIN` — **Dean / Principal** | Recruitment oversight | All applications, HOD assignment, position-change approval, summaries. |
 | `HR` — **HR – N4 Section** | Recruitment office | Job profiles, screening, departments and HOD invitations, exports, help desk, viewers. |
@@ -130,7 +129,7 @@ demo candidates, vacancies or applications.
 
 ## 6. Strict 100% Passwordless Authentication & Email Infrastructure
 
-The portal employs a zero-password, zero-magic-link authentication architecture. Every user—including Candidates, HODs, HR, Dean, Principal, and Super Admin—must authenticate using a cryptographically generated 6-digit OTP delivered to their verified or official email address.
+The portal employs a zero-password, zero-magic-link authentication architecture. Every user—including Candidates, HODs, HR, Dean, Principal, and the owner account—must authenticate using a cryptographically generated 6-digit OTP delivered to their verified or official email address.
 
 ### Email Infrastructure Architecture
 
@@ -210,7 +209,7 @@ The candidate application wizard organizes the official requirements into struct
 
 ## 8. Department HOD Review & Summary Sheet Workflow
 
-1. **Bulk Assignment**: The Principal, Dean, or Super Admin selects submitted applications across departments and assigns them in bulk to authorized departmental HODs.
+1. **Bulk Assignment**: The Principal or Dean selects submitted applications across departments and assigns them in bulk to authorized departmental HODs.
 2. **Department-Scoped Review**: HODs log in and see only applications belonging to their assigned department.
 3. **Auditable Recommendation Outcomes**:
    - **Accept**: Application accepted as applied.
@@ -219,7 +218,7 @@ The candidate application wizard organizes the official requirements into struct
 4. **Versioned Summary Sheet**:
    - Once all department applications are decided, the HOD generates a department-wise summary sheet.
    - The HOD explicitly reviews and clicks **Approve Summary Sheet**.
-   - **Access Control**: Unapproved summaries remain draft snapshots. Only after HOD approval does the summary sheet become visible to HR / N4 Section, the Dean, Principal, and Super Admin.
+   - **Access Control**: Unapproved summaries remain draft snapshots. Only after HOD approval does the summary sheet become visible to HR / N4 Section, the Dean and Principal.
 
 ---
 
@@ -237,14 +236,14 @@ The portal provides an auditable, Excel-compatible CSV export engine:
 
 ## 9a. Help Desk and E-mail Quota
 
-Candidates raise support tickets at `/help-desk`; HR – N4 Section and the Super Admin answer them at `/staff/help-desk`. E-mail is kept within the daily mail quota with a budget, one-e-mail-per-event keys and in-app notifications (bell icon). See [docs/help-desk.md](docs/help-desk.md).
+Candidates raise support tickets at `/help-desk`; HR – N4 Section and senior administrators answer them at `/staff/help-desk`. E-mail is kept within the daily mail quota with a budget, one-e-mail-per-event keys and in-app notifications (bell icon). See [docs/help-desk.md](docs/help-desk.md).
 
 ## 10. Team Work Allocation: Tino vs Hari
 
-| Ownership Dimension         | Tino (Technical Lead & Super Admin)                                                                                                                                                                                                                                                                                                                                                                                                                                                                | Hari (Senior Full-Stack Engineer)                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                            |
+| Ownership Dimension         | Tino (Technical Lead)                                                                                                                                                                                                                                                                                                                                                                                                                                                                | Hari (Senior Full-Stack Engineer)                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                            |
 | :-------------------------- | :------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | :--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | **Core Workstream**         | **Workstream A: Foundation, Security & Integration**                                                                                                                                                                                                                                                                                                                                                                                                                                               | **Workstream B: Recruitment Experience & Workflows**                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                         |
-| **Primary Modules**         | - Authentication & Session Architecture (Passwordless OTP)<br>- RBAC & Scopes (`SUPER_ADMIN`, `ADMIN`, `HR`, `HOD`)<br>- Database Schema, Relations & Prisma Migrations<br>- Account Provisioning & Security Auditing<br>- Department & Vacancy Administrative Interfaces<br>- Bulk HOD Assignment Workflow & Authorization Guards<br>- Docker Multi-Stage Builds, Volumes & Host Ports<br>- Blue-Green Deployment & VPS Production Automation<br>- CI/CD Pipeline & End-to-End System Integration | - Candidate Recruitment Portal & Public Vacancies<br>- Section-based Application Wizard (Steps 1–12)<br>- Academic Qualification & Arrear Form Controls<br>- Work Experience, Overlap Detection & Calculation<br>- Research Metrics, Publications & Patents UI<br>- Document Upload Experience & Validation<br>- Application Review Screen & Watermarked PDF Preview<br>- Candidate Receipt & Consolidated Bundle Downloads<br>- HR & HOD Dashboards & Filter Composability<br>- Department Summary Sheet Approval UI<br>- CSV Export Selection, Live Counts & Preview Table |
+| **Primary Modules**         | - Authentication & Session Architecture (Passwordless OTP)<br>- RBAC & Scopes (all staff roles)<br>- Database Schema, Relations & Prisma Migrations<br>- Account Provisioning & Security Auditing<br>- Department & Vacancy Administrative Interfaces<br>- Bulk HOD Assignment Workflow & Authorization Guards<br>- Docker Multi-Stage Builds, Volumes & Host Ports<br>- Blue-Green Deployment & VPS Production Automation<br>- CI/CD Pipeline & End-to-End System Integration | - Candidate Recruitment Portal & Public Vacancies<br>- Section-based Application Wizard (Steps 1–12)<br>- Academic Qualification & Arrear Form Controls<br>- Work Experience, Overlap Detection & Calculation<br>- Research Metrics, Publications & Patents UI<br>- Document Upload Experience & Validation<br>- Application Review Screen & Watermarked PDF Preview<br>- Candidate Receipt & Consolidated Bundle Downloads<br>- HR & HOD Dashboards & Filter Composability<br>- Department Summary Sheet Approval UI<br>- CSV Export Selection, Live Counts & Preview Table |
 | **Shared Responsibilities** | - Shared TypeScript API contracts and route loaders/actions<br>- Official form field mapping and PDF verification<br>- Automated unit, integration, and security test coverage<br>- WCAG 2.2 AA accessibility verification<br>- Code reviews (mandatory cross-developer pull request review)                                                                                                                                                                                                       | - Shared TypeScript API contracts and route loaders/actions<br>- Official form field mapping and PDF verification<br>- Automated unit, integration, and security test coverage<br>- WCAG 2.2 AA accessibility verification<br>- Code reviews (mandatory cross-developer pull request review)                                                                                                                                                                                                                                                                                 |
 
 ---
@@ -338,7 +337,7 @@ All quality gates pass cleanly:
 
 - **TypeScript Typecheck**: `npm run typecheck` passes with 0 errors across all routes and modules.
 - **ESLint Code Quality**: `npm run lint` passes with 0 errors and 0 warnings.
-- **Unit & Security Tests**: `npm test` passes all unit tests across test suites covering passwordless OTP expiry, reference number formatting, role permission boundaries (`SUPER_ADMIN` vs `ADMIN`), CSV formula injection protection, arrear calculations, qualification document rules, and structured input master options with department-scoped filtering.
+- **Unit & Security Tests**: `npm test` passes all unit tests across test suites covering passwordless OTP expiry, reference number formatting, role permission boundaries, CSV formula injection protection, arrear calculations, qualification document rules, and structured input master options with department-scoped filtering.
 - **Production Build**: `npm run build` compiles client bundles, SSR server builds, and background worker bundles without errors.
 
 ---

@@ -54,19 +54,19 @@ removed: `sudo certbot delete --cert-name recruitments.psgtech.ac.in` (same for 
 
 ## 4. The first account (new installations only)
 
-Before the first `./prod.sh`, put the first Super Admin in the server-only file `secrets/override.env`:
+Before the first `./prod.sh`, put the first owner account in the server-only file `secrets/override.env`:
 
 ```sh
 mkdir -p secrets
 cat >> secrets/override.env <<'EOF'
-BOOTSTRAP_SUPER_ADMIN_EMAIL=superadmin@your-college.edu
-BOOTSTRAP_SUPER_ADMIN_NAME=Your Name
+BOOTSTRAP_OWNER_EMAIL=owner@your-college.edu
+BOOTSTRAP_OWNER_NAME=Your Name
 EOF
 chmod 600 secrets/override.env
 ```
 
-The seed creates that account only when no Super Admin exists; on a running installation it changes
-nothing. The Super Admin then adds everyone else in **Users & roles** (Admins, Dean / Principal, HR,
+The seed creates that account only when no owner account exists; on a running installation it changes
+nothing. The owner then adds everyone else in **Users & roles** (Admins, Dean / Principal, HR,
 HODs, Viewers). An Admin can add HR, HOD and Viewer accounts. Everyone signs in with a 6-digit code
 e-mailed to them; no passwords.
 
@@ -159,7 +159,7 @@ default 450). The Control centre shows both routes, today's usage and whether th
 
 ## Read-only Viewers
 
-The Super Admin and HR – N4 Section add people who may only read applications at
+The owner and HR – N4 Section add people who may only read applications at
 **Set-up → Viewers (read only)** (`/admin/viewers`). A viewer signs in with the usual e-mail code and can
 list and open submitted applications and their documents — no changes, assignments, decisions,
 exports, help desk or settings. Removing a viewer signs them out and disables the account.

@@ -10,7 +10,7 @@ Roles (since v2, migration `20261023090000_v2_department_review`):
 - **HOD** — created by the Admin; one role row per department reviewed.
 - **CANDIDATE** — self-registered.
 
-The former roles map as SUPER_ADMIN / RECRUITMENT_ADMIN → ADMIN, HR_OFFICER → HR, DEPARTMENT_REVIEWER → HOD.
+The former roles map as RECRUITMENT_ADMIN → ADMIN, HR_OFFICER → HR, DEPARTMENT_REVIEWER → HOD.
 
 | Capability                                               | Candidate | HOD                                          | HR – N4 Section                     | Admin |
 | -------------------------------------------------------- | --------- | -------------------------------------------- | ----------------------------------- | ----- |

@@ -2,8 +2,8 @@
  * Seed script (idempotent; safe to run repeatedly, including in production).
  *  1. Registers the application form templates (immutable; checksum verified).
  *  2. Adds the initial research specialisations, only when none exist yet (HR manages them after).
- *  3. On a brand-new database only: the first department, and the first Super Admin from
- *     BOOTSTRAP_SUPER_ADMIN_EMAIL (server-only setting; no e-mail address lives in this repository).
+ *  3. On a brand-new database only: the first department, and the first owner account from
+ *     BOOTSTRAP_OWNER_EMAIL (server-only setting; no e-mail address lives in this repository).
  *     Existing users and roles are never created, changed or removed by the seed: everyone else is
  *     added in the application (Users & roles). Staff sign in with an e-mailed one-time code.
  *
@@ -134,25 +134,25 @@ async function ensureFirstDepartment() {
 }
 
 /**
- * First Super Admin on a new server. No e-mail address is stored in this repository: it is read from
- * BOOTSTRAP_SUPER_ADMIN_EMAIL (server-only, secrets/override.env). When an active Super Admin already
+ * First owner account on a new server. No e-mail address is stored in this repository: it is read from
+ * BOOTSTRAP_OWNER_EMAIL (server-only, secrets/override.env). When an active owner account already
  * exists — every running installation — nothing is created or changed: staff accounts and roles are
  * managed in the application (Users & roles), and the seed never touches existing users.
  */
 async function ensureFirstSuperAdmin() {
   const active = await prisma.userRole.count({ where: { role: "SUPER_ADMIN", user: { status: "ACTIVE" } } });
   if (active > 0) {
-    console.log("Super Admin present: staff accounts are managed in the application");
+    console.log("Owner account present: staff accounts are managed in the application");
     return;
   }
-  const email = process.env.BOOTSTRAP_SUPER_ADMIN_EMAIL?.trim().toLowerCase();
+  const email = process.env.BOOTSTRAP_OWNER_EMAIL?.trim().toLowerCase();
   if (!email || !/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)) {
     console.warn(
-      "No Super Admin yet. Put BOOTSTRAP_SUPER_ADMIN_EMAIL=you@example.org in secrets/override.env and run ./prod.sh seed",
+      "No owner account yet. Put BOOTSTRAP_OWNER_EMAIL=you@example.org in secrets/override.env and run ./prod.sh seed",
     );
     return;
   }
-  const name = process.env.BOOTSTRAP_SUPER_ADMIN_NAME?.trim() || "System Administrator";
+  const name = process.env.BOOTSTRAP_OWNER_NAME?.trim() || "System Administrator";
   const existing = await prisma.user.findUnique({ where: { email }, include: { roles: true } });
   await prisma.$transaction(async (tx) => {
     const user =
@@ -178,7 +178,7 @@ async function ensureFirstSuperAdmin() {
       },
     });
   });
-  console.log("created the first Super Admin (sign in with an e-mail code)");
+  console.log("created the first owner account (sign in with an e-mail code)");
 }
 
 /** Test/demo staff accounts (reserved .test domain) must never have access in a real deployment. */
