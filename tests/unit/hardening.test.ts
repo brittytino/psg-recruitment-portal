@@ -55,8 +55,7 @@ describe("hardening", () => {
     });
 
     it("asks the thesis title only for an awarded Ph.D.", () => {
-      const at = (phdStatus: string) =>
-        validateAnswers(def, { phdStatus }, "submit").map((i) => i.path);
+      const at = (phdStatus: string) => validateAnswers(def, { phdStatus }, "submit").map((i) => i.path);
       expect(at("Pursuing")).not.toContain("phdTitle");
       expect(at("Pursuing")).toContain("phdSpecialisation");
       expect(at("Awarded")).toContain("phdTitle");

@@ -11,6 +11,7 @@ export const AUDIT_CATEGORIES = {
   setup: "Job profiles, departments and notices",
   user: "Users and roles",
   settings: "Settings and control centre",
+  helpdesk: "Help desk",
 } as const;
 export type AuditCategory = keyof typeof AUDIT_CATEGORIES;
 
@@ -24,6 +25,7 @@ export const CATEGORY_PREFIXES: Record<AuditCategory, string[]> = {
   setup: ["vacancy.", "department.", "discipline.", "research_specialisation.", "notice."],
   user: ["user."],
   settings: ["settings.", "system."],
+  helpdesk: ["helpdesk."],
 };
 
 const LABELS: Record<string, string> = {
@@ -78,6 +80,23 @@ const LABELS: Record<string, string> = {
   "user.sessions_revoked": "User signed out everywhere",
   "user.invite_resent": "Invitation re-sent",
   "settings.changed": "Setting changed",
+  "helpdesk.ticket_created": "Support ticket created",
+  "helpdesk.candidate_replied": "Candidate replied on a ticket",
+  "helpdesk.ticket_reopened": "Ticket reopened by the candidate",
+  "helpdesk.staff_replied": "Staff replied to the candidate",
+  "helpdesk.info_requested": "Information requested from the candidate",
+  "helpdesk.internal_note": "Internal note added",
+  "helpdesk.status_changed": "Ticket status changed",
+  "helpdesk.resolved": "Ticket resolved",
+  "helpdesk.closed": "Ticket closed",
+  "helpdesk.assigned": "Ticket assigned",
+  "helpdesk.priority_changed": "Ticket priority changed",
+  "helpdesk.escalated": "Ticket escalated",
+  "helpdesk.ticket_viewed": "Ticket opened by staff",
+  "helpdesk.attachment_downloaded": "Ticket attachment downloaded",
+  "helpdesk.config_changed": "Help desk settings changed",
+  "helpdesk.article_created": "Help article created",
+  "helpdesk.article_updated": "Help article edited",
   "system.pdfs_retried": "Failed PDFs queued again",
   "system.all_sessions_revoked": "Everyone signed out",
   "system.test_email_sent": "Test e-mail sent",

@@ -572,6 +572,7 @@ export async function submit(
         "application.submitted",
         `Application received — ${referenceNo}`,
         `Your application for ${app.vacancy.title} (${deptOrSpec}) has been submitted.\n\nApplication reference: ${referenceNo}\nRevision: ${revisionNo}\nSubmitted: ${updated.submittedAt!.toISOString()}\n\nKeep this reference for any correspondence.`,
+        { dedupeKey: `${id}:r${revisionNo}` },
       );
       await audit(
         {

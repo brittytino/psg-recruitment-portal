@@ -29,6 +29,7 @@ import {
   PanelLeftOpen,
   UserRound,
   Settings,
+  LifeBuoy,
   ScrollText,
   ShieldCheck,
   Users,
@@ -48,9 +49,11 @@ import {
   type RoleGrant,
 } from "./modules/auth/permissions";
 import { csrfToken, getSessionUser } from "./modules/auth/session.server";
+import { unreadCount } from "./modules/notifications/inbox.server";
 import { isOriginAllowed } from "./lib/origin.server";
 import { AccountMenu, SignOutDialog } from "./components/account-menu";
 import { GlobalSearch } from "./components/global-search";
+import { NotificationBell } from "./components/notification-bell";
 import { READING_SCRIPT, ReadingComfort } from "./components/reading-comfort";
 import { Tooltip, TooltipProvider } from "./components/ui/tooltip";
 
@@ -86,8 +89,13 @@ function staffNav(grants: RoleGrant[]): { title: string; items: NavItem[] }[] {
   if (hasPermission(grants, "system:manage"))
     system.push({ to: "/admin/logs", label: "System logs", icon: ScrollText });
 
+  const support: NavItem[] = [];
+  if (hasPermission(grants, "helpdesk:handle"))
+    support.push({ to: "/staff/help-desk", label: "Help desk", icon: LifeBuoy });
+
   return [
     { title: "Recruitment", items: work },
+    { title: "Support", items: support },
     { title: "Set-up", items: setup },
     { title: "System", items: system },
   ].filter((g) => g.items.length);
@@ -122,6 +130,7 @@ export const middleware: Route.MiddlewareFunction[] = [
 export async function loader({ context }: Route.LoaderArgs) {
   const user = context.get(userContext);
   return {
+    unread: user ? await unreadCount(user).catch(() => 0) : 0,
     nonce: context.get(nonceContext),
     csrf: csrfToken(user?.sessionId ?? null),
     user: user
@@ -255,6 +264,7 @@ function PublicHeader() {
     ["/help", "How to apply"],
   ];
   if (user && !staff) links.push(["/account", "My applications"]);
+  if (!staff) links.push(["/help-desk", "Help desk"]);
   if (staff) links.push(["/staff", "Staff workspace"]);
   const linkCls = ({ isActive }: { isActive: boolean }) =>
     `relative px-3 py-2 text-[15px] no-underline transition-colors after:absolute after:inset-x-3 after:-bottom-[13px] after:h-0.5 after:rounded-full ${
@@ -278,6 +288,7 @@ function PublicHeader() {
           ))}
         </nav>
         <div className="flex items-center gap-2">
+          {user && <NotificationBell />}
           <ReadingComfort />
           <div className="hidden items-center gap-2 md:flex">
             {user ? (
@@ -554,6 +565,7 @@ function StaffTopBar() {
       </div>
       <GlobalSearch fullList={fullList} />
       <div className="flex shrink-0 items-center gap-3">
+        <NotificationBell />
         <ReadingComfort />
         <span className="hidden text-right leading-tight xl:block">
           <span className="block max-w-48 truncate text-sm font-semibold text-ink">{name}</span>
@@ -608,6 +620,7 @@ function StaffLayout({ children }: { children: React.ReactNode }) {
       <header className="sticky top-0 z-40 flex h-14 items-center justify-between gap-2 border-b border-white/10 bg-navy-800 px-4 lg:hidden">
         <Brand to="/staff" subtitle="Staff workspace" inverted />
         <div className="flex items-center gap-2">
+          <NotificationBell tone="dark" />
           <ReadingComfort tone="dark" />
           {user && (
             <AccountMenu user={{ name, initials, roleLabel, email: user.email, staff: true }} tone="dark" />

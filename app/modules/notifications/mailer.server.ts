@@ -1,6 +1,7 @@
 import nodemailer, { type SendMailOptions, type Transporter } from "nodemailer";
 import { env } from "~/modules/core/env.server";
 import { logger } from "~/modules/core/logger.server";
+import { countEmail } from "./budget.server";
 
 let transport: Transporter | undefined;
 
@@ -303,6 +304,7 @@ export async function sendOtpEmail(
 
   try {
     await deliver({ from: e.MAIL_FROM, to, subject, text, html });
+    void countEmail();
   } catch (err) {
     const msg = (err as Error).message || String(err);
     logger.error(

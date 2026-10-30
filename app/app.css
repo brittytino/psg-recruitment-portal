@@ -422,3 +422,13 @@ html[data-contrast="high"] a { text-decoration-thickness: 2px; }
 .confirm-dialog[open] { animation: ui-in 180ms cubic-bezier(0.16, 1, 0.3, 1); }
 .confirm-dialog[open]::backdrop { animation: ui-fade-in 180ms ease-out; }
 @media (prefers-reduced-motion: reduce) { .confirm-dialog[open], .confirm-dialog[open]::backdrop { animation: none; } }
+
+/* Usage bar (Control centre e-mail budget); a native <progress> so no inline styles are needed. */
+.usage-bar { display: block; width: 100%; height: 0.625rem; border: 0; border-radius: 9999px; overflow: hidden; background: var(--color-soft); appearance: none; }
+.usage-bar::-webkit-progress-bar { background: var(--color-soft); border-radius: 9999px; }
+.usage-bar::-webkit-progress-value { background: var(--color-success); border-radius: 9999px; }
+.usage-bar::-moz-progress-bar { background: var(--color-success); border-radius: 9999px; }
+.usage-bar.usage-warning::-webkit-progress-value { background: var(--color-warning); }
+.usage-bar.usage-warning::-moz-progress-bar { background: var(--color-warning); }
+.usage-bar.usage-danger::-webkit-progress-value { background: var(--color-danger); }
+.usage-bar.usage-danger::-moz-progress-bar { background: var(--color-danger); }

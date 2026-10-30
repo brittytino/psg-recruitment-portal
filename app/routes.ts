@@ -9,6 +9,7 @@ export default [
   route("privacy", "routes/privacy.tsx"),
   route("sitemap.xml", "routes/sitemap.ts"),
   route("open-positions.pdf", "routes/files/notice.ts"),
+  route("notifications", "routes/notifications.ts"),
   route("research-positions.pdf", "routes/files/notice.ts", { id: "research-notice" }),
 
   // Account
@@ -19,6 +20,15 @@ export default [
   route("verify-email", "routes/auth/verify-email.tsx"),
   route("forgot-password", "routes/auth/forgot-password.tsx"),
   route("reset-password", "routes/auth/reset-password.tsx"),
+
+  // Help desk (candidates). Overview and articles are public; tickets need sign-in.
+  route("help-desk", "routes/help-desk/index.tsx"),
+  route("help-desk/tickets", "routes/help-desk/tickets.tsx"),
+  route("help-desk/new", "routes/help-desk/new.tsx"),
+  route("help-desk/tickets/:id", "routes/help-desk/ticket.tsx"),
+  route("help-desk/articles", "routes/help-desk/articles.tsx"),
+  route("help-desk/articles/:slug", "routes/help-desk/article.tsx"),
+  route("help-desk/files/:id", "routes/help-desk/file.ts"),
 
   // Candidate
   route("account", "routes/candidate/account.tsx"),
@@ -39,6 +49,9 @@ export default [
   route("staff/summary", "routes/staff/summary.tsx"),
   route("staff/summary/:id", "routes/staff/summary-sheet.tsx"),
   route("staff/audit", "routes/staff/audit.tsx"),
+  route("staff/help-desk", "routes/staff/help-desk.tsx"),
+  route("staff/help-desk/settings", "routes/staff/help-desk-settings.tsx"),
+  route("staff/help-desk/:id", "routes/staff/help-desk-ticket.tsx"),
 
   // Administration
   route("admin", "routes/admin/index.tsx"),

@@ -37,7 +37,11 @@ export type Permission =
   | "user:manage"
   | "settings:manage"
   | "audit:read"
-  | "system:manage";
+  | "system:manage"
+  /** Help desk: read and work on candidate support tickets. */
+  | "helpdesk:handle"
+  /** Help desk configuration: assignment rules, help articles, escalations. */
+  | "helpdesk:admin";
 
 /** Every permission except the candidate-only one. */
 export const ALL_STAFF_PERMISSIONS: readonly Permission[] = [
@@ -60,6 +64,8 @@ export const ALL_STAFF_PERMISSIONS: readonly Permission[] = [
   "settings:manage",
   "audit:read",
   "system:manage",
+  "helpdesk:handle",
+  "helpdesk:admin",
 ];
 export const ROLE_PERMISSIONS: Record<RoleName, readonly Permission[]> = {
   CANDIDATE: ["application:own"],
@@ -75,6 +81,7 @@ export const ROLE_PERMISSIONS: Record<RoleName, readonly Permission[]> = {
     "recruitment:manage",
     "department:manage",
     "notice:manage",
+    "helpdesk:handle",
   ],
   HOD: [
     "application:list",

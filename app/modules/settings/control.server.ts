@@ -7,6 +7,7 @@ import { ForbiddenError } from "~/modules/core/errors";
 import { redis } from "~/modules/core/redis.server";
 import { requestRegeneration } from "~/modules/documents/service.server";
 import { storageWritable } from "~/modules/documents/storage.server";
+import { emailsSentToday, ROUTINE_SHARE } from "~/modules/notifications/budget.server";
 import { sendNotificationEmail, verifySmtpConnection } from "~/modules/notifications/mailer.server";
 
 /** Super Admin control centre: live system status and operations no other role can run. */
@@ -59,6 +60,16 @@ export async function systemStatus(user: SessionUser | null) {
     }),
   ]);
   const since = new Date(Date.now() - 24 * 3600_000);
+  const istMidnight = new Date(
+    `${new Date(Date.now() + 330 * 60_000).toISOString().slice(0, 10)}T00:00:00+05:30`,
+  );
+  const [mailSent, mailSkipped, mailFailed] = await Promise.all([
+    emailsSentToday(),
+    prisma.notification.count({
+      where: { status: "IN_APP", error: { not: null }, createdAt: { gte: istMidnight } },
+    }),
+    prisma.notification.count({ where: { status: "FAILED", createdAt: { gte: istMidnight } } }),
+  ]);
   const [usersByRole, applications, sessions, failedPdfs, signIns24h, failedCodes24h] = await Promise.all([
     prisma.userRole.groupBy({ by: ["role"], _count: { _all: true } }),
     prisma.application.count({ where: { status: { not: "DRAFT" } } }),
@@ -85,6 +96,13 @@ export async function systemStatus(user: SessionUser | null) {
       failedPdfs,
       signIns24h,
       failedCodes24h,
+    },
+    mail: {
+      sent: mailSent,
+      budget: e.MAIL_DAILY_BUDGET,
+      routineLimit: Math.floor(e.MAIL_DAILY_BUDGET * ROUTINE_SHARE),
+      skipped: mailSkipped,
+      failed: mailFailed,
     },
     version: process.env.GIT_SHA ?? "dev",
     mailFrom: e.SMTP_FROM_EMAIL,

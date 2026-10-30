@@ -1,4 +1,4 @@
-import { ArrowLeftRight, ExternalLink, FileText, LayoutDashboard, LogOut } from "lucide-react";
+import { ArrowLeftRight, ExternalLink, FileText, LayoutDashboard, LifeBuoy, LogOut } from "lucide-react";
 import { useRef, useState, type ReactNode } from "react";
 import { Link } from "react-router";
 import { CsrfInput } from "~/components/forms";
@@ -108,9 +108,14 @@ export function AccountMenu({ user, tone = "light" }: { user: MenuUser; tone?: "
               </DropdownMenuItem>
             </>
           ) : (
-            <MenuLink to="/account" icon={<FileText />}>
-              My applications
-            </MenuLink>
+            <>
+              <MenuLink to="/account" icon={<FileText />}>
+                My applications
+              </MenuLink>
+              <MenuLink to="/help-desk" icon={<LifeBuoy />}>
+                Help desk
+              </MenuLink>
+            </>
           )}
           <DropdownMenuSeparator />
           <DropdownMenuItem onSelect={() => setIntent("switch")}>

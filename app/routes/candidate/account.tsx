@@ -1,5 +1,5 @@
 import { Form, Link } from "react-router";
-import { ArrowRight, Search } from "lucide-react";
+import { ArrowRight, LifeBuoy, Search } from "lucide-react";
 import { EmptyState, StatTile } from "~/components/staff";
 import type { Route } from "./+types/account";
 import { Alert, Badge, CsrfInput, formatDateTime, statusTone } from "~/components/forms";
@@ -59,9 +59,14 @@ export default function Account({ loaderData, actionData }: Route.ComponentProps
             Track your submitted applications, review feedback, and continue draft forms.
           </p>
         </div>
-        <Link to="/vacancies" className="btn-primary w-full sm:w-auto text-center shrink-0">
-          <Search className="h-4 w-4" aria-hidden="true" /> Browse vacancies
-        </Link>
+        <div className="flex w-full shrink-0 gap-2 sm:w-auto">
+          <Link to="/help-desk" className="btn-secondary flex-1 text-center sm:flex-none">
+            <LifeBuoy className="h-4 w-4" aria-hidden="true" /> Help desk
+          </Link>
+          <Link to="/vacancies" className="btn-primary flex-1 text-center sm:flex-none">
+            <Search className="h-4 w-4" aria-hidden="true" /> Browse vacancies
+          </Link>
+        </div>
       </div>
 
       {actionData && "message" in actionData && actionData.message && (

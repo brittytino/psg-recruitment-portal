@@ -89,6 +89,10 @@ export async function auditLogDetailed(user: SessionUser | null, q: AuditQuery) 
       if (typeof v === "string" && UUID.test(v) && /(hod|user|reviewer|actor|candidate)Id$/i.test(k))
         metaUserIds.add(v);
   }
+  const tickets = await prisma.supportTicket.findMany({
+    where: { id: { in: ids("support_ticket") } },
+    select: { id: true, referenceNo: true, subject: true },
+  });
   const [apps, users, vacancies, departments, sheets, notices, specs] = await Promise.all([
     prisma.application.findMany({
       where: { id: { in: ids("application") } },
@@ -157,6 +161,14 @@ export async function auditLogDetailed(user: SessionUser | null, q: AuditQuery) 
           kind: "Research specialisation",
           label: specs.find((x) => x.id === id)?.name ?? gone(id),
         };
+      case "support_ticket": {
+        const t = tickets.find((x) => x.id === id);
+        return {
+          kind: "Support ticket",
+          label: t ? `${t.referenceNo} · ${t.subject}` : gone(id),
+          href: t ? `/staff/help-desk/${id}` : undefined,
+        };
+      }
       case "setting":
         return { kind: "Setting", label: SETTINGS[id as keyof typeof SETTINGS]?.label ?? id };
       default:

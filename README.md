@@ -234,6 +234,10 @@ The portal provides an auditable, Excel-compatible CSV export engine:
 
 ---
 
+## 9a. Help Desk and E-mail Quota
+
+Candidates raise support tickets at `/help-desk`; HR – N4 Section and the Super Admin answer them at `/staff/help-desk`. E-mail is kept within the daily mail quota with a budget, one-e-mail-per-event keys and in-app notifications (bell icon). See [docs/help-desk.md](docs/help-desk.md).
+
 ## 10. Team Work Allocation: Tino vs Hari
 
 | Ownership Dimension         | Tino (Technical Lead & Super Admin)                                                                                                                                                                                                                                                                                                                                                                                                                                                                | Hari (Senior Full-Stack Engineer)                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                            |

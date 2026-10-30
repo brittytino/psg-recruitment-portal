@@ -16,6 +16,7 @@ import { newRedisConnection } from "~/modules/core/redis.server";
 import { generateBundle, markBundleFailed, PipelineError } from "~/modules/documents/pipeline.server";
 import { scanBytes } from "~/modules/documents/scan.server";
 import { getVerifiedFile } from "~/modules/documents/storage.server";
+import { countEmail, mayEmail } from "~/modules/notifications/budget.server";
 import { sendNotificationEmail } from "~/modules/notifications/mailer.server";
 
 const JOB_VERSION = 1;
@@ -169,9 +170,22 @@ async function processEmail(job: Job) {
     where: { id: job.data.notificationId },
     include: { user: { select: { email: true } } },
   });
-  if (!n || n.status === "SENT") return;
+  // Already sent (a retried job), or in-app only: never e-mail twice.
+  if (!n || n.status === "SENT" || n.status === "IN_APP") return;
+  if (!(await mayEmail(n.priority === "critical" ? "critical" : "routine"))) {
+    await prisma.notification.update({
+      where: { id: n.id },
+      data: { status: "IN_APP", error: "Not e-mailed: daily e-mail budget reached. Shown in the app." },
+    });
+    logger.warn(
+      { event: "mail_budget_skipped", notificationId: n.id, type: n.type, priority: n.priority },
+      "routine e-mail kept in the app: daily e-mail budget reached",
+    );
+    return;
+  }
   try {
     await sendNotificationEmail(n.user.email, n.subject, n.body);
+    await countEmail();
     await prisma.notification.update({
       where: { id: n.id },
       data: { status: "SENT", sentAt: new Date(), attempts: { increment: 1 }, error: null },

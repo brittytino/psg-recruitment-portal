@@ -18,6 +18,8 @@ const schema = z.object({
    * generous; per-account limits are unaffected and still protect individual accounts.
    */
   IP_RATE_LIMIT_MULTIPLIER: z.coerce.number().int().min(1).max(1000).default(30),
+  /** E-mails the app may send per day (IST), across web and worker. Keep below the provider quota. */
+  MAIL_DAILY_BUDGET: z.coerce.number().int().min(10).max(100000).default(450),
   CONVERTER_URL: z.string().url(),
   CONVERTER_TOKEN: z.string().default(""),
   MALWARE_SCAN: z.enum(["clamav", "disabled"]).default("clamav"),

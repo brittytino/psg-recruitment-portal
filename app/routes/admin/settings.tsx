@@ -151,6 +151,27 @@ export default function Settings({ loaderData, actionData }: Route.ComponentProp
             </div>
           ))}
         </dl>
+        <div className="rounded-xl border border-line p-4">
+          <div className="flex flex-wrap items-baseline justify-between gap-2">
+            <p className="text-sm font-semibold text-ink">E-mail usage today</p>
+            <p className="text-sm text-muted">
+              {status.mail.sent} of {status.mail.budget} sent
+              {status.mail.skipped ? ` · ${status.mail.skipped} kept in the app only` : ""}
+              {status.mail.failed ? ` · ${status.mail.failed} failed` : ""}
+            </p>
+          </div>
+          <progress
+            className={`usage-bar mt-2 ${status.mail.sent >= status.mail.budget * 0.95 ? "usage-danger" : status.mail.sent >= status.mail.budget * 0.7 ? "usage-warning" : ""}`}
+            max={status.mail.budget}
+            value={Math.min(status.mail.sent, status.mail.budget)}
+            aria-label="E-mails sent today"
+          />
+          <p className="mt-2 text-xs text-muted">
+            Sign-in codes always go out. Submission receipts, interview calls and invitations are sent up to
+            the budget; routine updates stop at {status.mail.routineLimit} and are then shown in the bell icon
+            only. Change the budget with MAIL_DAILY_BUDGET (keep it below the mail provider’s daily limit).
+          </p>
+        </div>
         <p className="text-xs text-muted">
           Version {status.version} · E-mails sent from {status.mailFrom} · Roles:{" "}
           {(["SUPER_ADMIN", "ADMIN", "HR", "HOD"] as const)

@@ -549,7 +549,8 @@ export async function approveSummarySheet(user: SessionUser | null, departmentId
         r.id,
         "summary.approved",
         `Summary sheet approved — ${s.department.name} (${academicYear})`,
-        `The HOD has approved the summary sheet (version ${s.version}) for ${s.department.name}, ${rows.length} application${rows.length === 1 ? "" : "s"}.\n\nSign in to the recruitment portal to view it and export the details.`,
+        `The HOD has approved the summary sheet (version ${s.version}) for ${s.department.name}, ${rows.length} application${rows.length === 1 ? "" : "s"}.\n\nSign in to view it and export the details.`,
+        { dedupeKey: `${s.id}:v${s.version}` },
       );
     await audit(
       {

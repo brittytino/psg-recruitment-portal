@@ -160,6 +160,8 @@ enum NotificationStatus {
   PENDING
   SENT
   FAILED
+  /// Shown in the app only (not e-mailed): in-app notification, or routine e-mail skipped by the daily budget.
+  IN_APP
 }
 
 model User {
@@ -175,19 +177,24 @@ model User {
   createdAt        DateTime   @default(now()) @db.Timestamptz(3)
   updatedAt        DateTime   @updatedAt @db.Timestamptz(3)
 
-  roles           UserRole[]
-  sessions        Session[]
-  tokens          AuthToken[]
-  profile         CandidateProfile?
-  applications    Application[]      @relation("CandidateApplications")
-  assignments     ReviewAssignment[] @relation("Reviewer")
-  reviews         Review[]
-  notifications   Notification[]
-  auditEvents     AuditEvent[]
-  otps            OtpChallenge[]
-  hodApplications Application[]      @relation("AssignedHod")
+  roles                  UserRole[]
+  sessions               Session[]
+  tokens                 AuthToken[]
+  profile                CandidateProfile?
+  applications           Application[]        @relation("CandidateApplications")
+  assignments            ReviewAssignment[]   @relation("Reviewer")
+  reviews                Review[]
+  notifications          Notification[]
+  auditEvents            AuditEvent[]
+  otps                   OtpChallenge[]
+  hodApplications        Application[]        @relation("AssignedHod")
+  supportTickets         SupportTicket[]      @relation("TicketCreator")
+  assignedSupportTickets SupportTicket[]      @relation("TicketAssignee")
+  supportMessages        SupportMessage[]
+  supportAttachments     SupportAttachment[]
+  supportTicketEvents    SupportTicketEvent[]
   /// Last column selection used for the summary CSV export (per-user convenience).
-  exportColumns   Json?
+  exportColumns          Json?
 
   @@map("users")
 }
@@ -453,6 +460,7 @@ model Application {
   statusHistory        ApplicationStatusHistory[]
   assignments          ReviewAssignment[]
   reviews              Review[]
+  supportTickets       SupportTicket[]
 
   /// Policy (pending confirmation): one application per candidate per vacancy.
   @@unique([candidateId, vacancyId])
@@ -674,8 +682,15 @@ model Notification {
   error     String?
   createdAt DateTime           @default(now()) @db.Timestamptz(3)
   sentAt    DateTime?          @db.Timestamptz(3)
+  /// One notification per event: a retried request never creates (or e-mails) it twice.
+  dedupeKey String?
+  /// "critical" (sent while the daily budget allows) or "routine" (skipped first when the budget runs low).
+  priority  String             @default("routine")
+  /// When the person opened it in the app.
+  readAt    DateTime?          @db.Timestamptz(3)
   user      User               @relation(fields: [userId], references: [id])
 
+  @@unique([userId, type, dedupeKey])
   @@index([userId, createdAt])
   @@map("notifications")
 }
@@ -779,4 +794,152 @@ model PublicNotice {
 
   @@index([category, active, uploadedAt])
   @@map("public_notices")
+}
+
+// ------------------------------------------------------------------------------------------------
+// Help desk (candidate support tickets). Additive: no existing table is changed.
+// ------------------------------------------------------------------------------------------------
+
+enum SupportTicketStatus {
+  OPEN
+  IN_PROGRESS
+  AWAITING_CANDIDATE
+  RESOLVED
+  CLOSED
+}
+
+enum SupportPriority {
+  LOW
+  NORMAL
+  HIGH
+  URGENT
+}
+
+enum SupportMessageKind {
+  /// Visible to the candidate.
+  PUBLIC
+  /// Staff only. Never shown to candidates, never e-mailed.
+  INTERNAL
+}
+
+/// Per-year counter for ticket references (PSGHD-<year>-<000001>), incremented atomically.
+model SupportCounter {
+  year  Int @id
+  value Int @default(0)
+
+  @@map("support_counters")
+}
+
+model SupportTicket {
+  id                   String               @id @default(uuid()) @db.Uuid
+  /// e.g. "PSGHD-2026-000001"; unique, never reused.
+  referenceNo          String               @unique
+  createdById          String               @db.Uuid
+  subject              String
+  category             String
+  subcategory          String?
+  /// How the candidate describes the urgency (free choice); staff set the operational priority.
+  candidateUrgency     String?
+  priority             SupportPriority      @default(NORMAL)
+  status               SupportTicketStatus  @default(OPEN)
+  assigneeId           String?              @db.Uuid
+  applicationId        String?              @db.Uuid
+  /// Help article the candidate came from, if any.
+  articleSlug          String?
+  escalated            Boolean              @default(false)
+  escalatedAt          DateTime?            @db.Timestamptz(3)
+  resolutionSummary    String?
+  createdAt            DateTime             @default(now()) @db.Timestamptz(3)
+  updatedAt            DateTime             @updatedAt @db.Timestamptz(3)
+  lastActivityAt       DateTime             @default(now()) @db.Timestamptz(3)
+  lastStaffReplyAt     DateTime?            @db.Timestamptz(3)
+  lastCandidateReplyAt DateTime?            @db.Timestamptz(3)
+  resolvedAt           DateTime?            @db.Timestamptz(3)
+  closedAt             DateTime?            @db.Timestamptz(3)
+  createdBy            User                 @relation("TicketCreator", fields: [createdById], references: [id])
+  assignee             User?                @relation("TicketAssignee", fields: [assigneeId], references: [id])
+  application          Application?         @relation(fields: [applicationId], references: [id])
+  messages             SupportMessage[]
+  attachments          SupportAttachment[]
+  events               SupportTicketEvent[]
+
+  @@index([createdById, lastActivityAt])
+  @@index([status, lastActivityAt])
+  @@index([assigneeId, status])
+  @@index([category])
+  @@index([priority, status])
+  @@map("support_tickets")
+}
+
+/// Conversation entries. Immutable once written.
+model SupportMessage {
+  id          String              @id @default(uuid()) @db.Uuid
+  ticketId    String              @db.Uuid
+  authorId    String              @db.Uuid
+  kind        SupportMessageKind  @default(PUBLIC)
+  /// Written by staff (true) or by the candidate (false).
+  fromStaff   Boolean             @default(false)
+  body        String
+  createdAt   DateTime            @default(now()) @db.Timestamptz(3)
+  ticket      SupportTicket       @relation(fields: [ticketId], references: [id])
+  author      User                @relation(fields: [authorId], references: [id])
+  attachments SupportAttachment[]
+
+  @@index([ticketId, createdAt])
+  @@map("support_messages")
+}
+
+model SupportAttachment {
+  id           String          @id @default(uuid()) @db.Uuid
+  ticketId     String          @db.Uuid
+  messageId    String?         @db.Uuid
+  uploadedById String          @db.Uuid
+  originalName String
+  /// Random, server-generated key in the private storage volume.
+  storageKey   String          @unique
+  mimeType     String
+  sizeBytes    Int
+  sha256       String
+  createdAt    DateTime        @default(now()) @db.Timestamptz(3)
+  ticket       SupportTicket   @relation(fields: [ticketId], references: [id])
+  message      SupportMessage? @relation(fields: [messageId], references: [id])
+  uploadedBy   User            @relation(fields: [uploadedById], references: [id])
+
+  @@index([ticketId])
+  @@map("support_attachments")
+}
+
+/// Ticket history: status changes, assignments, priority, escalation, resolution.
+model SupportTicketEvent {
+  id        String        @id @default(uuid()) @db.Uuid
+  ticketId  String        @db.Uuid
+  actorId   String?       @db.Uuid
+  type      String
+  fromValue String?
+  toValue   String?
+  reason    String?
+  createdAt DateTime      @default(now()) @db.Timestamptz(3)
+  ticket    SupportTicket @relation(fields: [ticketId], references: [id])
+  actor     User?         @relation(fields: [actorId], references: [id])
+
+  @@index([ticketId, createdAt])
+  @@map("support_ticket_events")
+}
+
+/// Help articles written by the Super Admin (no content is shipped with the system).
+model HelpArticle {
+  id          String   @id @default(uuid()) @db.Uuid
+  slug        String   @unique
+  title       String
+  summary     String
+  body        String
+  topic       String
+  published   Boolean  @default(false)
+  sortOrder   Int      @default(0)
+  updatedById String?  @db.Uuid
+  createdAt   DateTime @default(now()) @db.Timestamptz(3)
+  updatedAt   DateTime @updatedAt @db.Timestamptz(3)
+
+  @@index([published, sortOrder])
+  @@map("help_articles")
 }
