@@ -24,7 +24,7 @@ import {
   parseListQuery,
 } from "~/modules/reporting/applications.server";
 import { PAGE_SIZES } from "~/modules/reporting/constants";
-import { assignToHod } from "~/modules/reviews/service.server";
+import { assignToDepartmentHods, assignToHod } from "~/modules/reviews/service.server";
 import { hodsForDepartment } from "~/modules/users/service.server";
 
 export const meta: Route.MetaFunction = () => [
@@ -65,12 +65,22 @@ export async function action({ request, context }: Route.ActionArgs) {
     let ids = form.getAll("applicationId").map(String);
     if (form.get("scope") === "filtered") {
       const q = parseListQuery(new URL(request.url));
-      ids = await filteredIds(user, { ...q, status: undefined, hod: undefined });
+      // A department row's "Assign" button narrows to that department.
+      const departmentId = form.get("departmentId") ? String(form.get("departmentId")) : q.departmentId;
+      ids = await filteredIds(user, { ...q, departmentId, status: undefined, hod: undefined });
       const assignable = await prisma.application.findMany({
         where: { id: { in: ids }, status: { in: [...ASSIGNABLE] } },
         select: { id: true },
       });
       ids = assignable.map((a) => a.id);
+    }
+    if (form.get("intent") === "auto") {
+      const r = await assignToDepartmentHods(user, ids, clientIp(request));
+      const skipped = r.skipped.map((x) => `${x.department} (${x.count}) ${x.reason}`);
+      if (!r.assigned && skipped.length) return { formError: `Nothing was assigned: ${skipped.join("; ")}.` };
+      return {
+        message: `${r.assigned} application${r.assigned === 1 ? "" : "s"} sent to their department HOD${r.assigned === 1 ? "" : "s"}. Each HOD has been notified by e-mail.${skipped.length ? ` Not assigned: ${skipped.join("; ")}.` : ""}`,
+      };
     }
     const n = await assignToHod(
       user,
@@ -239,6 +249,7 @@ export default function StaffIndex({ loaderData, actionData }: Route.ComponentPr
               <thead>
                 <tr>
                   <th scope="col">Department</th>
+                  <th scope="col">HOD</th>
                   <th scope="col" className="text-right">
                     Total
                   </th>
@@ -272,6 +283,15 @@ export default function StaffIndex({ loaderData, actionData }: Route.ComponentPr
                     <td className="font-medium">
                       {d.name} <span className="text-muted">({d.code})</span>
                     </td>
+                    <td className="text-sm">
+                      {d.hods.length === 1 ? (
+                        d.hods[0]
+                      ) : d.hods.length ? (
+                        <span className="text-warning">{d.hods.length} HODs — choose when assigning</span>
+                      ) : (
+                        <span className="text-warning">No HOD yet</span>
+                      )}
+                    </td>
                     <td className="text-right tabular-nums">{d.total}</td>
                     <td className="text-right tabular-nums">{d.unassigned}</td>
                     <td className="text-right tabular-nums">{d.withHod}</td>
@@ -279,12 +299,35 @@ export default function StaffIndex({ loaderData, actionData }: Route.ComponentPr
                     <td className="text-right tabular-nums">{d.changed}</td>
                     <td className="text-right tabular-nums">{d.rejected}</td>
                     <td className="text-right">
-                      <Link
-                        to={withParams({ departmentId: d.id, page: 1 })}
-                        className="whitespace-nowrap text-sm font-semibold"
-                      >
-                        Show
-                      </Link>
+                      <div className="flex items-center justify-end gap-3">
+                        {canAssign && d.unassigned > 0 && d.hods.length === 1 && (
+                          <Form method="post">
+                            <CsrfInput />
+                            <input type="hidden" name="intent" value="auto" />
+                            <input type="hidden" name="scope" value="filtered" />
+                            <input type="hidden" name="departmentId" value={d.id} />
+                            <ConfirmDialog
+                              trigger={`Assign ${d.unassigned}`}
+                              triggerClassName="btn-primary btn-sm whitespace-nowrap"
+                              title={`Send ${d.name} applications to the HOD?`}
+                              confirmLabel="Send to HOD"
+                              disabled={nav.state !== "idle"}
+                            >
+                              <p>
+                                {d.unassigned} application{d.unassigned === 1 ? "" : "s"} of {d.name} not yet
+                                with a HOD will be sent to <strong>{d.hods[0]}</strong> for department review.
+                                The HOD is notified by e-mail and the step is recorded in the audit log.
+                              </p>
+                            </ConfirmDialog>
+                          </Form>
+                        )}
+                        <Link
+                          to={withParams({ departmentId: d.id, page: 1 })}
+                          className="whitespace-nowrap text-sm font-semibold"
+                        >
+                          Show
+                        </Link>
+                      </div>
                     </td>
                   </tr>
                 ))}
@@ -486,10 +529,44 @@ export default function StaffIndex({ loaderData, actionData }: Route.ComponentPr
                 )}
               </Form>
             ) : (
-              <p className="text-sm text-muted">
-                To move applications to a HOD, first choose a <strong>department</strong> in the filters or
-                the department-wise table above.
-              </p>
+              <Form method="post" className="flex flex-wrap items-center gap-3">
+                <CsrfInput />
+                <input type="hidden" name="intent" value="auto" />
+                {[...selected].map((id) => (
+                  <input key={id} type="hidden" name="applicationId" value={id} />
+                ))}
+                <input type="hidden" name="scope" value={selected.size ? "selected" : "filtered"} />
+                <div className="min-w-0 flex-1 text-sm">
+                  <p className="font-semibold text-ink">Send to department HODs</p>
+                  <p className="text-muted">
+                    Each application goes to the HOD of its own department. Tick rows below to send only
+                    those, or use the <strong>Assign</strong> button of a department in the table above.
+                  </p>
+                </div>
+                <ConfirmDialog
+                  trigger={
+                    selected.size
+                      ? `Send ${selected.size} selected to their HODs`
+                      : "Send all not-yet-assigned to their HODs"
+                  }
+                  title="Send applications to their department HODs?"
+                  confirmLabel="Send to HODs"
+                  disabled={
+                    nav.state !== "idle" || (!selected.size && departments.every((d) => d.unassigned === 0))
+                  }
+                >
+                  <p>
+                    {selected.size
+                      ? `The ${selected.size} selected application${selected.size === 1 ? "" : "s"}`
+                      : "Every faculty application matching the current filters that is not yet with a HOD"}{" "}
+                    will be sent to the HOD of its department. Each HOD is notified by e-mail.
+                  </p>
+                  <p className="text-muted">
+                    Departments without a HOD, or with more than one, are skipped and listed afterwards.
+                    Research applications are not sent to HODs.
+                  </p>
+                </ConfirmDialog>
+              </Form>
             )}
           </div>
         )}
@@ -506,7 +583,7 @@ export default function StaffIndex({ loaderData, actionData }: Route.ComponentPr
               <caption className="sr-only">Applications, sortable by column</caption>
               <thead>
                 <tr>
-                  {canAssign && q.departmentId && (
+                  {canAssign && (
                     <th scope="col" className="w-10">
                       <input
                         type="checkbox"
@@ -556,7 +633,7 @@ export default function StaffIndex({ loaderData, actionData }: Route.ComponentPr
                   const rev = r.currentRevision;
                   return (
                     <tr key={r.id}>
-                      {canAssign && q.departmentId && (
+                      {canAssign && (
                         <td>
                           {!isResearch && ASSIGNABLE.includes(r.status as AppStatus) && (
                             <input

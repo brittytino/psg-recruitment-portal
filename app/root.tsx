@@ -75,7 +75,7 @@ function staffNav(grants: RoleGrant[]): { title: string; items: NavItem[] }[] {
   if (hasPermission(grants, "user:manage"))
     system.push({ to: "/admin/users", label: "Users & roles", icon: Users });
   if (hasPermission(grants, "settings:manage"))
-    system.push({ to: "/admin/settings", label: "Settings", icon: Settings });
+    system.push({ to: "/admin/settings", label: "Control centre", icon: Settings });
   if (hasPermission(grants, "audit:read"))
     system.push({ to: "/staff/audit", label: "Audit log", icon: ShieldCheck });
 

@@ -267,7 +267,19 @@ export async function departmentCounts(user: SessionUser | null, q: Partial<List
     select: { id: true, name: true, code: true },
     orderBy: { name: "asc" },
   });
+  // Active HODs per department, so bulk assignment shows who will receive the applications.
+  const hodRoles = await prisma.userRole.findMany({
+    where: { role: "HOD", departmentId: { in: departments.map((d) => d.id) }, user: { status: "ACTIVE" } },
+    select: {
+      departmentId: true,
+      user: { select: { email: true, profile: { select: { fullName: true } } } },
+    },
+    take: 1000,
+  });
   return departments.map((d) => {
+    const hods = hodRoles
+      .filter((r) => r.departmentId === d.id)
+      .map((r) => r.user.profile?.fullName || r.user.email);
     const n = (...s: string[]) =>
       groups
         .filter((g) => g.departmentId === d.id && s.includes(g.status))
@@ -281,6 +293,7 @@ export async function departmentCounts(user: SessionUser | null, q: Partial<List
       changed: n("HOD_RECOMMENDED_CHANGE"),
       rejected: n("HOD_REJECTED", "REJECTED"),
       shortlisted: n("SHORTLISTED", "APPROVED"),
+      hods,
     };
   });
 }
@@ -547,26 +560,3 @@ export async function previewExport(
   return { headers, rows, total };
 }
 
-export async function auditLog(
-  user: SessionUser | null,
-  params: { entityId?: string; action?: string; actor?: string; page: number },
-) {
-  requirePermission(user, "audit:read");
-  const where: Prisma.AuditEventWhereInput = {
-    ...(params.entityId ? { entityId: params.entityId } : {}),
-    ...(params.action ? { action: { startsWith: params.action } } : {}),
-    ...(params.actor ? { actor: { email: { contains: params.actor.toLowerCase() } } } : {}),
-  };
-  const size = 50;
-  const [total, rows] = await Promise.all([
-    prisma.auditEvent.count({ where }),
-    prisma.auditEvent.findMany({
-      where,
-      orderBy: { createdAt: "desc" },
-      skip: (params.page - 1) * size,
-      take: size,
-      include: { actor: { select: { email: true } } },
-    }),
-  ]);
-  return { total, rows, pages: Math.max(1, Math.ceil(total / size)) };
-}

@@ -1,3 +1,4 @@
+import { getSetting } from "~/modules/settings/service.server";
 import { todayIst } from "~/lib/dates";
 import { createHash } from "node:crypto";
 import { Prisma, type Application, type ApplicationStatus } from "@prisma/client";
@@ -461,6 +462,10 @@ export async function submit(
   expectedVersion: number,
   declaration: { place?: string } = {},
 ) {
+  if (!(await getSetting("acceptSubmissions")))
+    throw new ConflictError(
+      "Submissions are paused by the recruitment office. Your draft is saved; please submit later.",
+    );
   const loaded = await getOwnApplication(user, id);
   const declDef = getFormDefinition(loaded.formTemplate.code as FormCode, loaded.formTemplate.version);
   const app = {

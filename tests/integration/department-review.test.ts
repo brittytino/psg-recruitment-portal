@@ -18,6 +18,7 @@ import { getFile } from "~/modules/documents/storage.server";
 import { exportCsv, listApplications, listQuerySchema } from "~/modules/reporting/applications.server";
 import {
   approveSummarySheet,
+  assignToDepartmentHods,
   assignToHod,
   decidePositionChange,
   recordHodDecision,
@@ -96,9 +97,9 @@ afterAll(async () => {
 });
 
 /** Fills, uploads and submits a complete v2 application. */
-async function submitted() {
+async function submitted(vacancyId = vacAssoc) {
   const cand = await makeUser("CANDIDATE");
-  const app = await createDraft(cand, vacAssoc);
+  const app = await createDraft(cand, vacancyId);
   const ug = await uploadDocument(cand, app.id, "DEGREE_CERTIFICATE", file(await pdf(), "ug.pdf"));
   const pg = await uploadDocument(cand, app.id, "DEGREE_CERTIFICATE", file(await pdf(2), "pg.pdf"));
   await uploadDocument(cand, app.id, "PHOTOGRAPH", file(testPhotoPng(), "photo.png"));
@@ -435,5 +436,78 @@ describe("visibility and Super Admin powers", () => {
         data: { status: "ACTIVE" },
       });
     }
+  });
+});
+
+describe("bulk assignment to department HODs", () => {
+  /** A fresh department with its own open vacancy, so HOD counts are under this test's control. */
+  async function freshDepartment(label: string) {
+    const code = `${label}${randomUUID().slice(0, 5)}`
+      .toUpperCase()
+      .replace(/[^A-Z0-9]/g, "X")
+      .slice(0, 8);
+    const dept = await prisma.department.create({ data: { code, name: `IT bulk ${code}` } });
+    const tpl = await prisma.formTemplate.findUniqueOrThrow({
+      where: { code_version: { code: "ASSOCIATE_PROFESSOR", version: 2 } },
+    });
+    const vac = await prisma.vacancy.create({
+      data: {
+        code: `ITB-${code}`,
+        departmentId: dept.id,
+        position: "ASSOCIATE_PROFESSOR",
+        formTemplateId: tpl.id,
+        title: "IT bulk Associate Professor",
+        description: "Integration test vacancy",
+        opensAt: new Date(Date.now() - 86400_000),
+        closesAt: new Date(Date.now() + 86400_000),
+        status: "PUBLISHED",
+      },
+    });
+    return { dept, vacId: vac.id };
+  }
+
+  it("Dean/Principal send each application to its own department's HOD and skip departments without one", async () => {
+    const withHod = await freshDepartment("BA");
+    const noHod = await freshDepartment("BB");
+    const hod = await makeUser("HOD", withHod.dept.id);
+    const a1 = await submitted(withHod.vacId);
+    const a2 = await submitted(withHod.vacId);
+    const b1 = await submitted(noHod.vacId);
+
+    const admin = await makeUser("ADMIN");
+    const r = await assignToDepartmentHods(admin, [a1.app.id, a2.app.id, b1.app.id]);
+    expect(r.assigned).toBe(2);
+    expect(r.skipped).toEqual([{ department: noHod.dept.name, count: 1, reason: "has no HOD yet" }]);
+
+    const rows = await prisma.application.findMany({
+      where: { id: { in: [a1.app.id, a2.app.id, b1.app.id] } },
+      select: { id: true, status: true, assignedHodId: true },
+    });
+    for (const id of [a1.app.id, a2.app.id]) {
+      const x = rows.find((y) => y.id === id)!;
+      expect(x.status).toBe("ASSIGNED_TO_HOD");
+      expect(x.assignedHodId).toBe(hod.id);
+    }
+    expect(rows.find((y) => y.id === b1.app.id)!.status).toBe("SUBMITTED");
+
+    // Running it again changes nothing: applications already with a HOD are left alone.
+    const again = await assignToDepartmentHods(admin, [a1.app.id, a2.app.id]);
+    expect(again.assigned).toBe(0);
+  });
+
+  it("skips a department with more than one HOD instead of guessing", async () => {
+    const d = await freshDepartment("BC");
+    await makeUser("HOD", d.dept.id);
+    await makeUser("HOD", d.dept.id);
+    const a = await submitted(d.vacId);
+    const r = await assignToDepartmentHods(await makeUser("SUPER_ADMIN"), [a.app.id]);
+    expect(r.assigned).toBe(0);
+    expect(r.skipped[0]!.reason).toMatch(/more than one HOD/);
+  });
+
+  it("is not available to HODs", async () => {
+    const d = await freshDepartment("BD");
+    const hod = await makeUser("HOD", d.dept.id);
+    await expect(assignToDepartmentHods(hod, [randomUUID()])).rejects.toThrow();
   });
 });

@@ -3,7 +3,8 @@ import { z } from "zod";
 import { audit } from "~/modules/audit/audit.server";
 import { prisma } from "~/modules/core/db.server";
 import { env } from "~/modules/core/env.server";
-import { ValidationError } from "~/modules/core/errors";
+import { ConflictError, ValidationError } from "~/modules/core/errors";
+import { getSetting } from "~/modules/settings/service.server";
 import { notify } from "~/modules/notifications/outbox.server";
 import { hashPassword, passwordProblems } from "./password.server";
 import { issueOtp, verifyOtp } from "./otp.server";
@@ -36,6 +37,10 @@ async function issueToken(userId: string, type: "EMAIL_VERIFICATION" | "PASSWORD
  */
 export async function registerCandidate(input: unknown, ip: string): Promise<string> {
   await rateLimit("register", ip, perIp(10), 3600);
+  if (!(await getSetting("acceptRegistrations")))
+    throw new ConflictError(
+      "New registrations are paused by the recruitment office. Please try again later or contact the office.",
+    );
   const parsed = registerSchema.safeParse(input);
   if (!parsed.success)
     throw new ValidationError(

@@ -124,6 +124,75 @@ export async function assignToHod(user: SessionUser | null, input: unknown, ip?:
   return apps.length;
 }
 
+export interface AutoAssignResult {
+  assigned: number;
+  /** Departments that were skipped, with the reason (no HOD, or several HODs to choose from). */
+  skipped: { department: string; count: number; reason: string }[];
+}
+
+/**
+ * Sends each application to the HOD of its own department. Used for bulk assignment across
+ * departments by Admin (Dean / Principal), HR and Super Admin. A department is skipped (and
+ * reported) when it has no active HOD or more than one, so nothing is ever sent to a guessed
+ * person. Research applications and applications already with a HOD are left out (reassigning one
+ * application to another HOD is done on its own page).
+ */
+export async function assignToDepartmentHods(
+  user: SessionUser | null,
+  applicationIds: string[],
+  ip?: string,
+): Promise<AutoAssignResult> {
+  const u = requirePermission(user, "application:assign");
+  const scope = hrScope(u);
+  if (!scope) throw new ForbiddenError();
+  const ids = z.array(z.string().uuid()).max(2000).parse(applicationIds);
+  if (!ids.length) throw new ValidationError("No applications to assign");
+  const apps = await prisma.application.findMany({
+    where: {
+      AND: [
+        { id: { in: ids } },
+        scope,
+        // Only applications not yet with a HOD: re-running never re-sends or re-notifies.
+        { status: { in: ["SUBMITTED", "UNDER_HR_REVIEW"] } },
+        { recruitmentCategory: { not: "RESEARCH" } },
+        { vacancy: { departmentId: { not: null } } },
+      ],
+    },
+    select: { id: true, vacancy: { select: { departmentId: true, department: { select: { name: true } } } } },
+  });
+  const byDept = new Map<string, { name: string; ids: string[] }>();
+  for (const a of apps) {
+    const d = a.vacancy.departmentId!;
+    const g = byDept.get(d) ?? { name: a.vacancy.department?.name ?? "Department", ids: [] };
+    g.ids.push(a.id);
+    byDept.set(d, g);
+  }
+  const result: AutoAssignResult = { assigned: 0, skipped: [] };
+  for (const [departmentId, g] of byDept) {
+    const hods = await prisma.user.findMany({
+      where: { status: "ACTIVE", roles: { some: { role: "HOD", departmentId } } },
+      select: { id: true },
+      take: 2,
+    });
+    if (hods.length !== 1) {
+      result.skipped.push({
+        department: g.name,
+        count: g.ids.length,
+        reason: hods.length ? "has more than one HOD — choose the HOD for this department" : "has no HOD yet",
+      });
+      continue;
+    }
+    // In batches of 500 (the per-call limit of assignToHod); each batch notifies the HOD once.
+    for (let i = 0; i < g.ids.length; i += 500)
+      result.assigned += await assignToHod(
+        u,
+        { hodId: hods[0]!.id, applicationIds: g.ids.slice(i, i + 500) },
+        ip,
+      );
+  }
+  return result;
+}
+
 /** Takes an application back from its HOD (before the HOD decides or after Admin reopens). */
 export async function unassign(user: SessionUser | null, applicationId: string, reason: string, ip?: string) {
   const u = requirePermission(user, "application:assign");

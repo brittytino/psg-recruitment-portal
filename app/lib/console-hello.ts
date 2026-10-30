@@ -10,15 +10,16 @@ export function consoleHello() {
   if (w.__psgHello) return;
   w.__psgHello = true;
 
-  const big =
-    "font: 800 28px/1.2 system-ui, sans-serif; color: #a3195b; text-shadow: 2px 2px 0 #10223b22; padding: 4px 0;";
-  const say = "font: 500 13px/1.6 system-ui, sans-serif; color: #10223b;";
-  const dim = "font: italic 12px/1.6 system-ui, sans-serif; color: #6b7280;";
+  // Every line has its own background, so it reads the same in light and dark DevTools themes.
+  const box = "padding: 4px 10px; border-radius: 6px; line-height: 1.7;";
+  const big = `font: 800 26px/1.3 system-ui, sans-serif; color: #fff; background: linear-gradient(90deg, #a3195b, #10223b); padding: 8px 16px; border-radius: 10px;`;
+  const say = `font: 500 13px system-ui, sans-serif; color: #10223b; background: #fdf2f8; border-left: 4px solid #a3195b; ${box}`;
+  const dim = `font: italic 500 12px system-ui, sans-serif; color: #1f2937; background: #e5e7eb; ${box}`;
   const tag =
-    "font: 700 12px/1 ui-monospace, monospace; color: #fff; background: #10223b; padding: 4px 8px; border-radius: 4px;";
+    "font: 700 12px/1 ui-monospace, monospace; color: #fff; background: #10223b; padding: 5px 9px; border-radius: 4px 0 0 4px;";
   const pink =
-    "font: 700 12px/1 ui-monospace, monospace; color: #fff; background: #a3195b; padding: 4px 8px; border-radius: 4px;";
-  const link = "font: 600 13px/1.6 system-ui, sans-serif; color: #0a66c2; text-decoration: underline;";
+    "font: 700 12px/1 ui-monospace, monospace; color: #fff; background: #a3195b; padding: 5px 9px; border-radius: 0 4px 4px 0;";
+  const link = `font: 600 13px system-ui, sans-serif; color: #fff; background: #0a66c2; ${box}`;
 
   console.log("%cOh hey 👀 you opened DevTools.", big);
   console.log(
@@ -38,12 +39,12 @@ export function consoleHello() {
   console.log(`%cSay hi (or hire me) 👉 ${LINKEDIN}`, link);
   console.log(
     `%cBuilt with %cHari Anand Balaji%c, who also did not sleep. Say hi 👉 ${HARI}`,
-    dim,
-    "font: 700 12px/1.6 system-ui, sans-serif; color: #a3195b;",
-    dim,
+    "font: italic 500 12px system-ui, sans-serif; color: #1f2937; background: #e5e7eb; padding: 4px 0 4px 10px; border-radius: 6px 0 0 6px; line-height: 1.7;",
+    "font: 700 12px system-ui, sans-serif; color: #a3195b; background: #e5e7eb; padding: 4px 0; line-height: 1.7;",
+    "font: italic 500 12px system-ui, sans-serif; color: #1f2937; background: #e5e7eb; padding: 4px 10px 4px 0; border-radius: 0 6px 6px 0; line-height: 1.7;",
   );
   console.log(
     "%cP.S. Pasting random code here that a stranger sent you is a great way to lose your account. Don't. 🚫",
-    "font: 700 12px/1.6 system-ui, sans-serif; color: #b91c1c;",
+    `font: 700 12px system-ui, sans-serif; color: #fff; background: #b91c1c; ${box}`,
   );
 }
