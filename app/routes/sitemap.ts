@@ -28,7 +28,7 @@ ${vacancies
     <lastmod>${v.updatedAt ? new Date(v.updatedAt).toISOString().split("T")[0] : today}</lastmod>
     <changefreq>weekly</changefreq>
     <priority>0.8</priority>
-  </url>`
+  </url>`,
   )
   .join("\n")}
   <url>
@@ -51,4 +51,3 @@ ${vacancies
     },
   });
 }
-

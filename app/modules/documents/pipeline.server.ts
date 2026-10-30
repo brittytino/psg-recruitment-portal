@@ -249,7 +249,7 @@ export async function generateBundle(
 
   const out = await PDFDocument.create();
   out.setTitle(`Application ${gen.application.referenceNo ?? ""} (revision ${rev.revisionNo})`);
-  out.setProducer("PSG Tech Staff Recruitment Portal");
+  out.setProducer("PSG Tech Recruitment");
   out.setCreationDate(new Date());
   (await out.copyPages(formPdf, formPdf.getPageIndices())).forEach((p) => out.addPage(p));
 
@@ -369,8 +369,13 @@ export async function generateBundle(
     });
   });
   logger.info(
-    { generatedDocumentId: gen.id, pages: expectedPages, attachments: attachments.length },
-    "bundle generated",
+    {
+      event: "pdf_generated",
+      generatedDocumentId: gen.id,
+      pages: expectedPages,
+      attachments: attachments.length,
+    },
+    "application PDF generated",
   );
   return "done";
 }
@@ -389,4 +394,8 @@ export async function markBundleFailed(generatedDocumentId: string, message: str
       data: { processingStatus: "FAILED" },
     });
   });
+  logger.error(
+    { event: "pdf_failed", generatedDocumentId, applicationId: gen?.applicationId, reason: message },
+    "application PDF could not be generated",
+  );
 }

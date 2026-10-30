@@ -34,6 +34,7 @@ export async function action({ request, context }: Route.ActionArgs) {
       String(form.get("code") ?? ""),
       ip,
       request.headers.get("user-agent"),
+      { remember: form.get("remember") === "on" },
     );
     if (r.ok !== true) return { formError: r.ok === false ? r.message : "Sign in again." };
     const roles = await prisma.userRole.findMany({
@@ -69,6 +70,16 @@ export default function LoginVerify({ actionData }: Route.ComponentProps) {
         <Form method="post" className="space-y-4">
           <CsrfInput />
           <OtpInput error={a?.formError} />
+          <label className="flex cursor-pointer items-start gap-3 rounded-xl border border-line p-3.5 text-sm has-[:checked]:border-brand-200 has-[:checked]:bg-brand-50/40">
+            <input type="checkbox" name="remember" defaultChecked className="mt-0.5 h-4 w-4 shrink-0" />
+            <span>
+              <span className="block font-medium text-ink">Keep me signed in on this device</span>
+              <span className="block text-muted">
+                Come back to your application for up to 30 days without a new code. Leave this unticked on a
+                shared or public computer. Staff accounts always sign out after 12 hours.
+              </span>
+            </span>
+          </label>
           <button type="submit" className="btn-primary w-full" disabled={busy}>
             {busy ? "Checking…" : "Verify and sign in"}
           </button>

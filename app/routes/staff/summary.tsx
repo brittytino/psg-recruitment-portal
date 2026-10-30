@@ -232,24 +232,36 @@ export default function Summary({ loaderData, actionData }: Route.ComponentProps
                           placeholder="Note (required to decline)"
                           className="field-input w-56 py-2"
                         />
-                        <button
-                          type="submit"
-                          name="approve"
-                          value="yes"
-                          className="btn-primary py-2"
+                        <ConfirmDialog
+                          trigger="Approve"
+                          triggerClassName="btn-primary py-2"
+                          title="Approve the position change?"
+                          confirmLabel="Approve change"
+                          confirmName="approve"
+                          confirmValue="yes"
                           disabled={busy}
                         >
-                          Approve
-                        </button>
-                        <button
-                          type="submit"
-                          name="approve"
-                          value="no"
-                          className="btn-secondary py-2"
+                          <p>
+                            The application will be considered for{" "}
+                            {POSITION_LABELS[p.toPosition] ?? p.toPosition}. This is recorded in the audit
+                            log.
+                          </p>
+                        </ConfirmDialog>
+                        <ConfirmDialog
+                          trigger="Decline"
+                          triggerClassName="btn-secondary py-2"
+                          tone="danger"
+                          title="Decline the recommendation?"
+                          confirmLabel="Decline"
+                          confirmName="approve"
+                          confirmValue="no"
                           disabled={busy}
                         >
-                          Decline
-                        </button>
+                          <p>
+                            The application stays at the position the candidate applied for. Add a note
+                            explaining why.
+                          </p>
+                        </ConfirmDialog>
                       </Form>
                     </div>
                   </li>
@@ -327,7 +339,7 @@ function OfficeSummary({ L }: { L: OfficeData }) {
   const [selectedRows, setSelectedRows] = useState<Set<string>>(new Set());
   const [showPreview, setShowPreview] = useState(false);
   const groups = [...new Set(EXPORT_COLUMNS.map((c) => c.group))];
-  const filterKeys = ["departmentId", "position", "status", "phd", "exam", "minExp", "q"];
+  const filterKeys = ["departmentId", "position", "status", "phd", "exam", "minExp", "q", "mode"];
 
   const allVisibleIds = L.list.rows.map((r) => r.id);
   const allVisibleSelected = allVisibleIds.length > 0 && allVisibleIds.every((id) => selectedRows.has(id));
@@ -394,6 +406,33 @@ function OfficeSummary({ L }: { L: OfficeData }) {
               value={L.q.position}
               options={Object.entries(POSITION_LABELS)}
             />
+            <fieldset>
+              <legend className="block text-sm font-medium">Mode of study</legend>
+              <div className="mt-1 flex h-[2.625rem] items-center gap-1 rounded-lg border border-line-strong bg-paper px-1.5">
+                {(
+                  [
+                    ["full", "Full-time", "Every degree and the Ph.D. were full-time"],
+                    ["part", "Part-time", "At least one degree or the Ph.D. was part-time"],
+                    ["distance", "Distance", "At least one degree was by distance education"],
+                  ] as const
+                ).map(([v, label, hint]) => (
+                  <label
+                    key={v}
+                    title={hint}
+                    className="flex cursor-pointer items-center gap-1.5 rounded-md px-2 py-1 text-sm has-[:checked]:bg-brand-50 has-[:checked]:font-semibold has-[:checked]:text-brand-800"
+                  >
+                    <input
+                      type="checkbox"
+                      name="mode"
+                      value={v}
+                      defaultChecked={L.q.mode?.includes(v)}
+                      className="h-4 w-4"
+                    />
+                    {label}
+                  </label>
+                ))}
+              </div>
+            </fieldset>
             <button type="submit" className="btn-secondary">
               Show
             </button>
@@ -520,11 +559,12 @@ function OfficeSummary({ L }: { L: OfficeData }) {
             </p>
           </div>
           <Form method="get" action="/staff/export.csv" reloadDocument className="space-y-5">
-            {filterKeys
-              .filter((k) => params.get(k))
-              .map((k) => (
-                <input key={k} type="hidden" name={k} value={params.get(k)!} />
-              ))}
+            {filterKeys.flatMap((k) =>
+              params
+                .getAll(k)
+                .filter(Boolean)
+                .map((v) => <input key={`${k}-${v}`} type="hidden" name={k} value={v} />),
+            )}
             {Array.from(selectedRows).map((id) => (
               <input key={id} type="hidden" name="ids" value={id} />
             ))}

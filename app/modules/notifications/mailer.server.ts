@@ -116,8 +116,8 @@ async function deliver(mail: SendMailOptions): Promise<void> {
   } catch (err) {
     if (e.EMAIL_PROVIDER !== "smtp" || !isConnectionError(err)) throw err;
     logger.warn(
-      { port: e.SMTP_PORT, err: (err as Error).message },
-      "SMTP port unreachable, trying the other port",
+      { event: "mail_port_fallback", port: e.SMTP_PORT, err: (err as Error).message },
+      "mail server port unreachable, trying the other port",
     );
   }
   if (!fallback) {
@@ -197,6 +197,7 @@ export async function verifySmtpConnection(timeoutMs = 5000): Promise<SmtpDiagno
 
     logger.error(
       {
+        event: "mail_check_failed",
         provider,
         code,
         diagnostic: safeMessage,
@@ -226,7 +227,7 @@ export function renderOtpEmail(
   const subject = `${code} is your PSG Tech recruitment verification code`;
 
   const text = `PSG COLLEGE OF TECHNOLOGY, COIMBATORE
-Staff Recruitment Portal
+Staff Recruitment
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
 Your 6-digit one-time password (OTP) for ${purpose} is:
@@ -234,7 +235,7 @@ Your 6-digit one-time password (OTP) for ${purpose} is:
     ${code}
 
 • This verification code expires in ${minutes} minutes and can be used once.
-• If you did not make this request on the recruitment portal, please ignore this email.
+• If you did not request this code, please ignore this e-mail.
 • SECURITY WARNING: Never share this verification code with anyone. PSG Tech administrators will never ask for your code.
 
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
@@ -252,7 +253,7 @@ This is an automated system message. Please do not reply to this email.`;
   <div style="max-width:540px;margin:0 auto;background:#ffffff;border:1px solid #d0d7de;border-radius:12px;overflow:hidden;box-shadow:0 4px 12px rgba(0,0,0,0.05);">
     <div style="background-color:#0b2545;padding:24px 32px;text-align:center;">
       <p style="margin:0;font-size:12px;letter-spacing:1.5px;text-transform:uppercase;color:#8da9c4;font-weight:600;">PSG College of Technology, Coimbatore</p>
-      <h1 style="margin:8px 0 0;font-size:20px;color:#ffffff;font-weight:700;">Staff Recruitment Portal</h1>
+      <h1 style="margin:8px 0 0;font-size:20px;color:#ffffff;font-weight:700;">Staff Recruitment</h1>
     </div>
     <div style="padding:32px;">
       <h2 style="margin:0 0 12px;font-size:18px;color:#1f2328;font-weight:600;">One-Time Verification Code</h2>
@@ -306,6 +307,7 @@ export async function sendOtpEmail(
     const msg = (err as Error).message || String(err);
     logger.error(
       {
+        event: "mail_send_failed",
         toDomain: to.split("@")[1] ?? "unknown",
         purpose,
         hint: smtpFailureHint(err),

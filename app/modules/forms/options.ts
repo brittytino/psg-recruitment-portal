@@ -1,6 +1,6 @@
 /**
  * Centralized, authoritative source of truth for all structured options, dropdown choices,
- * and controlled values across the PSG College of Technology Staff Recruitment Portal.
+ * and controlled values across the PSG College of Technology recruitment office.
  *
  * Used consistently across:
  * - Application wizard form definitions and validators
@@ -161,12 +161,40 @@ export const ACADEMIC_DISCIPLINES = [
   "Textile Technology",
   "Fashion Technology",
   "Apparel Technology",
+  "Instrumentation and Control Engineering",
+  "Mechatronics",
+  "Aeronautical Engineering",
+  "Food Technology",
+  // Science (B.Sc. / M.Sc.)
   "Applied Mathematics",
+  "Mathematics",
+  "Statistics",
   "Physics",
   "Chemistry",
-  "English / Humanities",
+  "Computer Science",
+  "Data Science",
+  "Software Systems",
+  "Electronics",
+  "Biochemistry",
+  "Microbiology",
+  "Zoology",
+  "Botany",
+  "Environmental Science",
+  "Applied Science",
+  // Computer applications (B.C.A. / M.C.A.)
+  "Computer Applications",
   "Computer Applications (MCA)",
+  // Commerce and management
+  "Commerce",
+  "Business Administration",
   "Management Sciences (MBA)",
+  "Economics",
+  // Arts and languages
+  "English / Humanities",
+  "English",
+  "Tamil",
+  "Psychology",
+  "Visual Communication",
   "Other",
 ] as const;
 

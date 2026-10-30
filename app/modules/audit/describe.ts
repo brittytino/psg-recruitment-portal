@@ -81,6 +81,7 @@ const LABELS: Record<string, string> = {
   "system.pdfs_retried": "Failed PDFs queued again",
   "system.all_sessions_revoked": "Everyone signed out",
   "system.test_email_sent": "Test e-mail sent",
+  "system.logs_downloaded": "System logs downloaded",
 };
 
 export function actionLabel(action: string): string {

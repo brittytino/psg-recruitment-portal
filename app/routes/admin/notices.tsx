@@ -1,7 +1,15 @@
 import { Form, useNavigation } from "react-router";
 import { ExternalLink, FileText, Upload } from "lucide-react";
 import type { Route } from "./+types/notices";
-import { Alert, Badge, CsrfInput, ErrorSummary, formatDateTime, TextInput } from "~/components/forms";
+import {
+  Alert,
+  Badge,
+  ConfirmDialog,
+  CsrfInput,
+  ErrorSummary,
+  formatDateTime,
+  TextInput,
+} from "~/components/forms";
 import { EmptyState, PageHeader } from "~/components/staff";
 import { handleAction, readForm, requireStaff } from "~/lib/http.server";
 import { ValidationError } from "~/modules/core/errors";
@@ -121,9 +129,22 @@ export default function Notices({ loaderData, actionData }: Route.ComponentProps
                     <input type="hidden" name="intent" value="toggle" />
                     <input type="hidden" name="id" value={n.id} />
                     <input type="hidden" name="active" value={n.active ? "false" : "true"} />
-                    <button type="submit" className="btn-secondary btn-sm" disabled={busy}>
-                      {n.active ? "Hide" : "Show on home page"}
-                    </button>
+                    <ConfirmDialog
+                      trigger={n.active ? "Hide" : "Show on home page"}
+                      triggerClassName="btn-secondary btn-sm"
+                      tone={n.active ? "danger" : "primary"}
+                      title={
+                        n.active ? "Hide this PDF from the home page?" : "Show this PDF on the home page?"
+                      }
+                      confirmLabel={n.active ? "Hide PDF" : "Show PDF"}
+                      disabled={busy}
+                    >
+                      <p>
+                        {n.active
+                          ? "Candidates will no longer see it. The home page button then opens the list of vacancies instead."
+                          : "It replaces the PDF currently shown for the same positions."}
+                      </p>
+                    </ConfirmDialog>
                   </Form>
                 </li>
               ))}

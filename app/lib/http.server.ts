@@ -80,7 +80,7 @@ export async function handleAction<T>(
         { status: e.status, headers },
       );
     }
-    logger.error({ err: e instanceof Error ? e.message : String(e) }, "action failed");
+    logger.error({ event: "app_error", err: e instanceof Error ? e.message : String(e) }, "action failed");
     return data<ActionResult>({ formError: "Something went wrong. Please try again." }, { status: 500 });
   }
 }

@@ -223,7 +223,7 @@ export async function renderApplicationPdf(input: RenderPdfInput): Promise<Uint8
   const { def, answers: a } = input;
   const doc = await PDFDocument.create();
   doc.setTitle(pdfSafe(`${def.title}${input.referenceNo ? ` — ${input.referenceNo}` : ""}`));
-  doc.setProducer("PSG Tech Staff Recruitment Portal");
+  doc.setProducer("PSG Tech Recruitment");
   doc.setCreationDate(input.submittedAt ?? new Date());
   const w = new Writer(
     doc,

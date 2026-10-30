@@ -51,7 +51,7 @@ describe("Email Service & Institutional Transporter", () => {
 
       // Plain Text
       expect(text).toContain("PSG COLLEGE OF TECHNOLOGY, COIMBATORE");
-      expect(text).toContain("Staff Recruitment Portal");
+      expect(text).toContain("Staff Recruitment");
       expect(text).toContain(code);
       expect(text).toContain("expires in 5 minutes");
       expect(text).toContain("Never share this verification code with anyone");
@@ -61,7 +61,7 @@ describe("Email Service & Institutional Transporter", () => {
 
       // HTML Version
       expect(html).toContain("PSG College of Technology, Coimbatore");
-      expect(html).toContain("Staff Recruitment Portal");
+      expect(html).toContain("Staff Recruitment");
       expect(html).toContain(code);
       expect(html).toContain("5 minutes");
       expect(html).toContain("Never share this code with anyone");

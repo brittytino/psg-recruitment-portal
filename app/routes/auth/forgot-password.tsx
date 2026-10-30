@@ -15,7 +15,7 @@ export default function ForgotPassword() {
         <h1>No password needed</h1>
         <div className="mt-4">
           <Alert tone="info" title="Sign in with a one-time code">
-            This portal does not use passwords. Enter your e-mail address on the sign-in page and we send a
+            Sign-in does not use passwords. Enter your e-mail address on the sign-in page and we send a
             6-digit code to it every time you sign in.
           </Alert>
         </div>

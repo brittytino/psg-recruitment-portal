@@ -73,11 +73,15 @@ export async function issueOtp(userId: string, purpose: OtpPurpose, ip: string):
     return c;
   });
   await r.set(cooldownKey, "1", "EX", cfg.resendCooldownSeconds);
-  if (env().DEV_LOG_OTP) logger.warn({ email: user.email, purpose }, `DEV OTP ${code}`);
+  // Development only (refused in production): printed to the console, never written to log files.
+  if (env().DEV_LOG_OTP) console.warn(`[dev] sign-in code for ${user.email}: ${code}`);
   try {
     await sendOtpEmail(user.email, code, PURPOSE_TEXT[purpose] ?? "authentication", cfg.expiryMinutes);
   } catch (err) {
-    logger.error({ err: (err as Error).message }, "otp e-mail failed");
+    logger.error(
+      { event: "otp_send_failed", purpose, userId, err: (err as Error).message },
+      "sign-in code e-mail failed",
+    );
     // Clean up immediately so user is not locked out with an undelivered challenge
     await prisma.otpChallenge
       .updateMany({
@@ -94,6 +98,7 @@ export async function issueOtp(userId: string, purpose: OtpPurpose, ip: string):
         "We could not send the sign-in code because the e-mail service is unreachable. Please try again in a few minutes or contact the recruitment office.",
       );
   }
+  logger.info({ event: "otp_sent", purpose, userId }, "sign-in code sent");
   await audit({
     actorId: userId,
     action: "auth.otp_sent",
@@ -156,6 +161,10 @@ export async function verifyOtp(
       ip,
       metadata: { purpose, attempts: attemptsUsed },
     });
+    logger.warn(
+      { event: "otp_wrong_code", purpose, userId: c.userId, attempts: attemptsUsed, ip },
+      "wrong sign-in code entered",
+    );
     const left = cfg.maxAttempts - attemptsUsed;
     return {
       ok: false,

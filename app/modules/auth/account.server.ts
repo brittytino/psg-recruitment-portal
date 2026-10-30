@@ -61,7 +61,7 @@ export async function registerCandidate(input: unknown, ip: string): Promise<str
         existing.id,
         "account.exists",
         "Sign-in attempt for your account",
-        "Someone tried to register with your e-mail address on the PSG Tech Staff Recruitment Portal. Sign in using your email address to receive a one-time code.",
+        "Someone tried to register with your e-mail address on the PSG Tech Recruitment. Sign in using your email address to receive a one-time code.",
       );
     });
     return randomUUID();
@@ -199,11 +199,14 @@ export async function completeLoginWithOtp(
   code: string,
   ip: string,
   userAgent: string | null,
+  opts: { remember?: boolean } = {},
 ): Promise<LoginResult> {
   const r = await verifyOtp(challengeId, code, "LOGIN", ip);
   if (!r.ok) return r;
-  const user = await prisma.user.findUnique({ where: { id: r.userId } });
+  const user = await prisma.user.findUnique({ where: { id: r.userId }, include: { roles: true } });
   if (!user || user.status !== "ACTIVE") return { ok: false, message: "This account cannot sign in." };
+  // Only candidates may stay signed in for days; staff sessions always end after SESSION_TTL_HOURS.
+  const remember = !!opts.remember && user.roles.every((x) => x.role === "CANDIDATE");
 
   await prisma.user.update({
     where: { id: user.id },
@@ -215,14 +218,14 @@ export async function completeLoginWithOtp(
     },
   });
 
-  const setCookie = await createSession(user.id, userAgent);
+  const setCookie = await createSession(user.id, userAgent, { remember });
   await audit({
     actorId: user.id,
     action: "auth.login",
     entityType: "user",
     entityId: user.id,
     ip,
-    metadata: { otp: true },
+    metadata: { otp: true, rememberDevice: remember },
   });
   return { ok: true, setCookie, userId: user.id };
 }

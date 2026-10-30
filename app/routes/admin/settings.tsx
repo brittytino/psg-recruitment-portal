@@ -102,7 +102,7 @@ export default function Settings({ loaderData, actionData }: Route.ComponentProp
       <PageHeader
         eyebrow="Super Admin"
         title="Control centre"
-        description="Everything that keeps the portal running: live system status, portal switches, recruitment rules and emergency actions. Every change here is recorded in the audit log."
+        description="Live system status, switches, recruitment rules and emergency actions in one place. Every change here is recorded in the audit log."
       />
       {a?.message && <Alert tone="success">{a.message}</Alert>}
       {a?.formError && <Alert tone="danger">{a.formError}</Alert>}

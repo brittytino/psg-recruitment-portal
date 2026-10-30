@@ -1,6 +1,6 @@
 import { useEffect, useId, useRef, type ReactNode } from "react";
 import { useRouteLoaderData } from "react-router";
-import { AlertTriangle, CheckCircle2, Info, XCircle } from "lucide-react";
+import { AlertTriangle, CheckCircle2, HelpCircle, Info, XCircle } from "lucide-react";
 
 type RootData = { csrf: string } | undefined;
 
@@ -230,6 +230,8 @@ export function ConfirmDialog({
   tone = "primary",
   triggerClassName,
   disabled,
+  confirmName,
+  confirmValue,
 }: {
   trigger: ReactNode;
   title: string;
@@ -238,15 +240,26 @@ export function ConfirmDialog({
   tone?: "primary" | "danger";
   triggerClassName?: string;
   disabled?: boolean;
+  /** Sent with the form when confirmed (for forms with several submit choices). */
+  confirmName?: string;
+  confirmValue?: string;
 }) {
   const ref = useRef<HTMLDialogElement>(null);
+  const triggerRef = useRef<HTMLButtonElement>(null);
   const titleId = useId();
+  const danger = tone === "danger";
   return (
     <>
       <button
+        ref={triggerRef}
         type="button"
-        className={triggerClassName ?? (tone === "danger" ? "btn-danger" : "btn-primary")}
-        onClick={() => ref.current?.showModal()}
+        className={triggerClassName ?? (danger ? "btn-danger" : "btn-primary")}
+        onClick={() => {
+          // Ask only once the form is complete: the browser shows what is missing first.
+          const form = triggerRef.current?.closest("form");
+          if (form && !form.reportValidity()) return;
+          ref.current?.showModal();
+        }}
         disabled={disabled}
       >
         {trigger}
@@ -254,20 +267,32 @@ export function ConfirmDialog({
       <dialog
         ref={ref}
         aria-labelledby={titleId}
-        className="m-auto w-[calc(100%-2rem)] max-w-lg rounded-xl border border-line p-0 shadow-2xl"
+        className="confirm-dialog m-auto w-[calc(100%-2rem)] max-w-md rounded-2xl border border-line bg-paper p-0 shadow-2xl backdrop:bg-navy-900/45 backdrop:backdrop-blur-[2px]"
       >
         <div className="p-6">
-          <h2 id={titleId} className="text-xl">
-            {title}
-          </h2>
-          <div className="mt-3 space-y-3 text-sm">{children}</div>
+          <div className="flex gap-4">
+            <span
+              aria-hidden="true"
+              className={`grid h-11 w-11 shrink-0 place-items-center rounded-full ${danger ? "bg-danger-50 text-danger" : "bg-brand-50 text-brand-700"}`}
+            >
+              {danger ? <AlertTriangle className="h-5 w-5" /> : <HelpCircle className="h-5 w-5" />}
+            </span>
+            <div className="min-w-0">
+              <h2 id={titleId} className="font-display text-xl font-semibold text-ink">
+                {title}
+              </h2>
+              <div className="mt-2 space-y-3 text-sm leading-relaxed text-muted">{children}</div>
+            </div>
+          </div>
           <div className="mt-6 flex flex-col-reverse gap-2 sm:flex-row sm:justify-end sm:gap-3">
             <button type="button" className="btn-secondary" onClick={() => ref.current?.close()}>
               Cancel
             </button>
             <button
               type="submit"
-              className={tone === "danger" ? "btn-danger" : "btn-primary"}
+              name={confirmName}
+              value={confirmValue}
+              className={danger ? "btn-danger" : "btn-primary"}
               onClick={() => setTimeout(() => ref.current?.close(), 0)}
             >
               {confirmLabel}

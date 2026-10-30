@@ -48,7 +48,7 @@ export default function Login({ actionData }: Route.ComponentProps) {
         </p>
         {params.get("invite") === "hod" && (
           <div className="mt-5">
-            <Alert tone="info" title="Welcome to the recruitment portal">
+            <Alert tone="info" title="Welcome">
               You have been added as a Head of Department. Send the sign-in code to your e-mail to continue.
             </Alert>
           </div>

@@ -34,6 +34,7 @@ export default [
   route("staff", "routes/staff/index.tsx"),
   route("staff/applications/:id", "routes/staff/application.tsx"),
   route("staff/export.csv", "routes/staff/export.ts"),
+  route("staff/search.json", "routes/staff/search.ts"),
   route("staff/review", "routes/staff/review.tsx"),
   route("staff/summary", "routes/staff/summary.tsx"),
   route("staff/summary/:id", "routes/staff/summary-sheet.tsx"),
@@ -47,6 +48,8 @@ export default [
   route("admin/notices", "routes/admin/notices.tsx"),
   route("admin/users", "routes/admin/users.tsx"),
   route("admin/settings", "routes/admin/settings.tsx"),
+  route("admin/logs", "routes/admin/logs.tsx"),
+  route("admin/logs/download", "routes/admin/logs-download.ts"),
 
   // Private files (authorised resource routes)
   route("files/documents/:id", "routes/files/document.ts"),

@@ -511,3 +511,37 @@ describe("bulk assignment to department HODs", () => {
     await expect(assignToDepartmentHods(hod, [randomUUID()])).rejects.toThrow();
   });
 });
+
+describe("summary filter: mode of study", () => {
+  it("full-time includes all-full-time candidates; part-time / distance exclude them", async () => {
+    const { app } = await submitted();
+    const admin = await makeUser("ADMIN");
+    const ids = async (mode: string) =>
+      (
+        await listApplications(
+          admin,
+          listQuerySchema.parse({ q: app.referenceNo ?? undefined, mode, size: 100 }),
+        )
+      ).rows.map((r) => r.id);
+    expect(await ids("full")).toContain(app.id);
+    expect(await ids("part")).not.toContain(app.id);
+    expect(await ids("distance")).not.toContain(app.id);
+    expect(await ids("part,full")).toContain(app.id);
+  });
+});
+
+describe("keep me signed in", () => {
+  it("candidates get a 30-day sliding session; staff never do", async () => {
+    const { createSession } = await import("~/modules/auth/session.server");
+    const cand = await makeUser("CANDIDATE");
+    const cookie = await createSession(cand.id, null, { remember: true });
+    expect(cookie).toMatch(/Max-Age=7776000/); // 90 days
+    const s = await prisma.session.findFirstOrThrow({ where: { userId: cand.id } });
+    const days = (s.expiresAt.getTime() - Date.now()) / 86_400_000;
+    expect(days).toBeGreaterThan(29);
+    expect(days).toBeLessThanOrEqual(30);
+
+    const plain = await createSession(cand.id, null);
+    expect(plain).toMatch(/Max-Age=43200/); // 12 hours
+  });
+});

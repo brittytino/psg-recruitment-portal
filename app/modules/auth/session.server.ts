@@ -14,6 +14,14 @@ export interface SessionUser {
 
 export const hashToken = (s: string) => createHash("sha256").update(s).digest("hex");
 const TOUCH_INTERVAL_MS = 5 * 60 * 1000;
+const DAY_MS = 86_400_000;
+/**
+ * "Keep me signed in on this device" (candidates only): the session stays valid while it is used
+ * at least once every REMEMBER_IDLE_DAYS, up to REMEMBER_MAX_DAYS after sign-in. Ordinary sessions
+ * (and every staff session) end SESSION_TTL_HOURS after sign-in.
+ */
+export const REMEMBER_IDLE_DAYS = 30;
+export const REMEMBER_MAX_DAYS = 90;
 
 /** The `__Host-` prefix requires Secure; it is used whenever cookies are Secure (HTTPS). */
 export function cookieName(): string {
@@ -46,9 +54,13 @@ export function readSessionToken(request: Request): string | null {
 }
 
 /** Creates a new server-side session and returns the Set-Cookie header (always a fresh token). */
-export async function createSession(userId: string, userAgent: string | null): Promise<string> {
+export async function createSession(
+  userId: string,
+  userAgent: string | null,
+  opts: { remember?: boolean } = {},
+): Promise<string> {
   const token = randomBytes(32).toString("base64url");
-  const ttlMs = env().SESSION_TTL_HOURS * 3600 * 1000;
+  const ttlMs = opts.remember ? REMEMBER_IDLE_DAYS * DAY_MS : env().SESSION_TTL_HOURS * 3600 * 1000;
   await prisma.session.create({
     data: {
       id: hashToken(token),
@@ -57,7 +69,15 @@ export async function createSession(userId: string, userAgent: string | null): P
       userAgent: userAgent?.slice(0, 300) ?? null,
     },
   });
-  return serialize(token, Math.floor(ttlMs / 1000));
+  // A remembered session's cookie lives until the absolute limit; the server-side expiry slides.
+  return serialize(token, Math.floor((opts.remember ? REMEMBER_MAX_DAYS * DAY_MS : ttlMs) / 1000));
+}
+
+/** A session longer than the ordinary lifetime was created with "keep me signed in". */
+function isRemembered(s: { lastSeenAt: Date; expiresAt: Date }): boolean {
+  return (
+    s.expiresAt.getTime() - s.lastSeenAt.getTime() > env().SESSION_TTL_HOURS * 3600 * 1000 + TOUCH_INTERVAL_MS
+  );
 }
 
 export async function destroySession(request: Request): Promise<string> {
@@ -81,14 +101,24 @@ export async function getSessionUser(request: Request): Promise<SessionUser | nu
   });
   if (!s) return null;
   const now = Date.now();
-  if (s.expiresAt.getTime() <= now || s.user.status !== "ACTIVE") {
+  const pastAbsolute = now - s.createdAt.getTime() > REMEMBER_MAX_DAYS * DAY_MS;
+  if (s.expiresAt.getTime() <= now || pastAbsolute || s.user.status !== "ACTIVE") {
     await prisma.session.deleteMany({ where: { id } });
     return null;
   }
-  if (now - s.lastSeenAt.getTime() > TOUCH_INTERVAL_MS)
+  if (now - s.lastSeenAt.getTime() > TOUCH_INTERVAL_MS) {
+    // Remembered sessions slide: each visit extends them, never past the absolute limit.
+    const slide = isRemembered(s)
+      ? {
+          expiresAt: new Date(
+            Math.min(now + REMEMBER_IDLE_DAYS * DAY_MS, s.createdAt.getTime() + REMEMBER_MAX_DAYS * DAY_MS),
+          ),
+        }
+      : {};
     await prisma.session
-      .update({ where: { id }, data: { lastSeenAt: new Date(now) } })
+      .update({ where: { id }, data: { lastSeenAt: new Date(now), ...slide } })
       .catch(() => undefined);
+  }
   return {
     id: s.user.id,
     email: s.user.email,

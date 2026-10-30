@@ -13,7 +13,7 @@ export const meta: Route.MetaFunction = () => [
   { property: "og:title", content: "Privacy Notice — PSG Tech Recruitment" },
   {
     property: "og:description",
-    content: "Information handling and privacy standards for the PSG Tech recruitment portal.",
+    content: "Information handling and privacy standards for PSG Tech recruitment.",
   },
   { property: "og:type", content: "website" },
   { property: "og:image", content: "/images/psg_logo.png" },
@@ -32,7 +32,7 @@ export default function Privacy() {
         </p>
       </div>
       <Alert tone="warning" title="Draft — pending institutional and legal review">
-        This notice describes how the portal is built to handle personal data. The final wording, retention
+        This notice describes how the recruitment system handles personal data. The final wording, retention
         periods and contact for data requests must be approved by the college before production use. Version{" "}
         {PRIVACY_NOTICE_VERSION}.
       </Alert>

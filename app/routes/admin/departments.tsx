@@ -341,9 +341,20 @@ export default function Departments({ loaderData, actionData }: Route.ComponentP
                             <input type="hidden" name="intent" value="specialisation-toggle" />
                             <input type="hidden" name="id" value={s.id} />
                             <input type="hidden" name="active" value={s.active ? "false" : "true"} />
-                            <button type="submit" className="btn-secondary btn-sm" disabled={busy}>
-                              {s.active ? "Deactivate" : "Activate"}
-                            </button>
+                            <ConfirmDialog
+                              trigger={s.active ? "Deactivate" : "Activate"}
+                              triggerClassName="btn-secondary btn-sm"
+                              tone={s.active ? "danger" : "primary"}
+                              title={s.active ? `Deactivate ${s.name}?` : `Activate ${s.name}?`}
+                              confirmLabel={s.active ? "Deactivate" : "Activate"}
+                              disabled={busy}
+                            >
+                              <p>
+                                {s.active
+                                  ? "It can no longer be chosen for new research job profiles. Existing applications are not affected."
+                                  : "It can be chosen again for new research job profiles."}
+                              </p>
+                            </ConfirmDialog>
                           </Form>
                         </td>
                       </tr>

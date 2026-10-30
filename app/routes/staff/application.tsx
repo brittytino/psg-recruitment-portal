@@ -440,9 +440,27 @@ export default function StaffApplication({ loaderData, actionData }: Route.Compo
                     className="field-input mt-1"
                   />
                 </div>
-                <button type="submit" className="btn-primary w-full" disabled={!decision || busy}>
-                  {app.hodDecision ? "Update decision" : "Record decision"}
-                </button>
+                <ConfirmDialog
+                  trigger={app.hodDecision ? "Update decision" : "Record decision"}
+                  triggerClassName="btn-primary w-full"
+                  tone={decision === "REJECT" ? "danger" : "primary"}
+                  title={
+                    decision === "REJECT"
+                      ? "Reject this application?"
+                      : decision === "ACCEPT"
+                        ? "Accept this application as applied?"
+                        : "Recommend a different position?"
+                  }
+                  confirmLabel={decision === "REJECT" ? "Reject application" : "Record decision"}
+                  disabled={!decision || busy}
+                >
+                  <p>
+                    {decision === "RECOMMEND_CHANGE"
+                      ? "Your recommendation goes to the Dean / Principal for approval. The candidate's submitted application is not changed."
+                      : "The decision is recorded with your name and time and shown to the recruitment office."}{" "}
+                    You can change it until your department summary sheet is approved.
+                  </p>
+                </ConfirmDialog>
               </Form>
             </section>
           )}
@@ -489,24 +507,36 @@ export default function StaffApplication({ loaderData, actionData }: Route.Compo
                       </label>
                       <textarea id="note" name="note" rows={2} maxLength={2000} className="field-input" />
                       <div className="flex gap-2">
-                        <button
-                          type="submit"
-                          name="approve"
-                          value="yes"
-                          className="btn-primary flex-1"
+                        <ConfirmDialog
+                          trigger="Approve change"
+                          triggerClassName="btn-primary flex-1"
+                          title="Approve the position change?"
+                          confirmLabel="Approve change"
+                          confirmName="approve"
+                          confirmValue="yes"
                           disabled={busy}
                         >
-                          Approve change
-                        </button>
-                        <button
-                          type="submit"
-                          name="approve"
-                          value="no"
-                          className="btn-secondary flex-1"
+                          <p>
+                            The application will be considered for {POSITION_LABELS[pending.toPosition]}{" "}
+                            instead of {POSITION_LABELS[pending.fromPosition]}. This is recorded in the audit
+                            log.
+                          </p>
+                        </ConfirmDialog>
+                        <ConfirmDialog
+                          trigger="Do not approve"
+                          triggerClassName="btn-secondary flex-1"
+                          tone="danger"
+                          title="Turn down the recommendation?"
+                          confirmLabel="Do not approve"
+                          confirmName="approve"
+                          confirmValue="no"
                           disabled={busy}
                         >
-                          Do not approve
-                        </button>
+                          <p>
+                            The application stays at {POSITION_LABELS[pending.fromPosition]}. Add a note
+                            explaining why.
+                          </p>
+                        </ConfirmDialog>
                       </div>
                       <p className="text-xs text-muted">
                         The candidate’s submitted application is not changed.
@@ -561,9 +591,18 @@ export default function StaffApplication({ loaderData, actionData }: Route.Compo
                     {!hods.length && (
                       <p className="text-sm text-warning">No HOD is set up for this department.</p>
                     )}
-                    <button type="submit" className="btn-secondary w-full" disabled={busy || !hods.length}>
-                      Move to HOD
-                    </button>
+                    <ConfirmDialog
+                      trigger="Move to HOD"
+                      triggerClassName="btn-secondary w-full"
+                      title="Send this application to the HOD?"
+                      confirmLabel="Send to HOD"
+                      disabled={busy || !hods.length}
+                    >
+                      <p>
+                        The HOD is notified by e-mail and can then accept, reject or recommend another
+                        position.
+                      </p>
+                    </ConfirmDialog>
                   </Form>
                 )}
                 {app.status === "ASSIGNED_TO_HOD" && (
@@ -574,9 +613,19 @@ export default function StaffApplication({ loaderData, actionData }: Route.Compo
                       Take back from the HOD — reason
                     </label>
                     <input id="ureason" name="reason" required minLength={5} className="field-input" />
-                    <button type="submit" className="btn-secondary w-full" disabled={busy}>
-                      Take back
-                    </button>
+                    <ConfirmDialog
+                      trigger="Take back"
+                      triggerClassName="btn-secondary w-full"
+                      tone="danger"
+                      title="Take this application back from the HOD?"
+                      confirmLabel="Take back"
+                      disabled={busy}
+                    >
+                      <p>
+                        It returns to the recruitment office and leaves the HOD's review list. Your reason is
+                        recorded.
+                      </p>
+                    </ConfirmDialog>
                   </Form>
                 )}
               </section>

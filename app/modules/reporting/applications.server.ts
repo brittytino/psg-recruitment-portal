@@ -49,6 +49,18 @@ export const listQuerySchema = z.object({
   exam: z.string().trim().max(40).optional().catch(undefined),
   minExp: z.coerce.number().int().min(0).max(50).optional().catch(undefined),
   hod: z.enum(["assigned", "unassigned"]).optional().catch(undefined),
+  /**
+   * Mode of study (summary sheet check boxes), comma separated: "full" = every degree and the
+   * Ph.D. full-time; "part" / "distance" = at least one degree or the Ph.D. in that mode.
+   */
+  mode: z
+    .string()
+    .optional()
+    .transform((v) => {
+      const m = (v ?? "").split(",").filter((x): x is StudyMode => STUDY_MODES.includes(x as StudyMode));
+      return m.length ? [...new Set(m)] : undefined;
+    })
+    .catch(undefined),
   from: optionalDate,
   to: optionalDate,
   sort: z.enum(SORTS).default("-submittedAt").catch("-submittedAt"),
@@ -63,8 +75,20 @@ export const listQuerySchema = z.object({
 export type ListQuery = z.infer<typeof listQuerySchema>;
 
 export function parseListQuery(url: URL): ListQuery {
-  return listQuerySchema.parse(Object.fromEntries([...url.searchParams].filter(([, v]) => v !== "")));
+  const entries = Object.fromEntries([...url.searchParams].filter(([, v]) => v !== ""));
+  // Check boxes send the same name several times.
+  const modes = url.searchParams.getAll("mode").filter(Boolean);
+  if (modes.length) entries.mode = modes.join(",");
+  return listQuerySchema.parse(entries);
 }
+
+export const STUDY_MODES = ["full", "part", "distance"] as const;
+export type StudyMode = (typeof STUDY_MODES)[number];
+const MODE_VALUE: Record<StudyMode, string> = {
+  full: "Full-time",
+  part: "Part-time",
+  distance: "Distance Education",
+};
 
 const PHD_STATUS: Record<string, string> = {
   awarded: "Awarded",
@@ -97,6 +121,25 @@ function filterWhere(q: ListQuery): Prisma.ApplicationWhereInput {
   else if (q.exam) and.push({ currentRevision: { competitiveExams: { has: q.exam } } });
   if (q.minExp !== undefined)
     and.push({ currentRevision: { totalExperienceMonths: { gte: q.minExp * 12 } } });
+  if (q.mode?.length)
+    and.push({
+      OR: q.mode.map((m): Prisma.ApplicationWhereInput =>
+        m === "full"
+          ? {
+              currentRevision: {
+                qualifications: {
+                  some: { category: "COLLEGE" },
+                  none: { category: "COLLEGE", modeOfStudy: { not: MODE_VALUE.full } },
+                },
+              },
+            }
+          : {
+              currentRevision: {
+                qualifications: { some: { category: "COLLEGE", modeOfStudy: MODE_VALUE[m] } },
+              },
+            },
+      ),
+    });
   if (q.hod === "assigned") and.push({ assignedHodId: { not: null } });
   if (q.hod === "unassigned") and.push({ assignedHodId: null });
   if (q.from) and.push({ submittedAt: { gte: new Date(`${q.from}T00:00:00+05:30`) } });
@@ -559,4 +602,3 @@ export async function previewExport(
   const total = await prisma.application.count({ where });
   return { headers, rows, total };
 }
-

@@ -118,7 +118,7 @@ export async function assignToHod(user: SessionUser | null, input: unknown, ip?:
       hodId,
       "review.assigned",
       `${apps.length} application${apps.length === 1 ? "" : "s"} assigned for your review`,
-      `${apps.length} application${apps.length === 1 ? " has" : "s have"} been assigned to you for department review on the PSG Tech Staff Recruitment Portal.\n\nSign in to review them: accept, recommend a position change or reject, then generate and approve your department summary sheet.`,
+      `${apps.length} application${apps.length === 1 ? " has" : "s have"} been assigned to you for department review on the PSG Tech Recruitment.\n\nSign in to review them: accept, recommend a position change or reject, then generate and approve your department summary sheet.`,
     );
   });
   return apps.length;

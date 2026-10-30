@@ -1,5 +1,6 @@
 import { RateLimitedError } from "~/modules/core/errors";
 import { env } from "~/modules/core/env.server";
+import { logger } from "~/modules/core/logger.server";
 import { redis } from "~/modules/core/redis.server";
 
 /**
@@ -18,6 +19,9 @@ export async function rateLimit(
   if (n === 1) await r.expire(k, windowSeconds);
   if (n > limit) {
     const ttl = await r.ttl(k);
+    // Logged once per window (at the first refused request) to keep the log readable.
+    if (n === limit + 1)
+      logger.warn({ event: "rate_limit", bucket, key, limit, windowSeconds }, "rate limit reached");
     throw new RateLimitedError(ttl > 0 ? ttl : windowSeconds);
   }
 }

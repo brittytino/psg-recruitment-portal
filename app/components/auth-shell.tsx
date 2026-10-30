@@ -14,7 +14,7 @@ export function AuthShell({ children }: { children: ReactNode }) {
           <img src="/images/psg_logo.png" alt="" className="h-11 w-auto rounded" />
           <p className="text-sm leading-tight font-semibold text-ink">
             PSG College of Technology
-            <span className="block font-normal text-muted">Recruitment Portal</span>
+            <span className="block font-normal text-muted">Faculty & Research Recruitment</span>
           </p>
         </div>
         <div>

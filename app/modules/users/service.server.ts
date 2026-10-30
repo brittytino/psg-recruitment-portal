@@ -109,7 +109,7 @@ export async function createStaffUser(actor: SessionUser | null, input: unknown)
       u.id,
       "account.staff_invite",
       "Your PSG Tech recruitment portal account",
-      `An account has been created for you on the PSG College of Technology Staff Recruitment Portal.\n\nSign in directly using your email address:\n${env().APP_ORIGIN}/login\n\nA secure 6-digit one-time verification code (OTP) will be sent to this email address on every sign-in. No password is required.`,
+      `An account has been created for you on the PSG College of Technology recruitment office.\n\nSign in directly using your email address:\n${env().APP_ORIGIN}/login\n\nA secure 6-digit one-time verification code (OTP) will be sent to this email address on every sign-in. No password is required.`,
     );
     await audit(
       {
@@ -239,7 +239,7 @@ export async function resendInvite(actor: SessionUser | null, userId: string) {
       userId,
       "account.staff_invite",
       "Sign-in instructions for PSG Tech recruitment portal",
-      `An administrator has resent your sign-in details for the PSG College of Technology Staff Recruitment Portal.\n\nSign in directly using your email address:\n${env().APP_ORIGIN}/login\n\nA secure 6-digit one-time verification code (OTP) will be sent to your email address on every sign-in. No password is required.`,
+      `An administrator has resent your sign-in details for the PSG College of Technology recruitment office.\n\nSign in directly using your email address:\n${env().APP_ORIGIN}/login\n\nA secure 6-digit one-time verification code (OTP) will be sent to your email address on every sign-in. No password is required.`,
     );
     await audit({ actorId: a.id, action: "user.invite_resent", entityType: "user", entityId: userId }, tx);
   });
@@ -256,7 +256,7 @@ function hodInviteBody(fullName: string, departmentName: string, email: string) 
   return [
     `Dear ${fullName},`,
     "",
-    `You have been added as the Head of Department for ${departmentName} on the PSG College of Technology Staff Recruitment Portal.`,
+    `You have been added as the Head of Department for ${departmentName} on the PSG College of Technology recruitment office.`,
     "",
     "Accept the invitation and sign in here:",
     link,
@@ -307,7 +307,7 @@ export async function inviteHod(actor: SessionUser | null, input: unknown) {
       tx,
       user.id,
       "account.hod_invite",
-      `HOD access – ${department.name} | PSG Tech Recruitment Portal`,
+      `HOD access – ${department.name} | PSG Tech Recruitment`,
       hodInviteBody(v.fullName, department.name, v.email),
     );
     await audit(
@@ -336,7 +336,7 @@ export async function resendHodInvite(actor: SessionUser | null, roleId: string)
       tx,
       r.userId,
       "account.hod_invite",
-      `HOD access – ${r.department!.name} | PSG Tech Recruitment Portal`,
+      `HOD access – ${r.department!.name} | PSG Tech Recruitment`,
       hodInviteBody(r.user.profile?.fullName ?? r.user.email, r.department!.name, r.user.email),
     );
     await audit(

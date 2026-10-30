@@ -200,8 +200,15 @@ const workers = [
 for (const w of workers) {
   w.on("failed", (job, err) =>
     logger.warn(
-      { queue: w.name, job: job?.name, jobId: job?.id, attempt: job?.attemptsMade, err: err.message },
-      "job failed",
+      {
+        event: w.name.includes("doc") || /generate|bundle|pdf|scan/i.test(job?.name ?? "") ? "pdf_job_failed" : "job_failed",
+        queue: w.name,
+        job: job?.name,
+        jobId: job?.id,
+        attempt: job?.attemptsMade,
+        err: err.message,
+      },
+      "background job failed",
     ),
   );
   w.on("completed", (job) => logger.info({ queue: w.name, job: job.name, jobId: job.id }, "job completed"));

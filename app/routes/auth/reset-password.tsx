@@ -20,9 +20,9 @@ export default function ResetPassword() {
         <h1>No password needed</h1>
         <div className="mt-4">
           <Alert tone="info" title="No Password Required">
-            The PSG College of Technology Staff Recruitment Portal uses passwordless sign-in exclusively. You
-            do not need to choose or reset a password. Simply enter your registered email address on the
-            sign-in page to receive a secure 6-digit one-time code (OTP).
+            The PSG College of Technology recruitment office uses passwordless sign-in exclusively. You do not
+            need to choose or reset a password. Simply enter your registered email address on the sign-in page
+            to receive a secure 6-digit one-time code (OTP).
           </Alert>
         </div>
         <div className="mt-6">

@@ -25,9 +25,11 @@ import {
   LayoutDashboard,
   LogOut,
   Menu,
-  Search,
+  PanelLeftClose,
+  PanelLeftOpen,
   UserRound,
   Settings,
+  ScrollText,
   ShieldCheck,
   Users,
   X,
@@ -47,7 +49,10 @@ import {
 } from "./modules/auth/permissions";
 import { csrfToken, getSessionUser } from "./modules/auth/session.server";
 import { isOriginAllowed } from "./lib/origin.server";
-import { CsrfInput } from "./components/forms";
+import { AccountMenu, SignOutDialog } from "./components/account-menu";
+import { GlobalSearch } from "./components/global-search";
+import { READING_SCRIPT, ReadingComfort } from "./components/reading-comfort";
+import { Tooltip, TooltipProvider } from "./components/ui/tooltip";
 
 type NavItem = { to: string; label: string; icon: LucideIcon; end?: boolean };
 
@@ -78,6 +83,8 @@ function staffNav(grants: RoleGrant[]): { title: string; items: NavItem[] }[] {
     system.push({ to: "/admin/settings", label: "Control centre", icon: Settings });
   if (hasPermission(grants, "audit:read"))
     system.push({ to: "/staff/audit", label: "Audit log", icon: ShieldCheck });
+  if (hasPermission(grants, "system:manage"))
+    system.push({ to: "/admin/logs", label: "System logs", icon: ScrollText });
 
   return [
     { title: "Recruitment", items: work },
@@ -129,7 +136,7 @@ export async function loader({ context }: Route.LoaderArgs) {
 }
 
 export const meta: Route.MetaFunction = () => [
-  { title: "PSG College of Technology — Faculty & Staff Recruitment Portal" },
+  { title: "PSG College of Technology — Faculty & Research Recruitment" },
   {
     name: "description",
     content:
@@ -141,7 +148,7 @@ export const meta: Route.MetaFunction = () => [
       "PSG College of Technology, PSG Tech recruitment, faculty positions Coimbatore, engineering faculty vacancies, assistant professor jobs, Anna University autonomous colleges, research fellow recruitment",
   },
   { name: "author", content: "PSG College of Technology" },
-  { property: "og:site_name", content: "PSG College of Technology Recruitment Portal" },
+  { property: "og:site_name", content: "PSG College of Technology Recruitment" },
   { property: "og:type", content: "website" },
   { property: "og:image", content: "/images/psg_logo.png" },
   { property: "og:locale", content: "en_IN" },
@@ -165,6 +172,7 @@ export function Layout({ children }: { children: React.ReactNode }) {
         <meta name="theme-color" content="#10223b" />
         <Meta />
         <Links />
+        <script nonce={root?.nonce} dangerouslySetInnerHTML={{ __html: READING_SCRIPT }} />
       </head>
       <body className="min-h-dvh">
         {children}
@@ -232,23 +240,13 @@ function RouteProgress() {
   );
 }
 
-function SignOut({ className }: { className: string }) {
-  return (
-    <form method="post" action="/logout">
-      <CsrfInput />
-      <button type="submit" className={className}>
-        <LogOut className="h-4 w-4" aria-hidden="true" /> Sign out
-      </button>
-    </form>
-  );
-}
-
 // ------------------------------------------------------------------------------------------------
 // Public layout
 // ------------------------------------------------------------------------------------------------
 function PublicHeader() {
-  const { user, staff } = useUser();
+  const { user, staff, name, initials, roleLabel } = useUser();
   const [open, setOpen] = useState(false);
+  const [signOut, setSignOut] = useState(false);
   const location = useLocation();
   useEffect(() => setOpen(false), [location.pathname]);
 
@@ -271,7 +269,7 @@ function PublicHeader() {
         Skip to main content
       </a>
       <div className="page-container flex h-16 items-center justify-between gap-4">
-        <Brand to="/" subtitle="Recruitment Portal" />
+        <Brand to="/" subtitle="Faculty & Research Recruitment" />
         <nav aria-label="Main" className="hidden items-center gap-1 md:flex">
           {links.map(([to, label]) => (
             <NavLink key={to} to={to} className={linkCls}>
@@ -279,33 +277,36 @@ function PublicHeader() {
             </NavLink>
           ))}
         </nav>
-        <div className="hidden items-center gap-2 md:flex">
-          {user ? (
-            <SignOut className="btn-secondary btn-sm" />
-          ) : (
-            <>
-              <Link to="/register" className="btn-ghost btn-sm text-muted">
-                Create account
-              </Link>
-              <Link
-                to="/login"
-                className="btn border border-brand-600 px-5 text-brand-700 hover:bg-brand-50 hover:text-brand-800"
-              >
-                <UserRound className="h-4 w-4" aria-hidden="true" /> Sign in
-              </Link>
-            </>
-          )}
+        <div className="flex items-center gap-2">
+          <ReadingComfort />
+          <div className="hidden items-center gap-2 md:flex">
+            {user ? (
+              <AccountMenu user={{ name, initials, roleLabel, email: user.email, staff }} />
+            ) : (
+              <>
+                <Link to="/register" className="btn-ghost btn-sm text-muted">
+                  Create account
+                </Link>
+                <Link
+                  to="/login"
+                  className="btn border border-brand-600 px-5 text-brand-700 hover:bg-brand-50 hover:text-brand-800"
+                >
+                  <UserRound className="h-4 w-4" aria-hidden="true" /> Sign in
+                </Link>
+              </>
+            )}
+          </div>
+          <button
+            type="button"
+            onClick={() => setOpen((v) => !v)}
+            className="btn-ghost -mr-2 px-2 md:hidden"
+            aria-expanded={open}
+            aria-controls="mobile-nav"
+            aria-label={open ? "Close menu" : "Open menu"}
+          >
+            {open ? <X className="h-5 w-5" /> : <Menu className="h-5 w-5" />}
+          </button>
         </div>
-        <button
-          type="button"
-          onClick={() => setOpen((v) => !v)}
-          className="btn-ghost -mr-2 px-2 md:hidden"
-          aria-expanded={open}
-          aria-controls="mobile-nav"
-          aria-label={open ? "Close menu" : "Open menu"}
-        >
-          {open ? <X className="h-5 w-5" /> : <Menu className="h-5 w-5" />}
-        </button>
       </div>
       {open && (
         <div id="mobile-nav" className="border-t border-line bg-paper md:hidden">
@@ -318,9 +319,15 @@ function PublicHeader() {
           </nav>
           <div className="page-container grid grid-cols-2 gap-2 border-t border-line py-3">
             {user ? (
-              <div className="col-span-2">
-                <SignOut className="btn-secondary w-full" />
-              </div>
+              <>
+                <p className="col-span-2 truncate text-sm">
+                  <span className="font-semibold text-ink">{name}</span>{" "}
+                  <span className="text-muted">· {roleLabel}</span>
+                </p>
+                <button type="button" className="btn-secondary col-span-2" onClick={() => setSignOut(true)}>
+                  <LogOut className="h-4 w-4" aria-hidden="true" /> Sign out
+                </button>
+              </>
             ) : (
               <>
                 <Link to="/login" className="btn-secondary">
@@ -334,6 +341,7 @@ function PublicHeader() {
           </div>
         </div>
       )}
+      <SignOutDialog intent={signOut ? "signout" : null} onClose={() => setSignOut(false)} />
     </header>
   );
 }
@@ -343,7 +351,7 @@ function Footer() {
     <footer className="mt-16 border-t border-line bg-paper">
       <div className="page-container grid gap-10 py-12 sm:grid-cols-2 lg:grid-cols-[2fr_1fr_1fr]">
         <div className="space-y-4">
-          <Brand to="/" subtitle="Recruitment Portal" />
+          <Brand to="/" subtitle="Faculty & Research Recruitment" />
           <p className="max-w-md text-sm text-muted">
             Avinashi Road, Peelamedu, Coimbatore – 641 004, Tamil Nadu. An autonomous institution affiliated
             to Anna University.
@@ -404,132 +412,182 @@ function PublicLayout({ children }: { children: React.ReactNode }) {
 }
 
 // ------------------------------------------------------------------------------------------------
-// Staff layout: sidebar on large screens, top bar + drawer on small screens.
+// Staff layout: collapsible sidebar on large screens, top bar + drawer on small screens.
 // ------------------------------------------------------------------------------------------------
-function StaffSidebarContent({ onNavigate }: { onNavigate?: () => void }) {
-  const { grants, name, initials, roleLabel, user } = useUser();
+function StaffSidebarContent({
+  collapsed = false,
+  onToggle,
+  onNavigate,
+}: {
+  collapsed?: boolean;
+  onToggle?: () => void;
+  onNavigate?: () => void;
+}) {
+  const { grants, name, initials, roleLabel } = useUser();
+  const [signOut, setSignOut] = useState(false);
   const groups = staffNav(grants);
   return (
-    <div className="flex h-full flex-col">
-      <div className="px-5 py-5">
-        <Brand to="/staff" subtitle="Staff workspace" inverted />
+    <div className="flex h-full flex-col" data-collapsed={collapsed}>
+      <div className={`flex items-center py-5 ${collapsed ? "justify-center px-3" : "px-5"}`}>
+        {collapsed ? (
+          <Link
+            to="/staff"
+            aria-label="PSG College of Technology, staff home"
+            className="rounded-lg bg-white p-1"
+          >
+            <img src="/images/psg_logo.png" alt="" className="h-8 w-auto" />
+          </Link>
+        ) : (
+          <Brand to="/staff" subtitle="Staff workspace" inverted />
+        )}
       </div>
-      <nav aria-label="Staff" className="flex-1 space-y-6 overflow-y-auto px-3 pb-6">
+      <nav aria-label="Staff" className="flex-1 space-y-6 overflow-x-hidden overflow-y-auto px-3 pb-6">
         {groups.map((g) => (
           <div key={g.title}>
-            <p className="px-3 pb-2 text-[11px] font-semibold tracking-[0.12em] text-white/45 uppercase">
+            <p
+              className={`pb-2 text-[11px] font-semibold tracking-[0.12em] text-white/45 uppercase ${collapsed ? "sr-only" : "px-3"}`}
+            >
               {g.title}
             </p>
             <ul className="space-y-0.5">
               {g.items.map((n) => (
                 <li key={n.to}>
-                  <NavLink
-                    to={n.to}
-                    end={n.end}
-                    onClick={onNavigate}
-                    className={({ isActive }) =>
-                      `flex items-center gap-3 rounded-md px-3 py-2 text-sm no-underline transition-colors ${
-                        isActive
-                          ? "bg-brand-600 font-semibold text-white shadow-sm"
-                          : "text-white/80 hover:bg-white/8 hover:text-white"
-                      }`
-                    }
-                  >
-                    <n.icon className="h-4 w-4 shrink-0" aria-hidden="true" />
-                    {n.label}
-                  </NavLink>
+                  <Tooltip label={n.label} disabled={!collapsed}>
+                    <NavLink
+                      to={n.to}
+                      end={n.end}
+                      onClick={onNavigate}
+                      aria-label={collapsed ? n.label : undefined}
+                      className={({ isActive }) =>
+                        `flex items-center gap-3 rounded-lg py-2 text-sm no-underline transition-colors ${
+                          collapsed ? "justify-center px-0" : "px-3"
+                        } ${
+                          isActive
+                            ? "bg-brand-600 font-semibold text-white shadow-sm"
+                            : "text-white/80 hover:bg-white/8 hover:text-white"
+                        }`
+                      }
+                    >
+                      <n.icon className="h-[18px] w-[18px] shrink-0" aria-hidden="true" />
+                      <span className="sidebar-label">{n.label}</span>
+                    </NavLink>
+                  </Tooltip>
                 </li>
               ))}
             </ul>
           </div>
         ))}
-        <div>
+        <Tooltip label="Public website" disabled={!collapsed}>
           <a
             href="/"
             target="_blank"
             rel="noreferrer"
-            className="flex items-center gap-3 rounded-md px-3 py-2 text-sm text-white/60 no-underline hover:bg-white/6 hover:text-white"
+            aria-label={collapsed ? "Public website" : undefined}
+            className={`flex items-center gap-3 rounded-lg py-2 text-sm text-white/60 no-underline hover:bg-white/6 hover:text-white ${collapsed ? "justify-center" : "px-3"}`}
           >
-            <ExternalLink className="h-4 w-4" aria-hidden="true" /> Public site
+            <ExternalLink className="h-[18px] w-[18px] shrink-0" aria-hidden="true" />
+            <span className="sidebar-label">Public website</span>
           </a>
-        </div>
+        </Tooltip>
       </nav>
-      <div className="border-t border-white/10 p-4">
-        <div className="flex items-center gap-3">
-          <span
-            aria-hidden="true"
-            className="grid h-9 w-9 shrink-0 place-items-center rounded-full bg-gold-400 text-xs font-bold text-navy-900"
+
+      <div className="space-y-2 border-t border-white/10 p-3">
+        <Tooltip label="Sign out" disabled={!collapsed}>
+          <button
+            type="button"
+            onClick={() => setSignOut(true)}
+            aria-label={collapsed ? `Sign out ${name}` : undefined}
+            className={`group flex w-full items-center gap-3 rounded-xl p-2 text-left transition-colors hover:bg-white/8 ${collapsed ? "justify-center" : ""}`}
           >
-            {initials || "U"}
-          </span>
-          <span className="min-w-0 leading-tight">
-            <span className="block truncate text-sm font-semibold text-white">{name}</span>
-            <span className="block truncate text-xs text-white/60">{roleLabel}</span>
-          </span>
-        </div>
-        <p className="mt-2 truncate text-xs text-white/45" title={user?.email}>
-          {user?.email}
-        </p>
-        <SignOut className="btn btn-sm mt-3 w-full border border-white/15 text-white hover:bg-white/10 hover:text-white" />
+            <span
+              aria-hidden="true"
+              className="grid h-9 w-9 shrink-0 place-items-center rounded-full bg-gold-400 text-xs font-bold text-navy-900"
+            >
+              {initials || "U"}
+            </span>
+            <span className="sidebar-label min-w-0 flex-1 leading-tight">
+              <span className="block truncate text-sm font-semibold text-white">{name}</span>
+              <span className="block truncate text-xs text-white/60">{roleLabel}</span>
+            </span>
+            <LogOut
+              className="sidebar-hide h-4 w-4 shrink-0 text-white/50 transition-colors group-hover:text-white"
+              aria-hidden="true"
+            />
+          </button>
+        </Tooltip>
+        {onToggle && (
+          <button
+            type="button"
+            onClick={onToggle}
+            aria-label={collapsed ? "Expand sidebar" : "Collapse sidebar"}
+            aria-expanded={!collapsed}
+            className={`flex w-full items-center gap-3 rounded-lg py-2 text-xs font-medium text-white/55 transition-colors hover:bg-white/6 hover:text-white ${collapsed ? "justify-center" : "px-3"}`}
+          >
+            {collapsed ? (
+              <PanelLeftOpen className="h-[18px] w-[18px]" aria-hidden="true" />
+            ) : (
+              <PanelLeftClose className="h-[18px] w-[18px]" aria-hidden="true" />
+            )}
+            <span className="sidebar-label">Collapse sidebar</span>
+          </button>
+        )}
       </div>
+      <SignOutDialog intent={signOut ? "signout" : null} onClose={() => setSignOut(false)} />
     </div>
   );
 }
 
-/** Desktop header: institution name, application search and the signed-in user. */
+/** Desktop header: institution name, application search, reading comfort and the account menu. */
 function StaffTopBar() {
-  const { grants, name, initials, roleLabel } = useUser();
-  const canSearch = isAdmin(grants) || isHrOfficer(grants);
+  const { grants, name, initials, roleLabel, user } = useUser();
+  const fullList = isAdmin(grants) || isHrOfficer(grants);
   return (
     <header className="sticky top-0 z-30 hidden h-16 items-center gap-6 border-b border-line bg-paper/95 px-8 backdrop-blur lg:flex">
-      <div className="flex min-w-0 items-center gap-3">
+      <div className="flex shrink-0 items-center gap-3">
         <img src="/images/psg_logo.png" alt="" className="h-9 w-auto" />
         <span className="min-w-0 leading-tight">
-          <span className="block truncate font-display text-base font-semibold text-navy-800 uppercase">
+          <span className="block truncate font-display text-base font-semibold text-navy-800">
             PSG College of Technology
           </span>
-          <span className="block truncate text-xs text-muted">Staff Recruitment Portal</span>
+          <span className="block truncate text-xs text-muted">Staff Recruitment</span>
         </span>
       </div>
-      {canSearch ? (
-        <form method="get" action="/staff" role="search" className="relative mx-auto w-full max-w-xl">
-          <label htmlFor="top-q" className="sr-only">
-            Search applications
-          </label>
-          <Search
-            className="pointer-events-none absolute top-1/2 left-3 h-4 w-4 -translate-y-1/2 text-muted"
-            aria-hidden="true"
-          />
-          <input
-            id="top-q"
-            name="q"
-            type="search"
-            placeholder="Search applications, candidates, reference no…"
-            className="field-input border-transparent bg-soft pl-9 hover:border-line"
-          />
-        </form>
-      ) : (
-        <div className="mx-auto" />
-      )}
+      <GlobalSearch fullList={fullList} />
       <div className="flex shrink-0 items-center gap-3">
-        <span
-          aria-hidden="true"
-          className="grid h-9 w-9 place-items-center rounded-full bg-navy-800 text-xs font-bold text-white"
-        >
-          {initials || "U"}
-        </span>
-        <span className="leading-tight">
+        <ReadingComfort />
+        <span className="hidden text-right leading-tight xl:block">
           <span className="block max-w-48 truncate text-sm font-semibold text-ink">{name}</span>
           <span className="block text-xs font-medium text-brand-700">{roleLabel}</span>
         </span>
+        {user && <AccountMenu user={{ name, initials, roleLabel, email: user.email, staff: true }} />}
       </div>
     </header>
   );
 }
 
+const SIDEBAR_KEY = "psg-sidebar";
+
 function StaffLayout({ children }: { children: React.ReactNode }) {
+  const { name, initials, roleLabel, user } = useUser();
   const [open, setOpen] = useState(false);
+  const [collapsed, setCollapsed] = useState(false);
   const location = useLocation();
+  useEffect(() => {
+    try {
+      setCollapsed(localStorage.getItem(SIDEBAR_KEY) === "collapsed");
+    } catch {
+      /* storage unavailable */
+    }
+  }, []);
+  const toggle = () =>
+    setCollapsed((c) => {
+      try {
+        localStorage.setItem(SIDEBAR_KEY, c ? "open" : "collapsed");
+      } catch {
+        /* storage unavailable */
+      }
+      return !c;
+    });
   useEffect(() => setOpen(false), [location.pathname, location.search]);
   useEffect(() => {
     if (!open) return;
@@ -539,44 +597,51 @@ function StaffLayout({ children }: { children: React.ReactNode }) {
   }, [open]);
 
   return (
-    <div className="min-h-dvh lg:grid lg:grid-cols-[16.5rem_1fr]">
+    <div className="staff-grid min-h-dvh lg:grid" data-collapsed={collapsed}>
       <a href="#main" className="skip-link">
         Skip to main content
       </a>
-      <aside className="hero-gradient sticky top-0 hidden h-dvh lg:block">
-        <StaffSidebarContent />
+      <aside className="hero-gradient sticky top-0 hidden h-dvh overflow-hidden lg:block">
+        <StaffSidebarContent collapsed={collapsed} onToggle={toggle} />
       </aside>
 
-      <header className="sticky top-0 z-40 flex h-14 items-center justify-between border-b border-white/10 bg-navy-800 px-4 lg:hidden">
+      <header className="sticky top-0 z-40 flex h-14 items-center justify-between gap-2 border-b border-white/10 bg-navy-800 px-4 lg:hidden">
         <Brand to="/staff" subtitle="Staff workspace" inverted />
-        <button
-          type="button"
-          onClick={() => setOpen(true)}
-          className="btn -mr-2 px-2 text-white hover:bg-white/10"
-          aria-expanded={open}
-          aria-controls="staff-drawer"
-          aria-label="Open menu"
-        >
-          <Menu className="h-5 w-5" />
-        </button>
+        <div className="flex items-center gap-2">
+          <ReadingComfort tone="dark" />
+          {user && (
+            <AccountMenu user={{ name, initials, roleLabel, email: user.email, staff: true }} tone="dark" />
+          )}
+          <button
+            type="button"
+            onClick={() => setOpen(true)}
+            className="btn -mr-2 px-2 text-white hover:bg-white/10"
+            aria-expanded={open}
+            aria-controls="staff-drawer"
+            aria-label="Open menu"
+          >
+            <Menu className="h-5 w-5" />
+          </button>
+        </div>
       </header>
 
       {open && (
         <div className="fixed inset-0 z-50 lg:hidden" role="dialog" aria-modal="true" aria-label="Staff menu">
           <button
             type="button"
-            className="absolute inset-0 bg-navy-900/60"
+            className="ui-fade absolute inset-0 bg-navy-900/60"
+            data-state="open"
             aria-label="Close menu"
             onClick={() => setOpen(false)}
           />
           <div
             id="staff-drawer"
-            className="hero-gradient absolute inset-y-0 left-0 w-[min(18rem,85vw)] shadow-2xl"
+            className="hero-gradient drawer-in absolute inset-y-0 left-0 w-[min(18rem,85vw)] shadow-2xl"
           >
             <button
               type="button"
               onClick={() => setOpen(false)}
-              className="btn absolute top-4 right-3 px-2 text-white hover:bg-white/10"
+              className="btn absolute top-4 right-3 z-10 px-2 text-white hover:bg-white/10"
               aria-label="Close menu"
             >
               <X className="h-5 w-5" />
@@ -603,7 +668,9 @@ function Shell({ children }: { children: React.ReactNode }) {
   return (
     <>
       <RouteProgress />
-      {staffArea ? <StaffLayout>{children}</StaffLayout> : <PublicLayout>{children}</PublicLayout>}
+      <TooltipProvider>
+        {staffArea ? <StaffLayout>{children}</StaffLayout> : <PublicLayout>{children}</PublicLayout>}
+      </TooltipProvider>
     </>
   );
 }

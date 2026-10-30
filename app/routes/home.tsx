@@ -24,14 +24,14 @@ export const meta: Route.MetaFunction = () => [
   {
     name: "description",
     content:
-      "Official recruitment portal of PSG College of Technology, Coimbatore. Apply online for Assistant Professor, Associate Professor, Professor, and research positions.",
+      "Official faculty and research recruitment of PSG College of Technology, Coimbatore. Apply online for Assistant Professor, Associate Professor, Professor, and research positions.",
   },
   { name: "robots", content: "index, follow, max-snippet:-1, max-image-preview:large, max-video-preview:-1" },
   { property: "og:title", content: "Faculty & Staff Recruitment — PSG College of Technology" },
   {
     property: "og:description",
     content:
-      "Official recruitment portal of PSG College of Technology, Coimbatore. Explore faculty vacancies and apply online.",
+      "Official faculty and research recruitment of PSG College of Technology, Coimbatore. Explore faculty vacancies and apply online.",
   },
   { property: "og:type", content: "website" },
   { property: "og:image", content: "/images/psg_logo.png" },
@@ -39,7 +39,7 @@ export const meta: Route.MetaFunction = () => [
   { name: "twitter:title", content: "Faculty & Staff Recruitment — PSG College of Technology" },
   {
     name: "twitter:description",
-    content: "Official faculty and research recruitment portal of PSG College of Technology, Coimbatore.",
+    content: "Faculty and research recruitment at PSG College of Technology, Coimbatore.",
   },
   { name: "twitter:image", content: "/images/psg_logo.png" },
 ];
@@ -124,7 +124,7 @@ export default function Home({ loaderData }: Route.ComponentProps) {
               },
               {
                 "@type": "WebSite",
-                name: "PSG College of Technology Recruitment Portal",
+                name: "PSG College of Technology Recruitment",
                 url: "/",
                 potentialAction: {
                   "@type": "SearchAction",

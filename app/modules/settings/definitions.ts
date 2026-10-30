@@ -3,7 +3,7 @@
  * college confirmation are switches here rather than hard-coded behaviour.
  */
 export const SETTING_GROUPS = {
-  portal: "Portal switches",
+  portal: "Switches",
   policy: "Recruitment rules",
 } as const;
 

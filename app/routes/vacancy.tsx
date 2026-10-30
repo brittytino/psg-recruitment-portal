@@ -76,7 +76,7 @@ export default function Vacancy({ loaderData }: Route.ComponentProps) {
             title: `${position} - ${where}`,
             description:
               v.description ||
-              `PSG College of Technology invites applications for the position of ${position} in ${where}. Apply online through the official recruitment portal before ${formatDateTime(v.closesAt)}.`,
+              `PSG College of Technology invites applications for the position of ${position} in ${where}. Apply online before ${formatDateTime(v.closesAt)}.`,
             identifier: {
               "@type": "PropertyValue",
               name: "PSG College of Technology",

@@ -96,6 +96,7 @@ export function handleError(error: unknown, { request }: { request: Request }) {
   if (request.signal.aborted) return;
   logger.error(
     {
+      event: "app_error",
       err: error instanceof Error ? { message: error.message, stack: error.stack } : String(error),
       path: new URL(request.url).pathname,
     },
