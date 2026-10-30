@@ -7,8 +7,13 @@ import { ForbiddenError } from "~/modules/core/errors";
 import { redis } from "~/modules/core/redis.server";
 import { requestRegeneration } from "~/modules/documents/service.server";
 import { storageWritable } from "~/modules/documents/storage.server";
-import { emailsSentToday, ROUTINE_SHARE } from "~/modules/notifications/budget.server";
-import { sendNotificationEmail, verifySmtpConnection } from "~/modules/notifications/mailer.server";
+import { relayDownReason, ROUTINE_SHARE, sentToday } from "~/modules/notifications/budget.server";
+import {
+  relayConfigured,
+  sendNotificationEmail,
+  verifyRelay,
+  verifySmtpConnection,
+} from "~/modules/notifications/mailer.server";
 
 /** Super Admin control centre: live system status and operations no other role can run. */
 function requireSuperAdmin(user: SessionUser | null): SessionUser {
@@ -63,8 +68,11 @@ export async function systemStatus(user: SessionUser | null) {
   const istMidnight = new Date(
     `${new Date(Date.now() + 330 * 60_000).toISOString().slice(0, 10)}T00:00:00+05:30`,
   );
-  const [mailSent, mailSkipped, mailFailed] = await Promise.all([
-    emailsSentToday(),
+  const [relaySent, gmailSent, relayCheck, relayPaused, mailSkipped, mailFailed] = await Promise.all([
+    sentToday("relay"),
+    sentToday("gmail"),
+    relayConfigured() ? verifyRelay() : Promise.resolve(null),
+    relayDownReason(),
     prisma.notification.count({
       where: { status: "IN_APP", error: { not: null }, createdAt: { gte: istMidnight } },
     }),
@@ -98,9 +106,22 @@ export async function systemStatus(user: SessionUser | null) {
       failedCodes24h,
     },
     mail: {
-      sent: mailSent,
-      budget: e.MAIL_DAILY_BUDGET,
-      routineLimit: Math.floor(e.MAIL_DAILY_BUDGET * ROUTINE_SHARE),
+      relay: relayConfigured()
+        ? {
+            host: e.SMTP_RELAY_HOST,
+            ok: !!relayCheck?.ok && !relayPaused,
+            detail: relayPaused
+              ? `Paused after a failure (${relayPaused}); the Gmail account is used meanwhile`
+              : (relayCheck?.message ?? ""),
+            sent: relaySent,
+            budget: e.MAIL_RELAY_DAILY_BUDGET,
+          }
+        : null,
+      gmail: {
+        sent: gmailSent,
+        budget: e.MAIL_DAILY_BUDGET,
+        routineLimit: Math.floor(e.MAIL_DAILY_BUDGET * ROUTINE_SHARE),
+      },
       skipped: mailSkipped,
       failed: mailFailed,
     },

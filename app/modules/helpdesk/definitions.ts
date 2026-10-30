@@ -122,3 +122,6 @@ export const ARTICLE_TOPICS = [
   "Status and next steps",
   "Technical help",
 ] as const;
+
+/** Tickets per page in every ticket list. */
+export const TICKET_PAGE_SIZE = 20;

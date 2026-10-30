@@ -1,6 +1,13 @@
 import type { Prisma } from "@prisma/client";
 import { ForbiddenError, UnauthenticatedError } from "~/modules/core/errors";
-import { hasPermission, hodDepartments, isAdmin, isHrOfficer, type Permission } from "./permissions";
+import {
+  hasPermission,
+  hodDepartments,
+  isAdmin,
+  isHrOfficer,
+  isViewer,
+  type Permission,
+} from "./permissions";
 import type { SessionUser } from "./session.server";
 
 export function requireAuth(user: SessionUser | null): SessionUser {
@@ -24,7 +31,8 @@ export function requirePermission(user: SessionUser | null, p: Permission): Sess
  *  - HOD: submitted applications of their own department(s) that are assigned to them.
  */
 export function staffApplicationScope(user: SessionUser): Prisma.ApplicationWhereInput | null {
-  if (isAdmin(user.grants) || isHrOfficer(user.grants)) return { status: { not: "DRAFT" } };
+  if (isAdmin(user.grants) || isHrOfficer(user.grants) || isViewer(user.grants))
+    return { status: { not: "DRAFT" } };
   const depts = hodDepartments(user.grants);
   if (!depts.length) return null;
   return {

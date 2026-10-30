@@ -3,7 +3,7 @@ import { ArrowLeftRight, CheckCircle2, Clock, Download, FileText, Plus, Users, X
 import { Form, Link, redirect, useLocation, useNavigation, useSearchParams } from "react-router";
 import type { Route } from "./+types/index";
 import { Alert, Badge, ConfirmDialog, CsrfInput, formatDate, statusTone } from "~/components/forms";
-import { EmptyState, FilterSelect, PageHeader, StatTile } from "~/components/staff";
+import { EmptyState, FilterSelect, ListPagination, PageHeader, StatTile } from "~/components/staff";
 import { clientIp, handleAction, readForm, requireStaff } from "~/lib/http.server";
 import { POSITION_LABELS } from "~/lib/labels";
 import {
@@ -55,6 +55,8 @@ export async function loader({ request, context }: Route.LoaderArgs) {
     canAssign,
     hods: canAssign && q.departmentId ? await hodsForDepartment(q.departmentId) : [],
     isAdmin: isAdmin(user.grants),
+    readOnly: !hasPermission(user.grants, "application:transition"),
+    canManageJobs: hasPermission(user.grants, "recruitment:manage"),
   };
 }
 
@@ -101,7 +103,19 @@ const SORTABLE: Record<string, string> = {
 };
 
 export default function StaffIndex({ loaderData, actionData }: Route.ComponentProps) {
-  const { list, counts, departments, options, q, canExport, canAssign, hods, isAdmin: admin } = loaderData;
+  const {
+    list,
+    counts,
+    departments,
+    options,
+    q,
+    canExport,
+    canAssign,
+    hods,
+    isAdmin: admin,
+    readOnly,
+    canManageJobs,
+  } = loaderData;
   const [params] = useSearchParams();
   const location = useLocation();
   const nav = useNavigation();
@@ -148,18 +162,28 @@ export default function StaffIndex({ loaderData, actionData }: Route.ComponentPr
     <div className="page-stack">
       <PageHeader
         crumbs={[["Dashboard", "/staff"], ["Applications"]]}
-        eyebrow={admin ? "Admin" : "HR – N4 Section"}
+        eyebrow={readOnly ? "Read-only access" : admin ? "Admin" : "HR – N4 Section"}
         title="Applications"
-        description="All submitted applications for faculty and research positions. Filter, review, assign to a HOD and track status."
+        description={
+          readOnly
+            ? "All submitted applications for faculty and research positions. You can open and read them; changes are made by the recruitment office."
+            : "All submitted applications for faculty and research positions. Filter, review, assign to a HOD and track status."
+        }
         actions={
-          <div className="flex flex-wrap items-center gap-2">
-            <Link to="/staff/summary" className="btn-secondary">
-              <Download className="h-4 w-4" aria-hidden="true" /> Summary &amp; export
-            </Link>
-            <Link to="/admin/vacancies/new" className="btn-primary">
-              <Plus className="h-4 w-4" aria-hidden="true" /> New job profile
-            </Link>
-          </div>
+          readOnly ? null : (
+            <div className="flex flex-wrap items-center gap-2">
+              {canExport && (
+                <Link to="/staff/summary" className="btn-secondary">
+                  <Download className="h-4 w-4" aria-hidden="true" /> Summary &amp; export
+                </Link>
+              )}
+              {canManageJobs && (
+                <Link to="/admin/vacancies/new" className="btn-primary">
+                  <Plus className="h-4 w-4" aria-hidden="true" /> New job profile
+                </Link>
+              )}
+            </div>
+          )
         }
       />
 
@@ -700,45 +724,34 @@ export default function StaffIndex({ loaderData, actionData }: Route.ComponentPr
             </table>
           </div>
         )}
-        <nav
-          aria-label="Pagination"
-          className="flex flex-wrap items-center justify-between gap-3 border-t border-line p-4 text-sm sm:px-5"
-        >
-          <Form method="get" className="flex items-center gap-2">
-            {[...params]
-              .filter(([k]) => k !== "size" && k !== "page")
-              .map(([k, v]) => (
-                <input key={k} type="hidden" name={k} value={v} />
-              ))}
-            <label htmlFor="size">Rows per page</label>
-            <select
-              id="size"
-              name="size"
-              defaultValue={q.size}
-              className="field-input w-20 py-1"
-              onChange={(e) => e.currentTarget.form?.requestSubmit()}
-            >
-              {PAGE_SIZES.map((s) => (
-                <option key={s}>{s}</option>
-              ))}
-            </select>
-          </Form>
-          <span className="flex items-center gap-2">
-            <span>
-              Page {q.page} of {list.pages}
-            </span>
-            {q.page > 1 && (
-              <Link to={withParams({ page: q.page - 1 })} className="btn-secondary py-1">
-                Previous
-              </Link>
-            )}
-            {q.page < list.pages && (
-              <Link to={withParams({ page: q.page + 1 })} className="btn-secondary py-1">
-                Next
-              </Link>
-            )}
-          </span>
-        </nav>
+        <ListPagination
+          page={q.page}
+          pages={list.pages}
+          total={list.total}
+          pageSize={q.size}
+          href={(p) => withParams({ page: p })}
+          sizeControl={
+            <Form method="get" className="flex items-center gap-2">
+              {[...params]
+                .filter(([k]) => k !== "size" && k !== "page")
+                .map(([k, v], i) => (
+                  <input key={`${k}-${i}`} type="hidden" name={k} value={v} />
+                ))}
+              <label htmlFor="size">Rows per page</label>
+              <select
+                id="size"
+                name="size"
+                defaultValue={q.size}
+                className="field-input w-20 py-1"
+                onChange={(e) => e.currentTarget.form?.requestSubmit()}
+              >
+                {PAGE_SIZES.map((n) => (
+                  <option key={n}>{n}</option>
+                ))}
+              </select>
+            </Form>
+          }
+        />
       </section>
     </div>
   );

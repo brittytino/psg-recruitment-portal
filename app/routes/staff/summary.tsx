@@ -1,8 +1,8 @@
 import { useState } from "react";
-import { Form, Link, useNavigation, useSearchParams } from "react-router";
+import { Form, Link, useNavigation, useSearchParams, redirect } from "react-router";
 import type { Route } from "./+types/summary";
 import { Alert, Badge, ConfirmDialog, CsrfInput, formatDateTime, statusTone } from "~/components/forms";
-import { EmptyState, FilterSelect, PageHeader } from "~/components/staff";
+import { EmptyState, FilterSelect, ListPagination, PageHeader } from "~/components/staff";
 import { SummaryTable } from "~/components/summary-table";
 import { clientIp, handleAction, readForm, requireStaff } from "~/lib/http.server";
 import { POSITION_LABELS } from "~/lib/labels";
@@ -33,6 +33,9 @@ export const meta: Route.MetaFunction = () => [
 
 export async function loader({ request, context }: Route.LoaderArgs) {
   const user = requireStaff(context, request, "application:list");
+  // Read-only viewers work from the applications list only.
+  if (!hasPermission(user.grants, "summary:read") && !hasPermission(user.grants, "review:record"))
+    throw redirect("/staff");
   const office = hasPermission(user.grants, "summary:read");
   const hodDepts = isSuperAdmin(user.grants)
     ? (
@@ -60,7 +63,7 @@ export async function loader({ request, context }: Route.LoaderArgs) {
   const [departments, options, list, approvals, me] = await Promise.all([
     departmentCounts(user, { position: q.position, departmentId: q.departmentId }),
     filterOptions(),
-    listApplications(user, { ...q, size: q.size < 50 ? 50 : q.size, sort: "referenceNo" }),
+    listApplications(user, { ...q, sort: "referenceNo" }),
     pendingPositionChanges(user),
     prisma.user.findUnique({ where: { id: user.id }, select: { exportColumns: true } }),
   ]);
@@ -536,12 +539,26 @@ function OfficeSummary({ L }: { L: OfficeData }) {
                 ))}
               </tbody>
             </table>
-            {L.list.pages > 1 && (
-              <p className="mt-3 text-sm text-muted">
-                Showing {L.list.rows.length} of {L.list.total}. The export below includes {exportCount} row
-                {exportCount === 1 ? "" : "s"}.
-              </p>
-            )}
+          </div>
+        )}
+        {L.list.total > 0 && (
+          <div className="-mx-5 -mb-5 sm:-mx-6 sm:-mb-6 lg:-mx-7 lg:-mb-7">
+            <ListPagination
+              page={L.q.page}
+              pages={L.list.pages}
+              total={L.list.total}
+              pageSize={L.q.size}
+              href={(n) => {
+                const sp = new URLSearchParams(params);
+                sp.set("page", String(n));
+                return `?${sp}`;
+              }}
+              sizeControl={
+                <span>
+                  The export includes {exportCount} row{exportCount === 1 ? "" : "s"}.
+                </span>
+              }
+            />
           </div>
         )}
       </section>

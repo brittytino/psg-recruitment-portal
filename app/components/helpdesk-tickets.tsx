@@ -1,9 +1,10 @@
 import { MessageSquareReply, Search } from "lucide-react";
 import { Form, Link } from "react-router";
 import { formatDateTime } from "~/components/forms";
-import { Pager, TicketStatusBadge } from "~/components/helpdesk";
-import { EmptyState } from "~/components/staff";
+import { TicketStatusBadge } from "~/components/helpdesk";
+import { EmptyState, ListPagination } from "~/components/staff";
 import {
+  TICKET_PAGE_SIZE,
   CATEGORY_KEYS,
   categoryLabel,
   STATUS_LABEL,
@@ -198,12 +199,14 @@ export function CandidateTicketTable({
               </li>
             ))}
           </ul>
-          <div className="flex flex-wrap items-center justify-between gap-3 border-t border-line p-4 text-sm text-muted sm:px-5">
-            <span>
-              {total} ticket{total === 1 ? "" : "s"}
-            </span>
-            <Pager page={page} pages={pages} href={href} />
-          </div>
+          <ListPagination
+            page={page}
+            pages={pages}
+            total={total}
+            pageSize={TICKET_PAGE_SIZE}
+            href={href}
+            label="tickets"
+          />
         </>
       )}
     </section>

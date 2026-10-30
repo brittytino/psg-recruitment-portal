@@ -22,3 +22,7 @@ export async function action({ request, params, context }: Route.ActionArgs) {
     throw e;
   }
 }
+export const meta: Route.MetaFunction = () => [
+  { title: "Start an application — PSG Tech Recruitment" },
+  { name: "robots", content: "noindex, nofollow" },
+];

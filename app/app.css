@@ -398,20 +398,43 @@ html[data-contrast="high"] {
 html[data-contrast="high"] a { text-decoration-thickness: 2px; }
 
 /* ---------------------------------------------------------------- Collapsible staff sidebar */
+/*
+ * Fixed icon rail: every row is laid out the same way in both states (0.75rem outer padding +
+ * 0.75rem row padding, 18px icon), so icons never move sideways. Collapsing only narrows the column
+ * to the rail (--rail = 2 x 1.5rem + 18px) and fades the text out.
+ */
 .staff-grid {
+  --rail: calc(3rem + 18px);
   grid-template-columns: var(--sidebar-w, 16.5rem) minmax(0, 1fr);
-  transition: grid-template-columns 280ms cubic-bezier(0.16, 1, 0.3, 1);
+  transition: grid-template-columns 300ms cubic-bezier(0.22, 1, 0.36, 1);
 }
-.staff-grid[data-collapsed="true"] { --sidebar-w: 4.75rem; }
+.staff-grid[data-collapsed="true"] { --sidebar-w: var(--rail); }
 .sidebar-label {
-  transition: opacity 180ms ease, max-width 280ms cubic-bezier(0.16, 1, 0.3, 1);
-  max-width: 14rem;
   white-space: nowrap;
   overflow: hidden;
+  text-overflow: clip;
+  transition: opacity 160ms ease 120ms;
 }
-[data-collapsed="true"] .sidebar-label { opacity: 0; max-width: 0; }
-[data-collapsed="true"] .sidebar-hide { display: none; }
-
+[data-collapsed="true"] .sidebar-label {
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 90ms ease;
+}
+/* Group headings become a short divider in the rail (same height, so rows do not shift). */
+.sidebar-heading { position: relative; height: 1.75rem; }
+.sidebar-heading::after {
+  content: "";
+  position: absolute;
+  left: 0.75rem;
+  top: 50%;
+  width: 18px;
+  height: 1px;
+  background: rgb(255 255 255 / 0.18);
+  opacity: 0;
+  transition: opacity 160ms ease;
+}
+[data-collapsed="true"] .sidebar-heading::after { opacity: 1; transition-delay: 120ms; }
+[data-collapsed="true"] .sidebar-hide { opacity: 0; }
 @media (prefers-reduced-motion: reduce) {
   .ui-pop, .ui-fade { animation: none !important; }
   .staff-grid, .sidebar-label { transition: none; }

@@ -1,4 +1,5 @@
 import { consoleHello } from "~/lib/console-hello";
+import { seo } from "~/lib/seo";
 import { useEffect, useState } from "react";
 import { newNonce } from "./lib/nonce.server";
 import {
@@ -20,13 +21,13 @@ import {
   Building2,
   ClipboardCheck,
   ExternalLink,
+  Eye,
   FileSpreadsheet,
   FileText,
   LayoutDashboard,
   LogOut,
   Menu,
   PanelLeftClose,
-  PanelLeftOpen,
   UserRound,
   Settings,
   LifeBuoy,
@@ -45,6 +46,7 @@ import {
   isHodReviewer,
   isHrOfficer,
   isStaff,
+  isViewer,
   primaryRoleLabel,
   type RoleGrant,
 } from "./modules/auth/permissions";
@@ -63,19 +65,24 @@ type NavItem = { to: string; label: string; icon: LucideIcon; end?: boolean };
 function staffNav(grants: RoleGrant[]): { title: string; items: NavItem[] }[] {
   const office = isAdmin(grants) || isHrOfficer(grants);
   const work: NavItem[] = [];
-  if (office) work.push({ to: "/staff", label: "Applications", icon: LayoutDashboard, end: true });
+  if (office || isViewer(grants))
+    work.push({ to: "/staff", label: "Applications", icon: LayoutDashboard, end: true });
   if (isHodReviewer(grants)) work.push({ to: "/staff/review", label: "My reviews", icon: ClipboardCheck });
-  work.push({
-    to: "/staff/summary",
-    label: office ? "Summary & export" : "Summary sheet",
-    icon: FileSpreadsheet,
-  });
+  // Viewers only read applications: no summary sheets or exports.
+  if (office || isHodReviewer(grants))
+    work.push({
+      to: "/staff/summary",
+      label: office ? "Summary & export" : "Summary sheet",
+      icon: FileSpreadsheet,
+    });
 
   const setup: NavItem[] = [];
   if (hasPermission(grants, "recruitment:manage"))
     setup.push({ to: "/admin", label: "Job profiles", icon: Briefcase, end: true });
   if (hasPermission(grants, "department:manage"))
     setup.push({ to: "/admin/departments", label: "Departments & HODs", icon: Building2 });
+  if (hasPermission(grants, "viewer:manage"))
+    setup.push({ to: "/admin/viewers", label: "Viewers (read only)", icon: Eye });
   if (hasPermission(grants, "notice:manage"))
     setup.push({ to: "/admin/notices", label: "Open positions PDFs", icon: FileText });
 
@@ -130,6 +137,8 @@ export const middleware: Route.MiddlewareFunction[] = [
 export async function loader({ context }: Route.LoaderArgs) {
   const user = context.get(userContext);
   return {
+    // Public site address for canonical links and sharing cards (see app/lib/seo.ts).
+    origin: (process.env.APP_ORIGIN ?? "").replace(/\/$/, ""),
     unread: user ? await unreadCount(user).catch(() => 0) : 0,
     nonce: context.get(nonceContext),
     csrf: csrfToken(user?.sessionId ?? null),
@@ -144,26 +153,12 @@ export async function loader({ context }: Route.LoaderArgs) {
   };
 }
 
-export const meta: Route.MetaFunction = () => [
-  { title: "PSG College of Technology — Faculty & Research Recruitment" },
-  {
-    name: "description",
-    content:
-      "Official faculty and research recruitment portal of PSG College of Technology, Coimbatore. Explore teaching vacancies, eligibility, and apply online.",
-  },
-  {
-    name: "keywords",
-    content:
-      "PSG College of Technology, PSG Tech recruitment, faculty positions Coimbatore, engineering faculty vacancies, assistant professor jobs, Anna University autonomous colleges, research fellow recruitment",
-  },
-  { name: "author", content: "PSG College of Technology" },
-  { property: "og:site_name", content: "PSG College of Technology Recruitment" },
-  { property: "og:type", content: "website" },
-  { property: "og:image", content: "/images/psg_logo.png" },
-  { property: "og:locale", content: "en_IN" },
-  { name: "twitter:card", content: "summary" },
-  { name: "twitter:image", content: "/images/psg_logo.png" },
-];
+export const meta: Route.MetaFunction = ({ data }) =>
+  seo({
+    title: "Faculty & Research Recruitment — PSG College of Technology",
+    path: "/",
+    origin: data?.origin ?? "",
+  });
 
 export const links: Route.LinksFunction = () => [
   { rel: "icon", href: "/favicon.ico", sizes: "any" },
@@ -437,28 +432,34 @@ function StaffSidebarContent({
   const { grants, name, initials, roleLabel } = useUser();
   const [signOut, setSignOut] = useState(false);
   const groups = staffNav(grants);
+  // One row style for every item: identical padding in both states keeps icons on the rail.
+  const row =
+    "flex h-10 min-w-0 items-center gap-3 overflow-hidden rounded-lg px-3 text-sm no-underline transition-colors";
   return (
-    <div className="flex h-full flex-col" data-collapsed={collapsed}>
-      <div className={`flex items-center py-5 ${collapsed ? "justify-center px-3" : "px-5"}`}>
-        {collapsed ? (
-          <Link
-            to="/staff"
-            aria-label="PSG College of Technology, staff home"
-            className="rounded-lg bg-white p-1"
-          >
-            <img src="/images/psg_logo.png" alt="" className="h-8 w-auto" />
-          </Link>
-        ) : (
-          <Brand to="/staff" subtitle="Staff workspace" inverted />
-        )}
+    <div className="flex h-full min-w-0 flex-col overflow-x-clip" data-collapsed={collapsed}>
+      <div className="flex h-[4.5rem] shrink-0 items-center px-3">
+        <Link
+          to="/staff"
+          aria-label="PSG College of Technology, staff home"
+          className="flex min-w-0 items-center gap-3 rounded-lg no-underline"
+        >
+          <span className="grid h-[42px] w-[42px] shrink-0 place-items-center rounded-lg bg-white shadow-sm">
+            <img src="/images/psg_logo.png" alt="" className="h-[34px] w-auto" />
+          </span>
+          <span className="sidebar-label min-w-0 leading-tight">
+            <span className="block truncate font-display text-[15px] font-semibold text-white">
+              PSG College of Technology
+            </span>
+            <span className="block truncate text-xs text-white/60">Staff workspace</span>
+          </span>
+        </Link>
       </div>
-      <nav aria-label="Staff" className="flex-1 space-y-6 overflow-x-hidden overflow-y-auto px-3 pb-6">
+
+      <nav aria-label="Staff" className="flex-1 space-y-4 overflow-x-clip overflow-y-auto px-3 pt-2 pb-6">
         {groups.map((g) => (
           <div key={g.title}>
-            <p
-              className={`pb-2 text-[11px] font-semibold tracking-[0.12em] text-white/45 uppercase ${collapsed ? "sr-only" : "px-3"}`}
-            >
-              {g.title}
+            <p className="sidebar-heading flex items-center px-3 text-[11px] font-semibold tracking-[0.12em] text-white/45 uppercase">
+              <span className="sidebar-label">{g.title}</span>
             </p>
             <ul className="space-y-0.5">
               {g.items.map((n) => (
@@ -470,9 +471,7 @@ function StaffSidebarContent({
                       onClick={onNavigate}
                       aria-label={collapsed ? n.label : undefined}
                       className={({ isActive }) =>
-                        `flex items-center gap-3 rounded-lg py-2 text-sm no-underline transition-colors ${
-                          collapsed ? "justify-center px-0" : "px-3"
-                        } ${
+                        `${row} ${
                           isActive
                             ? "bg-brand-600 font-semibold text-white shadow-sm"
                             : "text-white/80 hover:bg-white/8 hover:text-white"
@@ -494,7 +493,7 @@ function StaffSidebarContent({
             target="_blank"
             rel="noreferrer"
             aria-label={collapsed ? "Public website" : undefined}
-            className={`flex items-center gap-3 rounded-lg py-2 text-sm text-white/60 no-underline hover:bg-white/6 hover:text-white ${collapsed ? "justify-center" : "px-3"}`}
+            className={`${row} text-white/60 hover:bg-white/6 hover:text-white`}
           >
             <ExternalLink className="h-[18px] w-[18px] shrink-0" aria-hidden="true" />
             <span className="sidebar-label">Public website</span>
@@ -502,13 +501,13 @@ function StaffSidebarContent({
         </Tooltip>
       </nav>
 
-      <div className="space-y-2 border-t border-white/10 p-3">
-        <Tooltip label="Sign out" disabled={!collapsed}>
+      <div className="shrink-0 space-y-1 border-t border-white/10 px-3 py-3">
+        <Tooltip label={`Sign out (${name})`} disabled={!collapsed}>
           <button
             type="button"
             onClick={() => setSignOut(true)}
             aria-label={collapsed ? `Sign out ${name}` : undefined}
-            className={`group flex w-full items-center gap-3 rounded-xl p-2 text-left transition-colors hover:bg-white/8 ${collapsed ? "justify-center" : ""}`}
+            className="group flex h-12 w-full min-w-0 items-center gap-3 overflow-hidden rounded-xl px-[3px] text-left transition-colors hover:bg-white/8"
           >
             <span
               aria-hidden="true"
@@ -521,26 +520,27 @@ function StaffSidebarContent({
               <span className="block truncate text-xs text-white/60">{roleLabel}</span>
             </span>
             <LogOut
-              className="sidebar-hide h-4 w-4 shrink-0 text-white/50 transition-colors group-hover:text-white"
+              className="sidebar-hide mr-2 h-4 w-4 shrink-0 text-white/50 transition-opacity group-hover:text-white"
               aria-hidden="true"
             />
           </button>
         </Tooltip>
         {onToggle && (
-          <button
-            type="button"
-            onClick={onToggle}
-            aria-label={collapsed ? "Expand sidebar" : "Collapse sidebar"}
-            aria-expanded={!collapsed}
-            className={`flex w-full items-center gap-3 rounded-lg py-2 text-xs font-medium text-white/55 transition-colors hover:bg-white/6 hover:text-white ${collapsed ? "justify-center" : "px-3"}`}
-          >
-            {collapsed ? (
-              <PanelLeftOpen className="h-[18px] w-[18px]" aria-hidden="true" />
-            ) : (
-              <PanelLeftClose className="h-[18px] w-[18px]" aria-hidden="true" />
-            )}
-            <span className="sidebar-label">Collapse sidebar</span>
-          </button>
+          <Tooltip label="Expand sidebar" disabled={!collapsed}>
+            <button
+              type="button"
+              onClick={onToggle}
+              aria-label={collapsed ? "Expand sidebar" : "Collapse sidebar"}
+              aria-expanded={!collapsed}
+              className={`${row} w-full text-xs font-medium text-white/55 hover:bg-white/6 hover:text-white`}
+            >
+              <PanelLeftClose
+                className={`h-[18px] w-[18px] shrink-0 transition-transform duration-300 ${collapsed ? "rotate-180" : ""}`}
+                aria-hidden="true"
+              />
+              <span className="sidebar-label">Collapse sidebar</span>
+            </button>
+          </Tooltip>
         )}
       </div>
       <SignOutDialog intent={signOut ? "signout" : null} onClose={() => setSignOut(false)} />
@@ -551,7 +551,7 @@ function StaffSidebarContent({
 /** Desktop header: institution name, application search, reading comfort and the account menu. */
 function StaffTopBar() {
   const { grants, name, initials, roleLabel, user } = useUser();
-  const fullList = isAdmin(grants) || isHrOfficer(grants);
+  const fullList = isAdmin(grants) || isHrOfficer(grants) || isViewer(grants);
   return (
     <header className="sticky top-0 z-30 hidden h-16 items-center gap-6 border-b border-line bg-paper/95 px-8 backdrop-blur lg:flex">
       <div className="flex shrink-0 items-center gap-3">
@@ -613,7 +613,10 @@ function StaffLayout({ children }: { children: React.ReactNode }) {
       <a href="#main" className="skip-link">
         Skip to main content
       </a>
-      <aside className="hero-gradient sticky top-0 hidden h-dvh overflow-hidden lg:block">
+      <aside
+        className="hero-gradient sticky top-0 hidden h-dvh overflow-hidden lg:block"
+        aria-label="Staff navigation"
+      >
         <StaffSidebarContent collapsed={collapsed} onToggle={toggle} />
       </aside>
 

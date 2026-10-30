@@ -18,7 +18,13 @@ export function Tooltip({
   if (disabled) return <>{children}</>;
   return (
     <Primitive.Root delayDuration={150}>
-      <Primitive.Trigger asChild>{children}</Primitive.Trigger>
+      {/*
+        The trigger is a wrapper, not the child itself: merging props into a NavLink would turn its
+        className function into text and drop its styles.
+      */}
+      <Primitive.Trigger asChild>
+        <span className="block">{children}</span>
+      </Primitive.Trigger>
       <Primitive.Portal>
         <Primitive.Content
           side={side}

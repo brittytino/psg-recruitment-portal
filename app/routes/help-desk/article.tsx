@@ -1,3 +1,4 @@
+import { originFrom, seo } from "~/lib/seo";
 import { Link } from "react-router";
 import type { Route } from "./+types/article";
 import { formatDateTime } from "~/components/forms";
@@ -6,10 +7,16 @@ import { PageHeader } from "~/components/staff";
 import { userContext } from "~/context";
 import { publishedArticle } from "~/modules/helpdesk/articles.server";
 
-export const meta: Route.MetaFunction = ({ data }) => [
-  { title: `${data?.article.title ?? "Article"} — Help desk` },
-  { name: "description", content: data?.article.summary ?? "" },
-];
+export const meta: Route.MetaFunction = ({ data, matches }) =>
+  data
+    ? seo({
+        title: `${data.article.title} — help for applicants`,
+        description: data.article.summary,
+        path: `/help-desk/articles/${data.article.slug}`,
+        origin: originFrom(matches),
+        type: "article",
+      })
+    : seo({ title: "Article not found", path: "/help-desk/articles", noindex: true });
 
 export async function loader({ params, context }: Route.LoaderArgs) {
   const a = await publishedArticle(params.slug);

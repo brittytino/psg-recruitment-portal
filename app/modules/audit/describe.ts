@@ -79,6 +79,8 @@ const LABELS: Record<string, string> = {
   "user.status_changed": "Account enabled / disabled",
   "user.sessions_revoked": "User signed out everywhere",
   "user.invite_resent": "Invitation re-sent",
+  "user.viewer_added": "Read-only viewer added",
+  "user.viewer_removed": "Read-only viewer removed",
   "settings.changed": "Setting changed",
   "helpdesk.ticket_created": "Support ticket created",
   "helpdesk.candidate_replied": "Candidate replied on a ticket",

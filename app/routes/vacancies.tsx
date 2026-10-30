@@ -1,3 +1,4 @@
+import { originFrom, seo } from "~/lib/seo";
 import { jsonLd } from "~/lib/json-ld";
 import { Form, Link } from "react-router";
 import { Search, X } from "lucide-react";
@@ -7,30 +8,14 @@ import { EmptyState } from "~/components/staff";
 import { POSITION_LABELS } from "~/lib/labels";
 import { listDepartments, listPublishedVacancies } from "~/modules/recruitment/service.server";
 
-export const meta: Route.MetaFunction = () => [
-  { title: "Current Vacancies & Faculty Openings — PSG Tech Recruitment" },
-  {
-    name: "description",
-    content:
-      "Browse current open teaching and research vacancies at PSG College of Technology across engineering, sciences, and management departments. Apply online.",
-  },
-  { name: "robots", content: "index, follow, max-snippet:-1, max-image-preview:large" },
-  { property: "og:title", content: "Open Faculty Vacancies — PSG College of Technology" },
-  {
-    property: "og:description",
-    content:
-      "Explore open positions and eligibility requirements for teaching faculty and research positions at PSG Tech.",
-  },
-  { property: "og:type", content: "website" },
-  { property: "og:image", content: "/images/psg_logo.png" },
-  { name: "twitter:card", content: "summary" },
-  { name: "twitter:title", content: "Open Faculty Vacancies — PSG College of Technology" },
-  {
-    name: "twitter:description",
-    content: "Current faculty and research vacancies at PSG College of Technology, Coimbatore.",
-  },
-  { name: "twitter:image", content: "/images/psg_logo.png" },
-];
+export const meta: Route.MetaFunction = ({ matches }) =>
+  seo({
+    title: "Open vacancies — faculty and research positions",
+    description:
+      "Current faculty and research openings at PSG College of Technology, Coimbatore, with departments, eligibility and closing dates. Apply online.",
+    path: "/vacancies",
+    origin: originFrom(matches),
+  });
 
 const FACULTY_POSITIONS = ["ASSISTANT_PROFESSOR", "ASSOCIATE_PROFESSOR", "PROFESSOR"] as const;
 

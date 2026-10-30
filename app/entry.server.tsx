@@ -6,6 +6,7 @@ import { renderToPipeableStream } from "react-dom/server";
 import { ServerRouter, type EntryContext, type RouterContextProvider } from "react-router";
 import { nonceContext } from "./context";
 import { logger } from "./modules/core/logger.server";
+import { PRIVATE_PATHS } from "./lib/seo";
 
 export const streamTimeout = 5_000;
 
@@ -44,6 +45,10 @@ export default function handleRequest(
 ) {
   const nonce = loadContext.get(nonceContext);
   securityHeaders(responseHeaders, nonce);
+  // Private pages (sign-in, accounts, staff, admin, ticket pages) never appear in search results.
+  // Error pages are not indexed either.
+  if (PRIVATE_PATHS.test(new URL(request.url).pathname) || responseStatusCode >= 400)
+    responseHeaders.set("X-Robots-Tag", "noindex, nofollow");
   if (request.method.toUpperCase() === "HEAD")
     return new Response(null, { status: responseStatusCode, headers: responseHeaders });
 

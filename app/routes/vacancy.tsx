@@ -1,3 +1,4 @@
+import { originFrom, seo } from "~/lib/seo";
 import { jsonLd } from "~/lib/json-ld";
 import { Form, Link } from "react-router";
 import { ArrowLeft, CalendarClock, Check, Clock, Users } from "lucide-react";
@@ -9,30 +10,28 @@ import { userContext } from "~/context";
 import { getPublishedVacancy } from "~/modules/recruitment/service.server";
 import { prisma } from "~/modules/core/db.server";
 
-export const meta: Route.MetaFunction = ({ data }) => {
-  if (!data) return [{ title: "Vacancy — PSG Tech Recruitment" }, { name: "robots", content: "noindex" }];
+export const meta: Route.MetaFunction = ({ data, matches }) => {
+  if (!data) return seo({ title: "Vacancy not found", path: "/vacancies", noindex: true });
   const v = data.vacancy;
   const where = v.department?.name ?? v.researchSpecialisation?.name ?? "PSG College of Technology";
   const pos =
     v.researchPositionTitle ??
     (v.position ? (POSITION_LABELS[v.position] ?? v.position) : "Faculty position");
-  const desc = v.description
-    ? v.description.slice(0, 155).replace(/\s+/g, " ").trim()
-    : `Apply for ${pos} in ${where} at PSG College of Technology, Coimbatore. Online applications close on ${new Date(v.closesAt).toLocaleDateString("en-IN")}.`;
-
-  return [
-    { title: `${pos} — ${where} | PSG Tech Recruitment` },
-    { name: "description", content: desc },
-    { name: "robots", content: "index, follow, max-snippet:-1, max-image-preview:large" },
-    { property: "og:title", content: `${pos} — ${where} | PSG College of Technology` },
-    { property: "og:description", content: desc },
-    { property: "og:type", content: "article" },
-    { property: "og:image", content: "/images/psg_logo.png" },
-    { name: "twitter:card", content: "summary" },
-    { name: "twitter:title", content: `${pos} — ${where}` },
-    { name: "twitter:description", content: desc },
-    { name: "twitter:image", content: "/images/psg_logo.png" },
-  ];
+  const closes = new Date(v.closesAt).toLocaleDateString("en-IN", {
+    day: "numeric",
+    month: "long",
+    year: "numeric",
+    timeZone: "Asia/Kolkata",
+  });
+  return seo({
+    title: `${pos} — ${where}`,
+    description: v.description
+      ? v.description
+      : `Apply for ${pos} in ${where} at PSG College of Technology, Coimbatore. Online applications close on ${closes}.`,
+    path: `/vacancies/${encodeURIComponent(v.code)}`,
+    origin: originFrom(matches),
+    type: "article",
+  });
 };
 
 export async function loader({ params, context }: Route.LoaderArgs) {

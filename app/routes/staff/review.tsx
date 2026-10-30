@@ -7,7 +7,7 @@ import { EmptyState, FilterSelect, PageHeader, StatTile, Tabs } from "~/componen
 import { requireStaff } from "~/lib/http.server";
 import { POSITION_LABELS } from "~/lib/labels";
 import { STATUS_LABELS, type AppStatus } from "~/modules/applications/workflow";
-import { isHodReviewer } from "~/modules/auth/permissions";
+import { isHodReviewer, hasPermission } from "~/modules/auth/permissions";
 import { prisma } from "~/modules/core/db.server";
 import { formatYearsMonths, splitMonths } from "~/modules/forms/experience";
 import { hodScope } from "~/modules/reviews/service.server";
@@ -38,6 +38,9 @@ const PHD_FILTER_OPTIONS = [
 
 export async function loader({ request, context }: Route.LoaderArgs) {
   const user = requireStaff(context, request, "application:list");
+  // Read-only viewers work from the applications list only.
+  if (!hasPermission(user.grants, "summary:read") && !hasPermission(user.grants, "review:record"))
+    throw redirect("/staff");
   if (!isHodReviewer(user.grants)) throw redirect("/staff");
 
   const url = new URL(request.url);

@@ -21,7 +21,7 @@ import {
   staffListSchema,
   ticketListSchema,
 } from "~/modules/helpdesk/service.server";
-import { mayEmail } from "~/modules/notifications/budget.server";
+import { routeHasRoom } from "~/modules/notifications/budget.server";
 import { notify } from "~/modules/notifications/outbox.server";
 import { testPhotoPng } from "../fixtures/applications";
 
@@ -246,20 +246,29 @@ describe("e-mail controls", () => {
     ).toBeGreaterThan(0);
   });
 
-  it("routine e-mail stops at 80% of the budget; codes always go out", async () => {
+  it("per-route budgets: routine stops at 80% on the Gmail route, codes always go out, relay has its own budget", async () => {
     const day = new Date(Date.now() + 330 * 60_000).toISOString().slice(0, 10);
-    const key = `mail:sent:${day}`;
-    const before = await redis().get(key);
+    const keys = { gmail: `mail:sent:gmail:${day}`, relay: `mail:sent:relay:${day}` };
+    const before = { gmail: await redis().get(keys.gmail), relay: await redis().get(keys.relay) };
     try {
-      await redis().set(key, "100000");
-      expect(await mayEmail("routine")).toBe(false);
-      expect(await mayEmail("critical")).toBe(false);
-      expect(await mayEmail("otp")).toBe(true);
-      await redis().set(key, "0");
-      expect(await mayEmail("routine")).toBe(true);
+      await redis().set(keys.gmail, "100000");
+      expect(await routeHasRoom("gmail", "routine")).toBe(false);
+      expect(await routeHasRoom("gmail", "critical")).toBe(false);
+      expect(await routeHasRoom("gmail", "otp")).toBe(true);
+      // 400 of 450: routine (limit 360) stops, critical continues.
+      await redis().set(keys.gmail, "400");
+      expect(await routeHasRoom("gmail", "routine")).toBe(false);
+      expect(await routeHasRoom("gmail", "critical")).toBe(true);
+      // The relay route is counted separately.
+      await redis().set(keys.relay, "0");
+      expect(await routeHasRoom("relay", "routine")).toBe(true);
+      await redis().set(keys.relay, "100000");
+      expect(await routeHasRoom("relay", "otp")).toBe(false);
     } finally {
-      if (before === null) await redis().del(key);
-      else await redis().set(key, before);
+      for (const r of ["gmail", "relay"] as const) {
+        if (before[r] === null) await redis().del(keys[r]);
+        else await redis().set(keys[r], before[r]!);
+      }
     }
   });
 });

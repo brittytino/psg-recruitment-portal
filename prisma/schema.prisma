@@ -25,6 +25,8 @@ enum Role {
   HOD
   ADMIN
   SUPER_ADMIN
+  /// Read-only: can list and open applications and their documents; nothing else.
+  VIEWER
 }
 
 enum UserStatus {

@@ -27,6 +27,7 @@ import {
   TICKET_LIMITS,
   TICKET_STATUSES,
   STAFF_VIEWS,
+  TICKET_PAGE_SIZE,
   type StaffView,
   type TicketCategory,
   type TicketStatus,
@@ -34,7 +35,7 @@ import {
 export { STAFF_VIEWS, type StaffView };
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
-const PAGE = 15;
+const PAGE = TICKET_PAGE_SIZE;
 
 const fieldErrors = (e: z.ZodError) => z.flattenError(e).fieldErrors as Record<string, string[]>;
 

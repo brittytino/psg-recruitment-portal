@@ -14,7 +14,7 @@ import { totalDuration } from "~/modules/forms/experience";
 import type { Answers, TableRow } from "~/modules/forms/types";
 import { DEFAULT_EXPORT_COLUMNS, EXPORT_COLUMNS, type ExportColumnKey } from "./columns";
 
-import { PAGE_SIZES } from "./constants";
+import { DEFAULT_PAGE_SIZE, PAGE_SIZES } from "./constants";
 export { PAGE_SIZES };
 const SORTS = [
   "submittedAt",
@@ -69,8 +69,8 @@ export const listQuerySchema = z.object({
     .number()
     .int()
     .refine((n) => (PAGE_SIZES as readonly number[]).includes(n))
-    .default(25)
-    .catch(25),
+    .default(DEFAULT_PAGE_SIZE)
+    .catch(DEFAULT_PAGE_SIZE),
 });
 export type ListQuery = z.infer<typeof listQuerySchema>;
 

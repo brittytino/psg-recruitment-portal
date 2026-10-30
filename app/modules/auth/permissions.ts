@@ -8,13 +8,21 @@
  *  - HR: HR – N4 Section. Job profiles, screening, departments + HOD invitations, research
  *    specialisations, the public "open positions" notice, summaries and exports.
  *  - HOD: reviews the applications of their own department that were assigned to them.
+ *  - VIEWER: read-only access to applications (list, open, view documents). Granted by the
+ *    Super Admin or HR – N4 Section.
  *  - CANDIDATE: their own applications only.
  */
-export const ROLES = ["CANDIDATE", "HR", "HOD", "ADMIN", "SUPER_ADMIN"] as const;
+export const ROLES = ["CANDIDATE", "HR", "HOD", "ADMIN", "SUPER_ADMIN", "VIEWER"] as const;
 export type RoleName = (typeof ROLES)[number];
 
 /** Staff roles that Super Admin can grant (candidates register themselves). */
-export const STAFF_ROLES = ["SUPER_ADMIN", "ADMIN", "HR", "HOD"] as const satisfies readonly RoleName[];
+export const STAFF_ROLES = [
+  "SUPER_ADMIN",
+  "ADMIN",
+  "HR",
+  "HOD",
+  "VIEWER",
+] as const satisfies readonly RoleName[];
 export type StaffRole = (typeof STAFF_ROLES)[number];
 
 export type Permission =
@@ -41,7 +49,9 @@ export type Permission =
   /** Help desk: read and work on candidate support tickets. */
   | "helpdesk:handle"
   /** Help desk configuration: assignment rules, help articles, escalations. */
-  | "helpdesk:admin";
+  | "helpdesk:admin"
+  /** Add and remove read-only Viewer accounts (Super Admin, HR – N4 Section). */
+  | "viewer:manage";
 
 /** Every permission except the candidate-only one. */
 export const ALL_STAFF_PERMISSIONS: readonly Permission[] = [
@@ -66,6 +76,7 @@ export const ALL_STAFF_PERMISSIONS: readonly Permission[] = [
   "system:manage",
   "helpdesk:handle",
   "helpdesk:admin",
+  "viewer:manage",
 ];
 export const ROLE_PERMISSIONS: Record<RoleName, readonly Permission[]> = {
   CANDIDATE: ["application:own"],
@@ -82,6 +93,7 @@ export const ROLE_PERMISSIONS: Record<RoleName, readonly Permission[]> = {
     "department:manage",
     "notice:manage",
     "helpdesk:handle",
+    "viewer:manage",
   ],
   HOD: [
     "application:list",
@@ -106,6 +118,8 @@ export const ROLE_PERMISSIONS: Record<RoleName, readonly Permission[]> = {
   ],
   // Super Admin holds every staff permission, including ones added later (see ALL_STAFF_PERMISSIONS).
   SUPER_ADMIN: ALL_STAFF_PERMISSIONS,
+  // Read only: no transition, assignment, export, decisions, help desk or configuration.
+  VIEWER: ["application:list", "application:read", "document:download"],
 };
 
 export const ROLE_LABELS: Record<RoleName, string> = {
@@ -114,6 +128,7 @@ export const ROLE_LABELS: Record<RoleName, string> = {
   HOD: "Head of Department (HOD)",
   ADMIN: "Admin (Dean / Principal)",
   SUPER_ADMIN: "Super Admin",
+  VIEWER: "Viewer (read only)",
 };
 
 export const ROLE_DESCRIPTIONS: Record<RoleName, string> = {
@@ -123,6 +138,7 @@ export const ROLE_DESCRIPTIONS: Record<RoleName, string> = {
   ADMIN:
     "Recruitment oversight: assigns applications to HODs, tracks progress, approves position changes and views summaries.",
   SUPER_ADMIN: "Full system access: users, roles, settings, audit logs and every recruitment operation.",
+  VIEWER: "Can open and read submitted applications and their documents. Cannot change anything.",
 };
 
 export interface RoleGrant {
@@ -160,6 +176,11 @@ export function isHodReviewer(grants: readonly RoleGrant[]): boolean {
 }
 
 /** Department ids a HOD is responsible for. */
+/** Read-only viewer (and nothing more powerful). */
+export function isViewer(grants: readonly RoleGrant[]): boolean {
+  return hasRole(grants, "VIEWER");
+}
+
 export function hodDepartments(grants: readonly RoleGrant[]): string[] {
   return grants.filter((g) => g.role === "HOD" && g.departmentId).map((g) => g.departmentId!);
 }
@@ -170,6 +191,7 @@ export function primaryRoleLabel(grants: readonly RoleGrant[]): string {
   if (isAdmin(grants)) return "Admin";
   if (isHrOfficer(grants)) return "HR – N4 Section";
   if (isHodReviewer(grants)) return "HOD";
+  if (isViewer(grants)) return "Viewer (read only)";
   return "Applicant";
 }
 
@@ -177,5 +199,6 @@ export function primaryRoleLabel(grants: readonly RoleGrant[]): string {
 export function homePath(grants: readonly RoleGrant[]): string {
   if (isSuperAdmin(grants) || isAdmin(grants) || isHrOfficer(grants)) return "/staff";
   if (isHodReviewer(grants)) return "/staff/review";
+  if (isViewer(grants)) return "/staff";
   return "/account";
 }

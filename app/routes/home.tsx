@@ -1,3 +1,4 @@
+import { originFrom, seo } from "~/lib/seo";
 import { jsonLd } from "~/lib/json-ld";
 import { Form, Link } from "react-router";
 import { motion } from "framer-motion";
@@ -19,30 +20,14 @@ import { listPublishedVacancies } from "~/modules/recruitment/service.server";
 import { NOTICE_PATHS } from "~/modules/notices/categories";
 import { currentNotices } from "~/modules/notices/service.server";
 
-export const meta: Route.MetaFunction = () => [
-  { title: "Faculty & Staff Recruitment — PSG College of Technology, Coimbatore" },
-  {
-    name: "description",
-    content:
-      "Official faculty and research recruitment of PSG College of Technology, Coimbatore. Apply online for Assistant Professor, Associate Professor, Professor, and research positions.",
-  },
-  { name: "robots", content: "index, follow, max-snippet:-1, max-image-preview:large, max-video-preview:-1" },
-  { property: "og:title", content: "Faculty & Staff Recruitment — PSG College of Technology" },
-  {
-    property: "og:description",
-    content:
-      "Official faculty and research recruitment of PSG College of Technology, Coimbatore. Explore faculty vacancies and apply online.",
-  },
-  { property: "og:type", content: "website" },
-  { property: "og:image", content: "/images/psg_logo.png" },
-  { name: "twitter:card", content: "summary" },
-  { name: "twitter:title", content: "Faculty & Staff Recruitment — PSG College of Technology" },
-  {
-    name: "twitter:description",
-    content: "Faculty and research recruitment at PSG College of Technology, Coimbatore.",
-  },
-  { name: "twitter:image", content: "/images/psg_logo.png" },
-];
+export const meta: Route.MetaFunction = ({ matches }) =>
+  seo({
+    title: "Faculty & Research Recruitment — PSG College of Technology, Coimbatore",
+    description:
+      "Apply online for Assistant Professor, Associate Professor, Professor and research positions at PSG College of Technology, Coimbatore. Read the open positions and how to apply.",
+    path: "/",
+    origin: originFrom(matches),
+  });
 
 export async function loader() {
   const [vacancies, notices] = await Promise.all([listPublishedVacancies(), currentNotices()]);

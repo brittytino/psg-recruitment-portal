@@ -19,6 +19,50 @@ console.log(`\nE-mail check: ${host}, account ${user || "(none)"}\n`);
 const devMail = process.env.EMAIL_PROVIDER === "mailpit";
 if (devMail) ok("Development mode: e-mails go to Mailpit, not Gmail.");
 
+// ---- 1. Google Workspace SMTP Relay (main route), if configured --------------------------------
+const relayHost = process.env.SMTP_RELAY_HOST || "";
+if (!devMail && relayHost) {
+  console.log(`Main route: Google Workspace SMTP Relay (${relayHost})`);
+  const relay = nodemailer.createTransport({
+    host: relayHost,
+    port: Number(process.env.SMTP_RELAY_PORT || 587),
+    secure: process.env.SMTP_RELAY_SECURE === "true",
+    ...(process.env.SMTP_RELAY_HELO ? { name: process.env.SMTP_RELAY_HELO } : {}),
+    auth: process.env.SMTP_RELAY_USER
+      ? { user: process.env.SMTP_RELAY_USER, pass: process.env.SMTP_RELAY_PASSWORD || "" }
+      : undefined,
+    connectionTimeout: 10000,
+    greetingTimeout: 10000,
+    socketTimeout: 20000,
+  });
+  try {
+    await relay.verify();
+    ok(`Connected to ${relayHost}`);
+    if (to) {
+      await relay.sendMail({
+        from: process.env.MAIL_FROM || process.env.SMTP_FROM_EMAIL,
+        to,
+        subject: "PSG Tech recruitment: test e-mail (SMTP relay)",
+        text: "This test e-mail was sent through the Google Workspace SMTP relay. The main e-mail route works.",
+      });
+      ok(`Test e-mail sent to ${to} through the relay.`);
+    }
+    console.log("  The relay works: e-mails use it first (about 10 000 a day).\n");
+  } catch (e) {
+    bad(`Relay: ${e.responseCode ?? e.code ?? ""} ${e.message}`);
+    const m = String(e.message || "");
+    if (/relay denied|not authorized|5\.7\.1|5\.7\.0/i.test(m))
+      console.log(`  CAUSE: Google refused the relay for this server.
+  FIX:   In the Google Admin console (Apps > Google Workspace > Gmail > Routing > SMTP relay service)
+         allow this server's public IP, "Only addresses in my domains", and require TLS.
+         Check that MAIL_FROM uses a psgtech.ac.in address.`);
+    else if (/timed? ?out|ECONNREFUSED|EHOSTUNREACH/i.test(m))
+      console.log(`  CAUSE: this server cannot reach ${relayHost}:587 (firewall).`);
+    console.log("  Meanwhile every e-mail goes through the Gmail account below (fallback).\n");
+  }
+}
+console.log(`Fallback route: Gmail account (${host})`);
+
 try {
   const addrs = await dns.lookup(host, { all: true });
   ok(
@@ -45,8 +89,7 @@ for (const port of devMail ? [Number(process.env.SMTP_PORT || 1025)] : [587, 465
   if (r === "open") {
     ok(`Port ${port} to ${host} is reachable`);
     open.push(port);
-  }
-  else bad(`Port ${port} to ${host} is NOT reachable (${r})`);
+  } else bad(`Port ${port} to ${host} is NOT reachable (${r})`);
 }
 if (!open.length) {
   console.log(`

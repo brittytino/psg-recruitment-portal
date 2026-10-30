@@ -153,23 +153,72 @@ export default function Settings({ loaderData, actionData }: Route.ComponentProp
         </dl>
         <div className="rounded-xl border border-line p-4">
           <div className="flex flex-wrap items-baseline justify-between gap-2">
-            <p className="text-sm font-semibold text-ink">E-mail usage today</p>
+            <p className="text-sm font-semibold text-ink">E-mail today</p>
             <p className="text-sm text-muted">
-              {status.mail.sent} of {status.mail.budget} sent
-              {status.mail.skipped ? ` · ${status.mail.skipped} kept in the app only` : ""}
+              {status.mail.skipped ? `${status.mail.skipped} kept in the app only` : "None held back"}
               {status.mail.failed ? ` · ${status.mail.failed} failed` : ""}
             </p>
           </div>
-          <progress
-            className={`usage-bar mt-2 ${status.mail.sent >= status.mail.budget * 0.95 ? "usage-danger" : status.mail.sent >= status.mail.budget * 0.7 ? "usage-warning" : ""}`}
-            max={status.mail.budget}
-            value={Math.min(status.mail.sent, status.mail.budget)}
-            aria-label="E-mails sent today"
-          />
-          <p className="mt-2 text-xs text-muted">
-            Sign-in codes always go out. Submission receipts, interview calls and invitations are sent up to
-            the budget; routine updates stop at {status.mail.routineLimit} and are then shown in the bell icon
-            only. Change the budget with MAIL_DAILY_BUDGET (keep it below the mail provider’s daily limit).
+          <div className="mt-3 grid gap-4 md:grid-cols-2">
+            {(
+              [
+                status.mail.relay
+                  ? {
+                      name: "Google Workspace SMTP Relay (main)",
+                      detail: status.mail.relay.detail,
+                      ok: status.mail.relay.ok,
+                      sent: status.mail.relay.sent,
+                      budget: status.mail.relay.budget,
+                    }
+                  : {
+                      name: "Google Workspace SMTP Relay (main)",
+                      detail: "Not configured — set SMTP_RELAY_HOST to use it",
+                      ok: false,
+                      sent: 0,
+                      budget: 0,
+                    },
+                {
+                  name: status.mail.relay ? "Gmail account (fallback)" : "Gmail account",
+                  detail: `Routine updates stop at ${status.mail.gmail.routineLimit}; sign-in codes always go out`,
+                  ok: true,
+                  sent: status.mail.gmail.sent,
+                  budget: status.mail.gmail.budget,
+                },
+              ] as const
+            ).map((r) => (
+              <div key={r.name}>
+                <div className="flex items-baseline justify-between gap-2 text-sm">
+                  <span className="flex items-center gap-1.5 font-medium text-ink">
+                    {r.budget ? (
+                      r.ok ? (
+                        <CheckCircle2 className="h-4 w-4 text-success" aria-hidden="true" />
+                      ) : (
+                        <XCircle className="h-4 w-4 text-danger" aria-hidden="true" />
+                      )
+                    ) : null}
+                    {r.name}
+                  </span>
+                  {r.budget > 0 && (
+                    <span className="text-muted tabular-nums">
+                      {r.sent.toLocaleString("en-IN")} / {r.budget.toLocaleString("en-IN")}
+                    </span>
+                  )}
+                </div>
+                {r.budget > 0 && (
+                  <progress
+                    className={`usage-bar mt-2 ${r.sent >= r.budget * 0.95 ? "usage-danger" : r.sent >= r.budget * 0.7 ? "usage-warning" : ""}`}
+                    max={r.budget}
+                    value={Math.min(r.sent, r.budget)}
+                    aria-label={`${r.name}: e-mails sent today`}
+                  />
+                )}
+                <p className="mt-1 text-xs text-muted">{r.detail}</p>
+              </div>
+            ))}
+          </div>
+          <p className="mt-3 text-xs text-muted">
+            Every e-mail tries the relay first. If the relay is not enabled, refuses the message or reaches
+            its budget, the Gmail account sends it instead, so nobody misses an e-mail.
           </p>
         </div>
         <p className="text-xs text-muted">

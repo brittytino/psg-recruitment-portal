@@ -16,8 +16,7 @@ import { newRedisConnection } from "~/modules/core/redis.server";
 import { generateBundle, markBundleFailed, PipelineError } from "~/modules/documents/pipeline.server";
 import { scanBytes } from "~/modules/documents/scan.server";
 import { getVerifiedFile } from "~/modules/documents/storage.server";
-import { countEmail, mayEmail } from "~/modules/notifications/budget.server";
-import { sendNotificationEmail } from "~/modules/notifications/mailer.server";
+import { MailBudgetExceededError, sendNotificationEmail } from "~/modules/notifications/mailer.server";
 
 const JOB_VERSION = 1;
 const DOCUMENTS = "documents";
@@ -172,25 +171,30 @@ async function processEmail(job: Job) {
   });
   // Already sent (a retried job), or in-app only: never e-mail twice.
   if (!n || n.status === "SENT" || n.status === "IN_APP") return;
-  if (!(await mayEmail(n.priority === "critical" ? "critical" : "routine"))) {
-    await prisma.notification.update({
-      where: { id: n.id },
-      data: { status: "IN_APP", error: "Not e-mailed: daily e-mail budget reached. Shown in the app." },
-    });
-    logger.warn(
-      { event: "mail_budget_skipped", notificationId: n.id, type: n.type, priority: n.priority },
-      "routine e-mail kept in the app: daily e-mail budget reached",
-    );
-    return;
-  }
   try {
-    await sendNotificationEmail(n.user.email, n.subject, n.body);
-    await countEmail();
+    await sendNotificationEmail(
+      n.user.email,
+      n.subject,
+      n.body,
+      n.priority === "critical" ? "critical" : "routine",
+    );
     await prisma.notification.update({
       where: { id: n.id },
       data: { status: "SENT", sentAt: new Date(), attempts: { increment: 1 }, error: null },
     });
   } catch (err) {
+    // Every route has used up its budget for the day: keep it in the app (bell icon), no retry.
+    if (err instanceof MailBudgetExceededError) {
+      await prisma.notification.update({
+        where: { id: n.id },
+        data: { status: "IN_APP", error: "Not e-mailed: daily e-mail budget reached. Shown in the app." },
+      });
+      logger.warn(
+        { event: "mail_budget_skipped", notificationId: n.id, type: n.type, priority: n.priority },
+        "e-mail kept in the app: daily e-mail budget reached",
+      );
+      return;
+    }
     await prisma.notification.update({
       where: { id: n.id },
       data: {
@@ -215,7 +219,10 @@ for (const w of workers) {
   w.on("failed", (job, err) =>
     logger.warn(
       {
-        event: w.name.includes("doc") || /generate|bundle|pdf|scan/i.test(job?.name ?? "") ? "pdf_job_failed" : "job_failed",
+        event:
+          w.name.includes("doc") || /generate|bundle|pdf|scan/i.test(job?.name ?? "")
+            ? "pdf_job_failed"
+            : "job_failed",
         queue: w.name,
         job: job?.name,
         jobId: job?.id,

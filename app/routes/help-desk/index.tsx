@@ -1,3 +1,4 @@
+import { originFrom, seo } from "~/lib/seo";
 import { BookOpen, ChevronRight, FileText, Plus } from "lucide-react";
 import { Link, redirect } from "react-router";
 import type { Route } from "./+types/index";
@@ -9,13 +10,14 @@ import { publishedArticles } from "~/modules/helpdesk/articles.server";
 import { STATUS_LABEL, TICKET_STATUSES } from "~/modules/helpdesk/definitions";
 import { myTickets, ticketListSchema } from "~/modules/helpdesk/service.server";
 
-export const meta: Route.MetaFunction = () => [
-  { title: "Help desk — PSG College of Technology Recruitment" },
-  {
-    name: "description",
-    content: "Get help with registration, the application form, uploads and submission.",
-  },
-];
+export const meta: Route.MetaFunction = ({ matches }) =>
+  seo({
+    title: "Help desk for applicants",
+    description:
+      "Get help with registration, sign-in codes, the application form, document uploads, the application PDF and submission. Raise a support ticket or read the help articles.",
+    path: "/help-desk",
+    origin: originFrom(matches),
+  });
 
 export async function loader({ request, context }: Route.LoaderArgs) {
   const user = context.get(userContext);

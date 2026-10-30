@@ -172,3 +172,116 @@ export function Tabs({ items }: { items: { to: string; label: string; active: bo
     </nav>
   );
 }
+
+/** Page numbers to show: first, last, current ±1, with gaps ("…"). */
+function pageWindow(page: number, pages: number): (number | "gap")[] {
+  const keep = new Set([1, pages, page - 1, page, page + 1].filter((p) => p >= 1 && p <= pages));
+  const out: (number | "gap")[] = [];
+  let prev = 0;
+  for (const p of [...keep].sort((a, b) => a - b)) {
+    if (p - prev > 1) out.push("gap");
+    out.push(p);
+    prev = p;
+  }
+  return out;
+}
+
+/**
+ * Pagination used by every list: "Showing 21–40 of 113", numbered pages, previous / next, and an
+ * optional rows-per-page control (rendered by the caller as `sizeControl`).
+ */
+export function ListPagination({
+  page,
+  pages,
+  total,
+  pageSize,
+  href,
+  label = "applications",
+  sizeControl,
+}: {
+  page: number;
+  pages: number;
+  total: number;
+  pageSize: number;
+  href: (page: number) => string;
+  label?: string;
+  sizeControl?: ReactNode;
+}) {
+  const from = total === 0 ? 0 : (page - 1) * pageSize + 1;
+  const to = Math.min(total, page * pageSize);
+  const btn =
+    "inline-grid h-9 min-w-9 place-items-center rounded-lg border px-2.5 text-sm no-underline transition-colors";
+  return (
+    <nav
+      aria-label="Pagination"
+      className="flex flex-col gap-3 border-t border-line p-4 text-sm sm:flex-row sm:items-center sm:justify-between sm:px-5"
+    >
+      <div className="flex flex-wrap items-center gap-3 text-muted">
+        <span aria-live="polite">
+          {total === 0 ? `No ${label}` : `Showing ${from}–${to} of ${total.toLocaleString("en-IN")} ${label}`}
+        </span>
+        {sizeControl}
+      </div>
+      {pages > 1 && (
+        <ul className="flex flex-wrap items-center gap-1">
+          <li>
+            {page > 1 ? (
+              <Link
+                to={href(page - 1)}
+                className={`${btn} border-line bg-paper text-ink hover:bg-soft`}
+                rel="prev"
+              >
+                <span aria-hidden="true">‹</span>
+                <span className="sr-only sm:not-sr-only sm:ml-1">Previous</span>
+              </Link>
+            ) : (
+              <span className={`${btn} cursor-not-allowed border-line text-muted/50`} aria-disabled="true">
+                <span aria-hidden="true">‹</span>
+                <span className="sr-only sm:not-sr-only sm:ml-1">Previous</span>
+              </span>
+            )}
+          </li>
+          {pageWindow(page, pages).map((p, i) =>
+            p === "gap" ? (
+              <li key={`gap-${i}`} aria-hidden="true" className="px-1 text-muted">
+                …
+              </li>
+            ) : (
+              <li key={p}>
+                <Link
+                  to={href(p)}
+                  aria-current={p === page ? "page" : undefined}
+                  aria-label={`Page ${p}`}
+                  className={`${btn} ${
+                    p === page
+                      ? "border-brand-600 bg-brand-600 font-semibold text-white hover:text-white"
+                      : "border-line bg-paper text-ink hover:bg-soft"
+                  }`}
+                >
+                  {p}
+                </Link>
+              </li>
+            ),
+          )}
+          <li>
+            {page < pages ? (
+              <Link
+                to={href(page + 1)}
+                className={`${btn} border-line bg-paper text-ink hover:bg-soft`}
+                rel="next"
+              >
+                <span className="sr-only sm:not-sr-only sm:mr-1">Next</span>
+                <span aria-hidden="true">›</span>
+              </Link>
+            ) : (
+              <span className={`${btn} cursor-not-allowed border-line text-muted/50`} aria-disabled="true">
+                <span className="sr-only sm:not-sr-only sm:mr-1">Next</span>
+                <span aria-hidden="true">›</span>
+              </span>
+            )}
+          </li>
+        </ul>
+      )}
+    </nav>
+  );
+}

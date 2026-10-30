@@ -3,8 +3,8 @@ import { Form, Link, useNavigation, useSearchParams } from "react-router";
 import { AlertTriangle, MessageSquareWarning, Settings2 } from "lucide-react";
 import type { Route } from "./+types/help-desk";
 import { Alert, ConfirmDialog, CsrfInput, formatDateTime } from "~/components/forms";
-import { Pager, PriorityLabel, TicketStatusBadge } from "~/components/helpdesk";
-import { EmptyState, PageHeader } from "~/components/staff";
+import { PriorityLabel, TicketStatusBadge } from "~/components/helpdesk";
+import { EmptyState, ListPagination, PageHeader } from "~/components/staff";
 import { handleAction, readForm, requireStaff } from "~/lib/http.server";
 import { cn } from "~/lib/utils";
 import { hasPermission } from "~/modules/auth/permissions";
@@ -16,6 +16,7 @@ import {
   PRIORITY_LABEL,
   STAFF_STATUS_LABEL,
   STAFF_VIEWS,
+  TICKET_PAGE_SIZE,
   TICKET_STATUSES,
   type StaffView,
   type Priority,
@@ -425,9 +426,14 @@ export default function StaffHelpDesk({ loaderData: L, actionData }: Route.Compo
               </table>
             </div>
           )}
-          <div className="flex justify-end border-t border-line p-4 sm:px-5">
-            <Pager page={L.q.page} pages={L.pages} href={(p) => link({ page: String(p) })} />
-          </div>
+          <ListPagination
+            page={L.q.page}
+            pages={L.pages}
+            total={L.total}
+            pageSize={TICKET_PAGE_SIZE}
+            href={(p) => link({ page: String(p) })}
+            label="tickets"
+          />
         </section>
       </div>
     </div>

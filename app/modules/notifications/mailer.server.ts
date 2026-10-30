@@ -1,7 +1,22 @@
 import nodemailer, { type SendMailOptions, type Transporter } from "nodemailer";
 import { env } from "~/modules/core/env.server";
 import { logger } from "~/modules/core/logger.server";
-import { countEmail } from "./budget.server";
+import {
+  countEmail,
+  markRelayDown,
+  relayIsDown,
+  routeHasRoom,
+  type MailPriority,
+  type MailRoute,
+} from "./budget.server";
+
+/** No route has room left today (or none is configured). The caller keeps the message in the app. */
+export class MailBudgetExceededError extends Error {
+  constructor() {
+    super("Daily e-mail budget reached on every route");
+    this.name = "MailBudgetExceededError";
+  }
+}
 
 let transport: Transporter | undefined;
 
@@ -32,6 +47,7 @@ export function resetTransporterForTesting(): void {
   }
   transport = undefined;
   fallback = undefined;
+  relay = undefined;
 }
 
 /** Centralized transporter getter with connection pooling and timeouts. */
@@ -106,10 +122,10 @@ export function smtpFailureHint(err: unknown): string {
 }
 
 /**
- * Sends through the configured SMTP port; if the network blocks it (common on campus firewalls
- * for 587), retries once over the other Gmail port (465 implicit TLS, or 587 STARTTLS).
+ * Gmail account route: sends through the configured SMTP port; if the network blocks it (common on
+ * campus firewalls for 587), retries once over the other Gmail port (465 implicit TLS, or 587).
  */
-async function deliver(mail: SendMailOptions): Promise<void> {
+async function deliverGmail(mail: SendMailOptions): Promise<void> {
   const e = env();
   try {
     await getTransporter().sendMail(mail);
@@ -135,6 +151,80 @@ async function deliver(mail: SendMailOptions): Promise<void> {
     });
   }
   await fallback.sendMail(mail);
+}
+
+let relay: Transporter | undefined;
+
+export function relayConfigured(): boolean {
+  const e = env();
+  return e.EMAIL_PROVIDER === "smtp" && !!e.SMTP_RELAY_HOST;
+}
+
+/** Google Workspace SMTP Relay transport (pooled). */
+function getRelay(): Transporter {
+  if (!relay) {
+    const e = env();
+    relay = nodemailer.createTransport({
+      pool: true,
+      maxConnections: 5,
+      maxMessages: 100,
+      host: e.SMTP_RELAY_HOST,
+      port: e.SMTP_RELAY_PORT,
+      secure: e.SMTP_RELAY_SECURE,
+      ...(e.SMTP_RELAY_HELO ? { name: e.SMTP_RELAY_HELO } : {}),
+      auth: e.SMTP_RELAY_USER ? { user: e.SMTP_RELAY_USER, pass: e.SMTP_RELAY_PASSWORD } : undefined,
+      // Short timeouts: if the relay is unreachable the fallback must take over quickly.
+      connectionTimeout: 8_000,
+      greetingTimeout: 8_000,
+      socketTimeout: 20_000,
+      tls: { rejectUnauthorized: e.NODE_ENV === "production" },
+    });
+  }
+  return relay;
+}
+
+/**
+ * Sends one e-mail: Google Workspace SMTP Relay first, the Gmail account as the fallback. A route is
+ * used only while it has room in today's budget for this priority. A relay failure (not enabled yet,
+ * relay denied, network) switches to the fallback immediately and pauses the relay for 10 minutes,
+ * so people never wait for a broken route. Returns the route that delivered the e-mail.
+ */
+async function deliver(mail: SendMailOptions, priority: MailPriority): Promise<MailRoute> {
+  const e = env();
+  if (e.EMAIL_PROVIDER !== "smtp") {
+    await getTransporter().sendMail(mail); // Mailpit / test: no routes or budgets
+    return "gmail";
+  }
+  const routes: MailRoute[] = [];
+  if (relayConfigured() && !(await relayIsDown()) && (await routeHasRoom("relay", priority)))
+    routes.push("relay");
+  if (await routeHasRoom("gmail", priority)) routes.push("gmail");
+  if (!routes.length) throw new MailBudgetExceededError();
+  let lastErr: unknown;
+  for (const route of routes) {
+    try {
+      if (route === "relay") await getRelay().sendMail(mail);
+      else await deliverGmail(mail);
+      void countEmail(route);
+      return route;
+    } catch (err) {
+      lastErr = err;
+      if (route === "relay") {
+        const r = err as { responseCode?: number; code?: string; message?: string };
+        await markRelayDown(`${r.responseCode ?? r.code ?? ""} ${r.message ?? ""}`.trim());
+        logger.warn(
+          {
+            event: "mail_relay_failed",
+            code: r.responseCode ?? r.code,
+            err: (r.message ?? "").slice(0, 200),
+            fallback: routes.includes("gmail"),
+          },
+          "Google Workspace SMTP relay failed; using the Gmail account and pausing the relay for 10 minutes",
+        );
+      }
+    }
+  }
+  throw lastErr;
 }
 
 /** Diagnostic check for SMTP connectivity without sending actual emails. */
@@ -303,8 +393,7 @@ export async function sendOtpEmail(
   const { subject, text, html } = renderOtpEmail(code, purpose, minutes);
 
   try {
-    await deliver({ from: e.MAIL_FROM, to, subject, text, html });
-    void countEmail();
+    await deliver({ from: e.MAIL_FROM, to, subject, text, html }, "otp");
   } catch (err) {
     const msg = (err as Error).message || String(err);
     logger.error(
@@ -325,12 +414,34 @@ export async function sendOtpEmail(
 }
 
 /** Sends a plain-text notification. Bodies never contain application answers or documents. */
-export async function sendNotificationEmail(to: string, subject: string, body: string): Promise<void> {
+export async function sendNotificationEmail(
+  to: string,
+  subject: string,
+  body: string,
+  priority: "critical" | "routine" = "routine",
+): Promise<MailRoute> {
   const e = env();
-  await deliver({
-    from: e.MAIL_FROM,
-    to,
-    subject,
-    text: `${body}\n\n—\nPSG College of Technology, Coimbatore — Staff Recruitment\nThis is an automated message. Please do not reply.`,
-  });
+  return deliver(
+    {
+      from: e.MAIL_FROM,
+      to,
+      subject,
+      text: `${body}\n\n—\nPSG College of Technology, Coimbatore — Staff Recruitment\nThis is an automated message. Please do not reply.`,
+    },
+    priority,
+  );
+}
+
+/** Checks the relay connection (Control centre); never sends. */
+export async function verifyRelay(timeoutMs = 6000): Promise<{ ok: boolean; message: string }> {
+  if (!relayConfigured()) return { ok: false, message: "Not configured" };
+  try {
+    await Promise.race([
+      getRelay().verify(),
+      new Promise((_, rej) => setTimeout(() => rej(new Error("timed out")), timeoutMs)),
+    ]);
+    return { ok: true, message: `Connected to ${env().SMTP_RELAY_HOST}` };
+  } catch (err) {
+    return { ok: false, message: ((err as Error).message || "Not reachable").slice(0, 160) };
+  }
 }

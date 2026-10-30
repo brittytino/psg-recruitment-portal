@@ -1,25 +1,16 @@
+import { originFrom, seo } from "~/lib/seo";
 import type { Route } from "./+types/privacy";
 import { Alert } from "~/components/forms";
 import { PRIVACY_NOTICE_VERSION } from "~/lib/privacy";
 
-export const meta: Route.MetaFunction = () => [
-  { title: "Privacy Notice & Data Protection — PSG Tech Recruitment" },
-  {
-    name: "description",
-    content:
-      "Information governance, personal data protection standards, and audit transparency policies for applicants at PSG College of Technology, Coimbatore.",
-  },
-  { name: "robots", content: "index, follow" },
-  { property: "og:title", content: "Privacy Notice — PSG Tech Recruitment" },
-  {
-    property: "og:description",
-    content: "Information handling and privacy standards for PSG Tech recruitment.",
-  },
-  { property: "og:type", content: "website" },
-  { property: "og:image", content: "/images/psg_logo.png" },
-  { name: "twitter:card", content: "summary" },
-  { name: "twitter:image", content: "/images/psg_logo.png" },
-];
+export const meta: Route.MetaFunction = ({ matches }) =>
+  seo({
+    title: "Privacy notice",
+    description:
+      "How PSG College of Technology handles the personal data of applicants during recruitment: what is collected, who can see it and how long it is kept.",
+    path: "/privacy",
+    origin: originFrom(matches),
+  });
 
 export default function Privacy() {
   return (

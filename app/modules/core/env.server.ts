@@ -20,6 +20,19 @@ const schema = z.object({
   IP_RATE_LIMIT_MULTIPLIER: z.coerce.number().int().min(1).max(1000).default(30),
   /** E-mails the app may send per day (IST), across web and worker. Keep below the provider quota. */
   MAIL_DAILY_BUDGET: z.coerce.number().int().min(10).max(100000).default(450),
+  /**
+   * Google Workspace SMTP Relay (primary route, about 10 000 e-mails a day). Empty host = not used.
+   * Authenticates by the server IP (set up by IT in the Google Admin console) or, if set, with
+   * SMTP_RELAY_USER / SMTP_RELAY_PASSWORD. The Gmail account (SMTP_*) is the fallback.
+   */
+  SMTP_RELAY_HOST: z.string().optional().default(""),
+  SMTP_RELAY_PORT: z.coerce.number().int().default(587),
+  SMTP_RELAY_SECURE: bool.default(false),
+  SMTP_RELAY_USER: z.string().optional().default(""),
+  SMTP_RELAY_PASSWORD: z.string().optional().default(""),
+  /** Name sent in EHLO; Google requires a real domain when the relay authenticates by IP. */
+  SMTP_RELAY_HELO: z.string().optional().default(""),
+  MAIL_RELAY_DAILY_BUDGET: z.coerce.number().int().min(10).max(100000).default(9500),
   CONVERTER_URL: z.string().url(),
   CONVERTER_TOKEN: z.string().default(""),
   MALWARE_SCAN: z.enum(["clamav", "disabled"]).default("clamav"),

@@ -1,27 +1,17 @@
+import { originFrom, seo } from "~/lib/seo";
 import { jsonLd } from "~/lib/json-ld";
 import { ChevronDown, Mail, MapPin } from "lucide-react";
 import type { Route } from "./+types/help";
 import { env } from "~/modules/core/env.server";
 
-export const meta: Route.MetaFunction = () => [
-  { title: "Help & Frequently Asked Questions (FAQ) — PSG Tech Recruitment" },
-  {
-    name: "description",
-    content:
-      "Frequently asked questions and candidate help for PSG College of Technology faculty and research applications, forms, certificate uploads, and selection process.",
-  },
-  { name: "robots", content: "index, follow" },
-  { property: "og:title", content: "Help & FAQ — PSG Tech Recruitment" },
-  {
-    property: "og:description",
-    content:
-      "Answers about application forms, document requirements, drafts, and submission for PSG Tech recruitment.",
-  },
-  { property: "og:type", content: "website" },
-  { property: "og:image", content: "/images/psg_logo.png" },
-  { name: "twitter:card", content: "summary" },
-  { name: "twitter:image", content: "/images/psg_logo.png" },
-];
+export const meta: Route.MetaFunction = ({ matches }) =>
+  seo({
+    title: "How to apply — help and FAQ",
+    description:
+      "Step-by-step guidance for applying to PSG College of Technology: creating an account, signing in with an e-mail code, filling the form, uploading documents and submitting.",
+    path: "/help",
+    origin: originFrom(matches),
+  });
 
 export function loader() {
   return { email: env().SMTP_FROM_EMAIL };

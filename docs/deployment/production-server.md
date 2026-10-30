@@ -121,3 +121,41 @@ It prints the cause and the fix:
 | Ports 587 and 465 **not reachable** | The firewall blocks outgoing mail. Network team: allow outbound TCP 587 and 465 from this server to `smtp.gmail.com`. (The portal uses whichever of the two is open.) |
 | Gmail **rejected the login** (535) | App password wrong or revoked. Create a new one for recruitments@psgtech.ac.in (2-Step Verification must be on) and run `sudo ./prod.sh smtp-password`. |
 | Password **empty** | `sudo ./prod.sh smtp-password` |
+
+## E-mail: Google Workspace SMTP Relay (main) with the Gmail account as fallback
+
+Every e-mail (sign-in codes included) is sent through the **Google Workspace SMTP Relay**
+(`smtp-relay.gmail.com`, about 10 000 a day) first. If the relay is not enabled yet, refuses a message,
+cannot be reached or has used its daily budget, the same e-mail goes out through the **Gmail account**
+(`SMTP_*`, about 500 a day) straight away, so users are never affected. After a relay failure the relay
+is skipped for 10 minutes (no delay for people signing in) and then tried again.
+
+**IT team — enable the relay** (Google Admin console → Apps → Google Workspace → Gmail → Routing →
+SMTP relay service → Configure):
+
+| Setting | Value |
+| --- | --- |
+| Allowed senders | Only addresses in my domains |
+| Authentication | Only accept mail from the specified IP addresses → this server's **public** IP |
+| Encryption | Require TLS encryption |
+
+The repository already sets `SMTP_RELAY_HOST=smtp-relay.gmail.com`, port 587 and
+`SMTP_RELAY_HELO=recruitments.psgtech.ac.in`. If IT prefers SMTP authentication instead of the IP
+address, put `SMTP_RELAY_USER` and `SMTP_RELAY_PASSWORD` in `secrets/override.env`.
+
+Check it on the server:
+
+```sh
+sudo ./prod.sh mailtest someone@psgtech.ac.in   # tests the relay, then the Gmail fallback
+```
+
+Budgets: `MAIL_RELAY_DAILY_BUDGET` (relay, default 9500) and `MAIL_DAILY_BUDGET` (Gmail account,
+default 450). The Control centre shows both routes, today's usage and whether the relay is working.
+
+## Read-only Viewers
+
+The Super Admin and HR – N4 Section add people who may only read applications at
+**Set-up → Viewers (read only)** (`/admin/viewers`). A viewer signs in with the usual e-mail code and can
+list and open submitted applications and their documents — no changes, assignments, decisions,
+exports, help desk or settings. Removing a viewer signs them out and disables the account.
+Migration `20261102090000_viewer_role` only adds the role value.

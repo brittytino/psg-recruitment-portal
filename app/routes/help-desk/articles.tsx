@@ -1,3 +1,4 @@
+import { originFrom, seo } from "~/lib/seo";
 import { ChevronRight, Search } from "lucide-react";
 import { Form, Link } from "react-router";
 import type { Route } from "./+types/articles";
@@ -6,7 +7,14 @@ import { EmptyState, PageHeader } from "~/components/staff";
 import { userContext } from "~/context";
 import { publishedArticles } from "~/modules/helpdesk/articles.server";
 
-export const meta: Route.MetaFunction = () => [{ title: "Help articles — Help desk" }];
+export const meta: Route.MetaFunction = ({ matches }) =>
+  seo({
+    title: "Help articles for applicants",
+    description:
+      "Guidance from the PSG College of Technology recruitment office on signing in, the application form, uploads, the application PDF and application status.",
+    path: "/help-desk/articles",
+    origin: originFrom(matches),
+  });
 
 export async function loader({ request, context }: Route.LoaderArgs) {
   const q = new URL(request.url).searchParams.get("q")?.slice(0, 100) ?? "";
