@@ -6,8 +6,8 @@
    `SMTP_PASSWORD`, `MAIL_FROM`). Sign-in codes are e-mailed, so staff cannot sign in without working mail.
    `DEV_LOG_OTP` must stay `false` in production (the app refuses to start otherwise).
 2. Run migrations and the seed: `docker compose run --rm migrate` (or `npm run db:seed:prod`). The seed
-   registers the form templates and creates, if missing, `dean.admn@psgtech.ac.in` and
-   `principal@psgtech.ac.in` (Admin) and `admin.n4@psgtech.ac.in` (HR – N4 Section). Each new account is
+   registers the form templates and creates, if missing, `dean@your-college.edu` and
+   `principal@your-college.edu` (Admin) and `hr@your-college.edu` (HR – N4 Section). Each new account is
    e-mailed a set-password link valid for 72 hours; the link is also printed once in the seed output.
    No demo accounts, departments or HODs are created.
 3. Admin → **Job profiles → Departments**: create each department with its short code (e.g. `CSE`). The code

@@ -18,6 +18,8 @@ import {
   STAFF_ROLES,
   type RoleName,
   type StaffRole,
+  grantableRoles,
+  isSuperAdmin,
 } from "~/modules/auth/permissions";
 import { prisma } from "~/modules/core/db.server";
 import { ValidationError } from "~/modules/core/errors";
@@ -42,7 +44,11 @@ export async function loader({ request, context }: Route.LoaderArgs) {
   const url = new URL(request.url);
   const q = url.searchParams.get("q")?.slice(0, 100) || undefined;
   const rawRole = url.searchParams.get("role");
-  const role = rawRole === "CANDIDATE" ? "CANDIDATE" : STAFF_ROLES.find((r) => r === rawRole);
+  // Super Admin accounts and the Super Admin role are invisible to everyone else.
+  const visibleRoles = isSuperAdmin(user.grants)
+    ? STAFF_ROLES
+    : STAFF_ROLES.filter((r) => r !== "SUPER_ADMIN");
+  const role = rawRole === "CANDIDATE" ? "CANDIDATE" : visibleRoles.find((r) => r === rawRole);
   const [users, departments, counts] = await Promise.all([
     listStaff(user, q, role),
     prisma.department.findMany({
@@ -52,7 +58,7 @@ export async function loader({ request, context }: Route.LoaderArgs) {
     }),
     prisma.userRole.groupBy({
       by: ["role"],
-      where: { role: { in: [...STAFF_ROLES, "CANDIDATE"] } },
+      where: { role: { in: [...visibleRoles, "CANDIDATE"] } },
       _count: { _all: true },
     }),
   ]);
@@ -61,6 +67,8 @@ export async function loader({ request, context }: Route.LoaderArgs) {
     departments,
     selfId: user.id,
     role: role ?? null,
+    visibleRoles: [...visibleRoles],
+    grantable: [...grantableRoles(user.grants)],
     counts: Object.fromEntries(counts.map((c) => [c.role, c._count._all])),
   };
 }
@@ -107,7 +115,7 @@ export async function action({ request, context }: Route.ActionArgs) {
 }
 
 export default function Users({ loaderData, actionData }: Route.ComponentProps) {
-  const { users, departments, selfId, role, counts } = loaderData;
+  const { users, departments, selfId, role, counts, visibleRoles, grantable } = loaderData;
   const [params] = useSearchParams();
   const [newRole, setNewRole] = useState<StaffRole>("HOD");
   const a = actionData as
@@ -150,14 +158,14 @@ export default function Users({ loaderData, actionData }: Route.ComponentProps) 
               name="email"
               type="email"
               required
-              hint="e.g. hod.cse@psgtech.ac.in"
+              hint="e.g. hod.department@your-college.edu"
               error={fe?.email?.[0]}
             />
           </div>
           <fieldset>
             <legend className="text-sm font-semibold">Role</legend>
             <div className="mt-2 grid gap-3 md:grid-cols-3">
-              {STAFF_ROLES.map((r) => (
+              {grantable.map((r) => (
                 <label
                   key={r}
                   className="flex cursor-pointer items-start gap-3 rounded-xl border border-line p-3 has-[:checked]:border-ink has-[:checked]:bg-soft"
@@ -210,7 +218,7 @@ export default function Users({ loaderData, actionData }: Route.ComponentProps) 
         <Tabs
           items={[
             { to: "?", label: "All staff", active: !role },
-            ...STAFF_ROLES.map((r) => ({
+            ...visibleRoles.map((r) => ({
               to: `?role=${r}`,
               label: ROLE_LABELS[r],
               active: role === r,
@@ -388,7 +396,7 @@ export default function Users({ loaderData, actionData }: Route.ComponentProps) 
                           Role
                         </label>
                         <select id={`role-${u.id}`} name="role" className="field-input mt-1">
-                          {STAFF_ROLES.map((r) => (
+                          {grantable.map((r) => (
                             <option key={r} value={r}>
                               {ROLE_LABELS[r]}
                             </option>

@@ -3,7 +3,12 @@ import { createReadableStreamFromReadable } from "@react-router/node";
 import { isbot } from "isbot";
 import type { RenderToPipeableStreamOptions } from "react-dom/server";
 import { renderToPipeableStream } from "react-dom/server";
-import { ServerRouter, type EntryContext, type RouterContextProvider } from "react-router";
+import {
+  isRouteErrorResponse,
+  ServerRouter,
+  type EntryContext,
+  type RouterContextProvider,
+} from "react-router";
 import { nonceContext } from "./context";
 import { logger } from "./modules/core/logger.server";
 import { PRIVATE_PATHS } from "./lib/seo";
@@ -97,14 +102,40 @@ export default function handleRequest(
 }
 
 /** Logs unexpected server errors without leaking them to the client. */
+/**
+ * Paths that only automated scanners ask for (secrets, infrastructure files, other frameworks).
+ * They are 404s like any unknown address; they are logged once as a security notice, not as errors.
+ */
+const PROBE =
+  /(^|\/)\.(env|git|svn|hg|aws|ssh|docker|kube|terraform|vscode|idea|npmrc|htpasswd|DS_Store)|\.(tf|tfvars|tfstate|bak|backup|old|swp|sql|ini|cfg|conf|pem|key|yml|yaml|toml)(\.json)?$|(^|\/)(wp-|wordpress|phpmyadmin|cgi-bin|vendor\/|config\/|k8s\/|kubernetes\/|helm\/|chart\/|ansible|group_vars|host_vars|terraform|Procfile|Dockerfile|docker-compose|vercel\.json|netlify\.toml|fly\.toml|wrangler\.toml|railway\.json|render\.yaml|app\.yaml|kubeconfig|inventory|vault\.yml|\.vercel)/i;
+
+function describe(error: unknown) {
+  if (error instanceof Error) return { message: error.message, stack: error.stack };
+  if (isRouteErrorResponse(error)) return { status: error.status, statusText: error.statusText };
+  if (error instanceof Response) return { status: error.status };
+  try {
+    return { value: JSON.stringify(error)?.slice(0, 500) };
+  } catch {
+    return { value: String(error) };
+  }
+}
+
 export function handleError(error: unknown, { request }: { request: Request }) {
   if (request.signal.aborted) return;
-  logger.error(
-    {
-      event: "app_error",
-      err: error instanceof Error ? { message: error.message, stack: error.stack } : String(error),
-      path: new URL(request.url).pathname,
-    },
-    "unhandled error",
-  );
+  const path = new URL(request.url).pathname;
+  const status = isRouteErrorResponse(error) ? error.status : error instanceof Response ? error.status : 500;
+  // Not-found, forbidden and similar responses are normal outcomes, not application errors.
+  if (status < 500) {
+    if (PROBE.test(path))
+      logger.warn(
+        {
+          event: "security_probe",
+          path: path.slice(0, 200),
+          ip: request.headers.get("x-real-ip") ?? undefined,
+        },
+        "scanner probe for a sensitive file (answered 404)",
+      );
+    return;
+  }
+  logger.error({ event: "app_error", err: describe(error), path }, "unhandled error");
 }

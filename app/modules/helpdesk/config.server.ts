@@ -20,10 +20,19 @@ export interface HelpdeskConfig {
 }
 const DEFAULTS: HelpdeskConfig = { defaultAssigneeId: null, emailStaffOnNewTicket: false };
 
-/** Active accounts that may work on tickets (HR – N4 Section and Super Admin). */
-export function supportStaff() {
+const SUPPORT_ROLES = ["HR", "MANAGER", "SUPER_ADMIN"] as const;
+
+/**
+ * Active accounts that may work on tickets (HR – N4 Section, Admin, Super Admin). Pass
+ * includeSuperAdmin = false for anyone who is not the Super Admin: that account stays hidden.
+ */
+export function supportStaff(includeSuperAdmin = true) {
   return prisma.user.findMany({
-    where: { status: "ACTIVE", roles: { some: { role: { in: ["HR", "SUPER_ADMIN"] } } } },
+    where: {
+      status: "ACTIVE",
+      roles: { some: { role: { in: [...SUPPORT_ROLES] } } },
+      ...(includeSuperAdmin ? {} : { NOT: { roles: { some: { role: "SUPER_ADMIN" } } } }),
+    },
     select: {
       id: true,
       email: true,
@@ -38,7 +47,7 @@ export function supportStaff() {
 export async function isSupportStaff(userId: string): Promise<boolean> {
   return (
     (await prisma.user.count({
-      where: { id: userId, status: "ACTIVE", roles: { some: { role: { in: ["HR", "SUPER_ADMIN"] } } } },
+      where: { id: userId, status: "ACTIVE", roles: { some: { role: { in: [...SUPPORT_ROLES] } } } },
     })) > 0
   );
 }
@@ -62,7 +71,7 @@ export async function saveHelpdeskConfig(user: SessionUser | null, input: unknow
   const p = schema.safeParse(input);
   if (!p.success) throw new ValidationError("Please correct the highlighted fields");
   if (p.data.defaultAssigneeId && !(await isSupportStaff(p.data.defaultAssigneeId)))
-    throw new ValidationError("Choose an active HR – N4 Section or Super Admin account", {
+    throw new ValidationError("Choose an active support staff account", {
       defaultAssigneeId: ["Not a support staff account"],
     });
   await prisma.$transaction(async (tx) => {

@@ -1,3 +1,4 @@
+import { DocumentViewer } from "~/components/document-viewer";
 import { useRef, useState } from "react";
 import { postUpload, tooLargeMessage } from "~/lib/upload-client";
 import { useRevalidator } from "react-router";
@@ -190,6 +191,7 @@ function GroupCard({
                 </span>
               </span>
               <span className="flex items-center gap-2">
+                <DocumentViewer file={{ href: `/files/documents/${d.id}`, name: d.name }} />
                 <Badge tone={SCAN[d.scan]?.tone ?? "warning"}>{SCAN[d.scan]?.label ?? d.scan}</Badge>
                 <button
                   type="button"

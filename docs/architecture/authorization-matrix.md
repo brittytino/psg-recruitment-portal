@@ -5,8 +5,8 @@ Permissions: `app/modules/auth/permissions.ts`. Record scope: `app/modules/auth/
 
 Roles (since v2, migration `20261023090000_v2_department_review`):
 
-- **ADMIN** — Dean (`dean.admn@psgtech.ac.in`) and Principal (`principal@psgtech.ac.in`). Full control.
-- **HR** — HR – N4 Section (`admin.n4@psgtech.ac.in`).
+- **ADMIN** — Dean (`dean@your-college.edu`) and Principal (`principal@your-college.edu`). Full control.
+- **HR** — HR – N4 Section (`hr@your-college.edu`).
 - **HOD** — created by the Admin; one role row per department reviewed.
 - **CANDIDATE** — self-registered.
 

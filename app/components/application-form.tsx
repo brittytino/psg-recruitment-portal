@@ -1,3 +1,4 @@
+import { DocumentViewer } from "~/components/document-viewer";
 import { todayIst } from "~/lib/dates";
 import { useEffect, useId, useMemo, useRef, useState } from "react";
 import { postUpload, tooLargeMessage } from "~/lib/upload-client";
@@ -742,14 +743,14 @@ function InlineAttachmentEditor({
                 Attached to Entry {rowIndex + 1}
               </span>
               <span>·</span>
-              <a
-                href={`/files/documents/${docId}`}
-                target="_blank"
-                rel="noreferrer"
-                className="font-medium text-brand-700 underline hover:text-brand-900"
-              >
-                View document
-              </a>
+              <DocumentViewer
+                file={{
+                  href: `/files/documents/${docId}`,
+                  name: row.documentName ? String(row.documentName) : "Attached document",
+                }}
+                triggerClassName="inline-flex items-center gap-1 font-medium text-brand-700 underline hover:text-brand-900"
+                trigger={<>View document</>}
+              />
             </div>
           </div>
         </div>
@@ -962,15 +963,14 @@ export function AnswerView({ field, value }: { field: FieldDef; value: Answers[s
                 {hasAttachments && (
                   <td>
                     {r.documentId ? (
-                      <a
-                        href={`/files/documents/${r.documentId}`}
-                        target="_blank"
-                        rel="noreferrer"
-                        className="inline-flex items-center gap-1.5 font-medium text-brand-700 underline hover:text-brand-900"
-                      >
-                        <span aria-hidden="true">📄</span>
-                        <span>{r.documentName ? String(r.documentName) : "Attached document"}</span>
-                      </a>
+                      <DocumentViewer
+                        file={{
+                          href: `/files/documents/${r.documentId}`,
+                          name: r.documentName ? String(r.documentName) : "Attached document",
+                        }}
+                        triggerClassName="inline-flex items-center gap-1.5 text-left font-medium text-brand-700 underline hover:text-brand-900"
+                        trigger={<span>{r.documentName ? String(r.documentName) : "Attached document"}</span>}
+                      />
                     ) : (
                       <span className="text-xs text-muted">Not attached</span>
                     )}

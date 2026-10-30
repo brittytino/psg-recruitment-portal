@@ -29,6 +29,8 @@ import {
   RELATIVE_RELATIONSHIPS,
   SCHOOL_BOARDS,
   VACANCY_SOURCES,
+  HSC_ROUTES,
+  NO_HSC,
 } from "../options";
 import type { FormCode, FormDefinition, ScalarField, SectionDef, UploadGroup } from "../types";
 
@@ -262,7 +264,12 @@ function commonSections(): SectionDef[] {
           max: 20,
           integer: true,
         }),
+        select("hscRoute", "Higher secondary (HSC)", 4, "HSC", [...HSC_ROUTES], {
+          help: "Choose Diploma if you joined a Diploma after SSLC instead of HSC. Then add the Diploma under College education.",
+          wide: true,
+        }),
         select("hscMajor", "HSC — Major subjects (group)", 4, "Major subject", [...HSC_MAJOR_STREAMS], {
+          when: NO_HSC,
           requirement: "required",
           allowOther: true,
           otherOptionValue: "Other",
@@ -271,21 +278,35 @@ function commonSections(): SectionDef[] {
           help: "Select your main subjects or choose Other to specify.",
         }),
         text("hscSchool", "HSC — School", 4, "HSC School", {
+          when: NO_HSC,
           requirement: "required",
           maxLength: 200,
           wide: true,
         }),
         select("hscBoard", "HSC — Board", 4, "Board", [...SCHOOL_BOARDS], {
+          when: NO_HSC,
           requirement: "required",
           allowOther: true,
           otherOptionValue: "Other",
           otherLabel: "Specify HSC board",
           otherMaxLength: 120,
         }),
-        num("hscYear", "HSC — Year of completion", 4, "Year", { requirement: "required", ...YEAR }),
-        text("hscMarks", "HSC — Marks / percentage", 4, "Marks", { requirement: "required", maxLength: 30 }),
-        select("hscMode", "HSC — Mode of education", 4, "Mode", MODE, { requirement: "required" }),
+        num("hscYear", "HSC — Year of completion", 4, "Year", {
+          when: NO_HSC,
+          requirement: "required",
+          ...YEAR,
+        }),
+        text("hscMarks", "HSC — Marks / percentage", 4, "Marks", {
+          when: NO_HSC,
+          requirement: "required",
+          maxLength: 30,
+        }),
+        select("hscMode", "HSC — Mode of education", 4, "Mode", MODE, {
+          when: NO_HSC,
+          requirement: "required",
+        }),
         num("hscAttempts", "HSC — Number of attempts", 4, "Attempts", {
+          when: NO_HSC,
           requirement: "required",
           min: 1,
           max: 20,

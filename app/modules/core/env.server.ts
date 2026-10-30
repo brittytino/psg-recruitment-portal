@@ -47,7 +47,7 @@ const schema = z.object({
   SMTP_USER: z.string().optional().default(""),
   SMTP_PASSWORD: z.string().optional().default(""),
   SMTP_FROM_NAME: z.string().default("PSG College of Technology Recruitment"),
-  SMTP_FROM_EMAIL: z.string().email().default("recruitments@psgtech.ac.in"),
+  SMTP_FROM_EMAIL: z.string().email().optional().or(z.literal("")),
   MAIL_FROM: z.string().optional(),
   SMTP_CONNECTION_TIMEOUT_MS: z.coerce.number().int().default(10000),
   SMTP_GREETING_TIMEOUT_MS: z.coerce.number().int().default(10000),
@@ -84,7 +84,10 @@ export function env(): Env {
   }
   const e = {
     ...parsed.data,
-    MAIL_FROM: parsed.data.MAIL_FROM || `${parsed.data.SMTP_FROM_NAME} <${parsed.data.SMTP_FROM_EMAIL}>`,
+    SMTP_FROM_EMAIL: parsed.data.SMTP_FROM_EMAIL || parsed.data.SMTP_USER || "no-reply@localhost",
+    MAIL_FROM:
+      parsed.data.MAIL_FROM ||
+      `${parsed.data.SMTP_FROM_NAME} <${parsed.data.SMTP_FROM_EMAIL || parsed.data.SMTP_USER || "no-reply@localhost"}>`,
   };
   if (e.NODE_ENV === "production") {
     if (e.MALWARE_SCAN === "disabled") throw new Error("MALWARE_SCAN=disabled is not allowed in production");

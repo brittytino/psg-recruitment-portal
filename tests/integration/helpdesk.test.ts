@@ -211,7 +211,9 @@ describe("help desk: staff", () => {
       summary: "Solved after clearing the browser cache.",
     });
     await expect(candidateReply(cand, t.id, replyForm("One more thing"))).rejects.toThrow(/closed/);
-    await expect(setTicketStatus(hr, t.id, { status: "IN_PROGRESS" })).rejects.toThrow(/Super Admin/);
+    await expect(setTicketStatus(hr, t.id, { status: "IN_PROGRESS" })).rejects.toThrow(
+      /senior administrator/,
+    );
     await setTicketStatus(sa, t.id, { status: "IN_PROGRESS" });
     const events = await prisma.supportTicketEvent.findMany({ where: { ticketId: t.id } });
     expect(events.length).toBeGreaterThanOrEqual(5);
@@ -222,7 +224,7 @@ describe("help desk: staff", () => {
     const hr = await makeUser("HR");
     const hod = await makeUser("HOD");
     const t = await createTicket(cand, ticketForm());
-    await expect(assignTicket(hr, t.id, hod.id)).rejects.toThrow(/HR – N4 Section or Super Admin/);
+    await expect(assignTicket(hr, t.id, hod.id)).rejects.toThrow(/support staff account/);
     await assignTicket(hr, t.id, hr.id, "Mine");
     await setTicketPriority(hr, t.id, "URGENT");
     await expect(escalateTicket(hr, t.id, "short")).rejects.toThrow(/correct/);
@@ -270,5 +272,29 @@ describe("e-mail controls", () => {
         else await redis().set(keys[r], before[r]!);
       }
     }
+  });
+});
+
+describe("help desk: Admin role and hidden Super Admin", () => {
+  it("an Admin works on tickets and can reopen closed ones; the Super Admin stays hidden from others", async () => {
+    const cand = await makeUser("CANDIDATE");
+    const admin = await makeUser("MANAGER");
+    const sa = await makeUser("SUPER_ADMIN");
+    const hr = await makeUser("HR");
+    const t = await createTicket(cand, ticketForm());
+    await staffReply(sa, t.id, replyForm("Looking into this now.", "PUBLIC"));
+    await setTicketStatus(admin, t.id, { status: "CLOSED", summary: "Duplicate of an earlier request." });
+    await setTicketStatus(admin, t.id, { status: "IN_PROGRESS" });
+
+    const seenByHr = await staffTicket(hr, t.id);
+    expect(seenByHr.staff.some((s) => s.id === sa.id)).toBe(false);
+    const saMsg = seenByHr.ticket.messages.find((m) => m.authorId === sa.id)!;
+    expect(saMsg.author.profile?.fullName).toBe("Administrator");
+    expect(saMsg.author.email).toBe("");
+    const list = await staffTickets(hr, staffListSchema.parse({ view: "all", q: t.referenceNo }));
+    expect(list.rows[0]?.assigneeName).toBe("Administrator");
+
+    const seenBySa = await staffTicket(sa, t.id);
+    expect(seenBySa.staff.some((s) => s.id === sa.id)).toBe(true);
   });
 });

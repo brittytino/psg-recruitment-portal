@@ -20,3 +20,23 @@ storage-dev.log
 .env
 secrets/
 .env.backup.*
+
+# Local environment variants, keys and certificates (never commit)
+.env.local
+.env.*.local
+*.pem
+*.key
+*.p12
+*.pfx
+secrets.*
+# Database dumps and local data
+*.sql.gz
+*.dump
+dump*.sql
+*.sqlite
+# Tooling output
+coverage/
+.idea/
+.vscode/*
+!.vscode/extensions.json
+.cache/

@@ -2,7 +2,7 @@ import { randomBytes } from "node:crypto";
 import { z } from "zod";
 import { audit } from "~/modules/audit/audit.server";
 import { hashPassword } from "~/modules/auth/password.server";
-import { hasPermission } from "~/modules/auth/permissions";
+import { hasPermission, grantableRoles, isSuperAdmin } from "~/modules/auth/permissions";
 import type { SessionUser } from "~/modules/auth/session.server";
 import { hashToken } from "~/modules/auth/session.server";
 import { prisma, type Tx } from "~/modules/core/db.server";
@@ -19,12 +19,36 @@ function requireUserAdmin(user: SessionUser | null): SessionUser {
   return user;
 }
 
+/**
+ * Role hierarchy for user management: the Super Admin manages everyone; an Admin (MANAGER) manages
+ * only people whose roles are all below Admin (HR, HOD, Viewer). Super Admin accounts do not exist
+ * for anyone else ("not found").
+ */
+async function assertCanManage(actor: SessionUser, userId: string) {
+  if (isSuperAdmin(actor.grants)) return;
+  const roles = (await prisma.userRole.findMany({ where: { userId }, select: { role: true } })).map(
+    (r) => r.role,
+  );
+  if (roles.includes("SUPER_ADMIN")) throw new NotFoundError("User");
+  const allowed = grantableRoles(actor.grants) as readonly string[];
+  if (!roles.every((r) => r === "CANDIDATE" || allowed.includes(r)))
+    throw new ForbiddenError("Only the Super Admin can change this account");
+}
+
+function assertCanGrant(actor: SessionUser, role: string) {
+  if (!(grantableRoles(actor.grants) as readonly string[]).includes(role))
+    throw new ForbiddenError("You cannot give this role");
+}
+
 /** Lists staff accounts, or candidate accounts when role = "CANDIDATE" (Super Admin manages every user). */
 export async function listStaff(actor: SessionUser | null, q?: string, role?: StaffRole | "CANDIDATE") {
-  requireUserAdmin(actor);
+  const a = requireUserAdmin(actor);
+  const hideSuper = !isSuperAdmin(a.grants);
+  if (hideSuper && role === "SUPER_ADMIN") return [];
   return prisma.user.findMany({
     where: {
       roles: { some: role ? { role } : { role: { not: "CANDIDATE" } } },
+      ...(hideSuper ? { NOT: { roles: { some: { role: "SUPER_ADMIN" } } } } : {}),
       ...(q
         ? {
             OR: [
@@ -73,6 +97,7 @@ export async function createStaffUser(actor: SessionUser | null, input: unknown)
   if (!p.success)
     throw new ValidationError("Please correct the highlighted fields", z.flattenError(p.error).fieldErrors);
   const v = p.data;
+  assertCanGrant(a, v.role);
   if (await prisma.user.findUnique({ where: { email: v.email } }))
     throw new ConflictError("An account with this e-mail address already exists");
   if (v.role === "HOD") {
@@ -139,6 +164,8 @@ export async function grantRole(actor: SessionUser | null, input: unknown) {
   const p = grantSchema.safeParse(input);
   if (!p.success) throw new ValidationError("Invalid role assignment");
   const g = p.data;
+  assertCanGrant(a, g.role);
+  await assertCanManage(a, g.userId);
   if (g.role === "HOD" && !g.departmentId) throw new ValidationError("Choose the HOD's department");
   const target = await prisma.user.findUnique({ where: { id: g.userId }, include: { roles: true } });
   if (!target) throw new NotFoundError("User");
@@ -168,6 +195,8 @@ export async function revokeRole(actor: SessionUser | null, roleId: string) {
   const a = requireUserAdmin(actor);
   const r = await prisma.userRole.findUnique({ where: { id: roleId } });
   if (!r || r.role === "CANDIDATE") throw new NotFoundError("Role assignment");
+  await assertCanManage(a, r.userId);
+  assertCanGrant(a, r.role);
   await prisma.$transaction(async (tx) => {
     if (r.role === "SUPER_ADMIN") {
       if (r.userId === a.id) throw new ConflictError("You cannot remove your own Super Admin role");
@@ -195,6 +224,7 @@ export async function setUserStatus(
 ) {
   const a = requireUserAdmin(actor);
   if (userId === a.id) throw new ConflictError("You cannot disable your own account");
+  await assertCanManage(a, userId);
   await prisma.$transaction(async (tx) => {
     const target = await tx.user.findUnique({ where: { id: userId }, include: { roles: true } });
     if (!target) throw new NotFoundError("User");
@@ -222,6 +252,7 @@ export async function setUserStatus(
 /** Re-sends a set-password link (e.g. the invitation expired). */
 export async function resendInvite(actor: SessionUser | null, userId: string) {
   const a = requireUserAdmin(actor);
+  await assertCanManage(a, userId);
   const u = await prisma.user.findUnique({ where: { id: userId }, include: { roles: true } });
   if (!u || u.roles.every((r) => r.role === "CANDIDATE")) throw new NotFoundError("User");
   const token = randomBytes(32).toString("base64url");
@@ -384,6 +415,7 @@ export async function hodsForDepartment(departmentId: string) {
 /** Ends every session of a user (e.g. lost device). The user can sign in again with a new code. */
 export async function signOutEverywhere(actor: SessionUser | null, userId: string) {
   const a = requireUserAdmin(actor);
+  await assertCanManage(a, userId);
   if (userId === a.id) throw new ConflictError("Use Sign out for your own account");
   await prisma.$transaction(async (tx) => {
     if (!(await tx.user.findUnique({ where: { id: userId }, select: { id: true } })))
@@ -405,6 +437,7 @@ export async function signOutEverywhere(actor: SessionUser | null, userId: strin
 /** Corrects the display name of any account. Submitted applications keep their own snapshot. */
 export async function renameUser(actor: SessionUser | null, userId: string, nameRaw: unknown) {
   const a = requireUserAdmin(actor);
+  await assertCanManage(a, userId);
   const name = z.string().trim().min(2).max(120).safeParse(nameRaw);
   if (!name.success) throw new ValidationError("Enter the full name", { fullName: ["Enter the full name"] });
   await prisma.$transaction(async (tx) => {

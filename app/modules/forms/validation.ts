@@ -45,7 +45,8 @@ function validDate(s: string): boolean {
 export function conditionMet(when: Condition | undefined, values: Record<string, unknown>): boolean {
   if (!when) return true;
   const v = values[when.key];
-  return typeof v === "string" && when.in.includes(v);
+  if (when.notIn) return !(typeof v === "string" && when.notIn.includes(v));
+  return typeof v === "string" && (when.in ?? []).includes(v);
 }
 
 /** Validates one scalar value. Returns an error message or null. */
@@ -173,6 +174,18 @@ function checkCrossField(def: FormDefinition, a: Answers, mode: ValidationMode, 
   const dob = a.dateOfBirth;
   if (typeof dob === "string" && validDate(dob) && dob >= today)
     issues.push({ path: "dateOfBirth", sectionId: "personal", message: "Date of birth must be in the past" });
+  // Diploma instead of HSC: the Diploma itself must be listed under College education.
+  if (
+    mode === "submit" &&
+    a.hscRoute === "DIPLOMA" &&
+    allFields(def).some((f) => f.key === "collegeQualifications") &&
+    !rowsOf(a, "collegeQualifications").some((r) => r.level === "DIPLOMA")
+  )
+    issues.push({
+      path: "collegeQualifications",
+      sectionId: "college",
+      message: "You chose Diploma instead of HSC: add your Diploma (level “Diploma”) under College education",
+    });
   for (const key of ["experience", "jobsHeld"]) {
     const rows = rowsOf(a, key);
     const sectionId = key === "jobsHeld" ? "jobs" : "experience";

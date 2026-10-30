@@ -1,3 +1,5 @@
+import { RichText } from "~/components/rich-text";
+import { DocumentViewer } from "~/components/document-viewer";
 import { FileText, ImageIcon, Paperclip, X } from "lucide-react";
 import { useRef, useState, type ReactNode } from "react";
 import { Link, NavLink } from "react-router";
@@ -79,7 +81,8 @@ export function AttachmentList({
   return (
     <ul className="mt-3 flex flex-wrap gap-2">
       {files.map((f) => (
-        <li key={f.id}>
+        <li key={f.id} className="flex items-center gap-1">
+          <DocumentViewer file={{ href: `${base}/${f.id}`, name: f.originalName, mimeType: f.mimeType }} />
           <a
             href={`${base}/${f.id}`}
             className="inline-flex max-w-72 items-center gap-2 rounded-lg border border-line bg-paper px-2.5 py-1.5 text-xs text-ink no-underline hover:border-line-strong hover:bg-soft"
@@ -141,9 +144,7 @@ export function TicketMessage({
           {formatDateTime(createdAt)}
         </time>
       </header>
-      <p className="mt-2 text-[15px] leading-relaxed whitespace-pre-wrap text-ink [overflow-wrap:anywhere]">
-        {body}
-      </p>
+      <RichText text={body} className="mt-2 text-[15px] leading-relaxed text-ink" />
       {children}
     </article>
   );

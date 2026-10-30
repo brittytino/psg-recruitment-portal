@@ -1,3 +1,4 @@
+import { RichTextEditor } from "~/components/rich-text-editor";
 import { Form, Link, redirect, useNavigation } from "react-router";
 import { ArrowLeft } from "lucide-react";
 import type { Route } from "./+types/vacancy-edit";
@@ -176,13 +177,13 @@ export default function VacancyEdit({ loaderData, actionData }: Route.ComponentP
             <label htmlFor="f-description" className="block text-sm font-medium">
               Description <span className="text-danger">*</span>
             </label>
-            <textarea
+            <RichTextEditor
               id="f-description"
               name="description"
               rows={6}
               required
-              defaultValue={v.description}
-              className="field-input"
+              defaultValue={v.description ?? ""}
+              invalid={!!fe?.description}
             />
             {fe?.description?.[0] && <p className="text-sm text-danger">{fe.description[0]}</p>}
           </div>

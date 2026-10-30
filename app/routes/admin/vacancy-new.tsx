@@ -1,3 +1,4 @@
+import { RichTextEditor } from "~/components/rich-text-editor";
 import { useState } from "react";
 import { Form, Link, redirect, useNavigation } from "react-router";
 import { ArrowLeft, FlaskConical, GraduationCap } from "lucide-react";
@@ -249,18 +250,27 @@ export default function VacancyNew({ loaderData, actionData }: Route.ComponentPr
 
         <section className="form-section">
           <h2 className="form-section-title">Details for candidates</h2>
-          <TextAreaField
-            label="Description"
-            name="description"
-            required
-            rows={6}
-            error={fe?.description?.[0]}
-            placeholder={
-              category === "RESEARCH"
-                ? "Project, responsibilities, fellowship amount and duration…"
-                : "Responsibilities, teaching and research expectations…"
-            }
-          />
+          <div className="space-y-1">
+            <label htmlFor="f-description" className="block text-sm font-medium">
+              Description{" "}
+              <span className="text-danger" aria-hidden="true">
+                *
+              </span>
+            </label>
+            <RichTextEditor
+              id="f-description"
+              name="description"
+              required
+              rows={6}
+              invalid={!!fe?.description}
+              placeholder={
+                category === "RESEARCH"
+                  ? "Project, responsibilities, fellowship amount and duration…"
+                  : "Responsibilities, teaching and research expectations…"
+              }
+            />
+            {fe?.description?.[0] && <p className="text-sm text-danger">{fe.description[0]}</p>}
+          </div>
           <TextAreaField
             label="Eligibility criteria"
             name="eligibility"

@@ -59,7 +59,7 @@ function CreateEnv {
   $pw = $env:SMTP_PASSWORD
   if (-not $pw -and (Test-Path secretssmtp_password)) { $pw = (Get-Content secretssmtp_password -Raw).Trim() }
   if (-not $pw) {
-    $sec = Read-Host -AsSecureString "Gmail app password for recruitments@psgtech.ac.in (one time)"
+    $sec = Read-Host -AsSecureString "Gmail app password of the sending mailbox (one time)"
     $pw = [Runtime.InteropServices.Marshal]::PtrToStringAuto([Runtime.InteropServices.Marshal]::SecureStringToBSTR($sec))
   }
   $pw = $pw.Replace(" ", "")

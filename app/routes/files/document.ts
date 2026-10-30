@@ -1,5 +1,6 @@
 import { Readable } from "node:stream";
 import type { Route } from "./+types/document";
+import { fileHeaders } from "~/lib/file-response.server";
 import { requireUser } from "~/lib/http.server";
 import { clientIp } from "~/modules/auth/rate-limit.server";
 import { authorizeDocumentDownload } from "~/modules/documents/service.server";
@@ -17,15 +18,12 @@ export async function loader({ request, params, context }: Route.LoaderArgs) {
       status: 404,
     });
   const ext = doc.mimeType === "application/pdf" ? "pdf" : doc.mimeType === "image/png" ? "png" : "jpg";
+  // Generic file name: no personal data in headers. ?view=1 shows it in the document viewer.
   return new Response(Readable.toWeb(file.stream) as ReadableStream, {
-    headers: {
-      "Content-Type": doc.mimeType,
-      "Content-Length": String(file.size),
-      // Generic file name: no personal data in headers, and the browser downloads instead of rendering.
-      "Content-Disposition": `attachment; filename="document-${doc.id.slice(0, 8)}.${ext}"`,
-      "Cache-Control": "private, no-store",
-      "X-Content-Type-Options": "nosniff",
-      "Content-Security-Policy": "default-src 'none'; sandbox",
-    },
+    headers: fileHeaders(request, {
+      mimeType: doc.mimeType,
+      size: file.size,
+      downloadName: `document-${doc.id.slice(0, 8)}.${ext}`,
+    }),
   });
 }

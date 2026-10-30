@@ -1,3 +1,4 @@
+import { RichTextEditor } from "~/components/rich-text-editor";
 import { useEffect, useRef, useState } from "react";
 import { Form, Link, useNavigation } from "react-router";
 import type { Route } from "./+types/help-desk-ticket";
@@ -13,7 +14,7 @@ import { PageHeader } from "~/components/staff";
 import { clientIp } from "~/modules/auth/rate-limit.server";
 import { handleAction, readForm, requireStaff } from "~/lib/http.server";
 import { cn } from "~/lib/utils";
-import { isSuperAdmin } from "~/modules/auth/permissions";
+import { hasPermission } from "~/modules/auth/permissions";
 import { STATUS_LABELS, type AppStatus } from "~/modules/applications/workflow";
 import { audit } from "~/modules/audit/audit.server";
 import { ValidationError } from "~/modules/core/errors";
@@ -52,7 +53,7 @@ export async function loader({ request, params, context }: Route.LoaderArgs) {
     entityId: d.ticket.id,
     ip: clientIp(request),
   });
-  return { ...d, me: user.id, superAdmin: isSuperAdmin(user.grants) };
+  return { ...d, me: user.id, superAdmin: hasPermission(user.grants, "helpdesk:admin") };
 }
 
 export async function action({ request, params, context }: Route.ActionArgs) {
@@ -89,7 +90,7 @@ export async function action({ request, params, context }: Route.ActionArgs) {
         return { message: "Priority updated." };
       case "escalate":
         await escalateTicket(user, params.id, String(form.get("reason") ?? ""));
-        return { message: "Escalated to the Super Admin." };
+        return { message: "Escalated to the senior administrators." };
       default:
         throw new ValidationError("Unknown action");
     }
@@ -112,8 +113,12 @@ export default function StaffTicket({ loaderData: L, actionData }: Route.Compone
   const [nextStatus, setNextStatus] = useState("");
   useEffect(() => setNextStatus(""), [status]);
   const reply = useRef<HTMLFormElement>(null);
+  const [sent, setSent] = useState(0);
   useEffect(() => {
-    if (a?.message) reply.current?.reset();
+    if (a?.message) {
+      reply.current?.reset();
+      setSent((n) => n + 1);
+    }
   }, [a?.message]);
   const transitions = status === "CLOSED" && !L.superAdmin ? [] : STAFF_TRANSITIONS[status];
 
@@ -203,7 +208,8 @@ export default function StaffTicket({ loaderData: L, actionData }: Route.Compone
               <label htmlFor="r-body" className="sr-only">
                 Message
               </label>
-              <textarea
+              <RichTextEditor
+                key={sent}
                 id="r-body"
                 name="body"
                 required
@@ -214,7 +220,7 @@ export default function StaffTicket({ loaderData: L, actionData }: Route.Compone
                     ? "Note for colleagues (not visible to the candidate)"
                     : "Message to the candidate"
                 }
-                className={cn("field-input", kind === "INTERNAL" && "border-warning bg-warning-50/40")}
+                className={cn(kind === "INTERNAL" && "border-warning bg-warning-50/40")}
               />
               {a?.fieldErrors?.body?.[0] && (
                 <p className="mt-1 text-sm text-danger">{a.fieldErrors.body[0]}</p>
@@ -349,7 +355,7 @@ export default function StaffTicket({ loaderData: L, actionData }: Route.Compone
               </p>
             </ConfirmDialog>
             {status === "CLOSED" && !L.superAdmin && (
-              <p className="text-xs text-muted">Only the Super Admin can reopen a closed ticket.</p>
+              <p className="text-xs text-muted">Only a senior administrator can reopen a closed ticket.</p>
             )}
           </Form>
 
@@ -419,7 +425,7 @@ export default function StaffTicket({ loaderData: L, actionData }: Route.Compone
               <CsrfInput />
               <input type="hidden" name="intent" value="escalate" />
               <h2 id="es" className="text-lg">
-                Escalate to Super Admin
+                Escalate
               </h2>
               <p className="text-xs text-muted">
                 For technical faults or policy questions. The ticket keeps its history; priority is raised to
@@ -430,7 +436,7 @@ export default function StaffTicket({ loaderData: L, actionData }: Route.Compone
                 required
                 minLength={10}
                 rows={2}
-                placeholder="Why it needs the Super Admin"
+                placeholder="Why it needs a senior administrator"
                 className="field-input"
               />
               <ConfirmDialog
@@ -440,7 +446,10 @@ export default function StaffTicket({ loaderData: L, actionData }: Route.Compone
                 confirmLabel="Escalate"
                 disabled={busy}
               >
-                <p>The Super Admin is notified with your reason. This is recorded in the ticket history.</p>
+                <p>
+                  The senior administrators are notified with your reason. This is recorded in the ticket
+                  history.
+                </p>
               </ConfirmDialog>
             </Form>
           )}
@@ -458,7 +467,7 @@ export default function StaffTicket({ loaderData: L, actionData }: Route.Compone
                       : e.type === "assigned"
                         ? `Assigned: ${e.fromLabel} → ${e.toLabel}`
                         : e.type === "escalated"
-                          ? "Escalated to the Super Admin"
+                          ? "Escalated to the senior administrators"
                           : e.type === "reopened"
                             ? "Reopened by the candidate"
                             : e.type === "priority"

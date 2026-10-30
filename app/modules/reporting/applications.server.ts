@@ -457,7 +457,7 @@ export function exportValue(key: ExportColumnKey, r: ExportRecord, sNo: number):
     case "sslc":
       return s(a.sslcMarks);
     case "hsc":
-      return s(a.hscMarks);
+      return a.hscRoute === "DIPLOMA" ? "Diploma (no HSC)" : s(a.hscMarks);
     case "ugDegree":
       return degree("UG");
     case "ugScore":

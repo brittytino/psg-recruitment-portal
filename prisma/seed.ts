@@ -2,13 +2,10 @@
  * Seed script (idempotent; safe to run repeatedly, including in production).
  *  1. Registers the application form templates (immutable; checksum verified).
  *  2. Adds the initial research specialisations, only when none exist yet (HR manages them after).
- *  3. Ensures the CSE department and the institutional staff accounts exist with the right roles:
- *       brittytino08@gmail.com  — Super Admin (full system access)
- *       dean.admn@psgtech.ac.in — Admin (Dean)
- *       principal@psgtech.ac.in — Admin (Principal)
- *       admin.n4@psgtech.ac.in  — HR – N4 Section
- *       hod.cse@psgtech.ac.in   — HOD, Computer Science and Engineering
- *     Staff sign in with a one-time code e-mailed on every sign-in; no passwords are stored.
+ *  3. On a brand-new database only: the first department, and the first Super Admin from
+ *     BOOTSTRAP_SUPER_ADMIN_EMAIL (server-only setting; no e-mail address lives in this repository).
+ *     Existing users and roles are never created, changed or removed by the seed: everyone else is
+ *     added in the application (Users & roles). Staff sign in with an e-mailed one-time code.
  *
  * No demo candidates, vacancies or applications are created.
  *
@@ -16,7 +13,7 @@
  */
 import { createHash } from "node:crypto";
 import { readFileSync } from "node:fs";
-import { PrismaClient, type Role } from "@prisma/client";
+import { PrismaClient } from "@prisma/client";
 
 const prisma = new PrismaClient();
 const sha = (s: string | Uint8Array) => createHash("sha256").update(s).digest("hex");
@@ -87,14 +84,6 @@ const INITIAL_SPECIALISATIONS = [
   { name: "Renewable Energy & Battery Storage", description: "Solar PV, green hydrogen, supercapacitors" },
 ];
 
-const STAFF: { email: string; name: string; role: Role; departmentCode?: string }[] = [
-  { email: "brittytino08@gmail.com", name: "System Administrator", role: "SUPER_ADMIN" },
-  { email: "dean.admn@psgtech.ac.in", name: "Dr. S. Saravanan", role: "ADMIN" },
-  { email: "principal@psgtech.ac.in", name: "Dr. G. Thilagavathi", role: "ADMIN" },
-  { email: "admin.n4@psgtech.ac.in", name: "HR – N4 Section", role: "HR" },
-  { email: "hod.cse@psgtech.ac.in", name: "HOD – CSE", role: "HOD", departmentCode: "CSE" },
-];
-
 async function registerTemplates() {
   for (const t of TEMPLATES) {
     const sha256 = t.templatePath.startsWith("builtin:")
@@ -130,75 +119,66 @@ async function ensureSpecialisations() {
   console.log(`added ${INITIAL_SPECIALISATIONS.length} initial research specialisations`);
 }
 
-async function ensureDepartments() {
-  const cse = await prisma.department.upsert({
-    where: { code: "CSE" },
-    update: {},
-    create: {
+/** A starting department on a brand-new database only; afterwards departments are managed in the app. */
+async function ensureFirstDepartment() {
+  if ((await prisma.department.count()) > 0) return;
+  await prisma.department.create({
+    data: {
       code: "CSE",
       name: "Computer Science and Engineering",
       description: "Department of Computer Science and Engineering",
       active: true,
     },
   });
-  console.log(`ensured department CSE (${cse.id})`);
-  return cse;
+  console.log("added the first department (CSE)");
 }
 
-async function ensureStaff() {
-  const cseDept = await ensureDepartments();
-  for (const s of STAFF) {
-    const existing = await prisma.user.findUnique({
-      where: { email: s.email },
-      include: { roles: true, profile: true },
-    });
-    const departmentId = s.departmentCode === "CSE" ? cseDept.id : null;
-
-    if (existing) {
-      // Ensure the correct role is assigned
-      const hasRole = existing.roles.some((r) => r.role === s.role && r.departmentId === departmentId);
-      if (!hasRole) {
-        await prisma.userRole.create({
-          data: { userId: existing.id, role: s.role, departmentId },
-        });
-      }
-      if (existing.profile?.fullName !== s.name) {
-        await prisma.candidateProfile.upsert({
-          where: { userId: existing.id },
-          create: {
-            userId: existing.id,
-            fullName: s.name,
-            privacyVersion: "staff",
-            privacyAcceptedAt: new Date(),
-          },
-          update: { fullName: s.name },
-        });
-      }
-      console.log(`verified ${s.role} ${s.email}`);
-      continue;
-    }
-
-    await prisma.$transaction(async (tx) => {
-      const user = await tx.user.create({
+/**
+ * First Super Admin on a new server. No e-mail address is stored in this repository: it is read from
+ * BOOTSTRAP_SUPER_ADMIN_EMAIL (server-only, secrets/override.env). When an active Super Admin already
+ * exists — every running installation — nothing is created or changed: staff accounts and roles are
+ * managed in the application (Users & roles), and the seed never touches existing users.
+ */
+async function ensureFirstSuperAdmin() {
+  const active = await prisma.userRole.count({ where: { role: "SUPER_ADMIN", user: { status: "ACTIVE" } } });
+  if (active > 0) {
+    console.log("Super Admin present: staff accounts are managed in the application");
+    return;
+  }
+  const email = process.env.BOOTSTRAP_SUPER_ADMIN_EMAIL?.trim().toLowerCase();
+  if (!email || !/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)) {
+    console.warn(
+      "No Super Admin yet. Put BOOTSTRAP_SUPER_ADMIN_EMAIL=you@example.org in secrets/override.env and run ./prod.sh seed",
+    );
+    return;
+  }
+  const name = process.env.BOOTSTRAP_SUPER_ADMIN_NAME?.trim() || "System Administrator";
+  const existing = await prisma.user.findUnique({ where: { email }, include: { roles: true } });
+  await prisma.$transaction(async (tx) => {
+    const user =
+      existing ??
+      (await tx.user.create({
         data: {
-          email: s.email,
+          email,
           emailVerifiedAt: new Date(),
           status: "ACTIVE",
-          roles: { create: { role: s.role, departmentId } },
-          profile: { create: { fullName: s.name, privacyVersion: "staff", privacyAcceptedAt: new Date() } },
+          profile: { create: { fullName: name, privacyVersion: "staff", privacyAcceptedAt: new Date() } },
         },
-      });
-      await tx.auditEvent.create({
-        data: {
-          action: "user.seeded",
-          entityType: "user",
-          entityId: user.id,
-          metadata: { role: s.role, departmentCode: s.departmentCode },
-        },
-      });
+      }));
+    if (existing && existing.status !== "ACTIVE")
+      await tx.user.update({ where: { id: user.id }, data: { status: "ACTIVE" } });
+    if (!existing?.roles.some((r) => r.role === "SUPER_ADMIN"))
+      await tx.userRole.create({ data: { userId: user.id, role: "SUPER_ADMIN" } });
+    await tx.auditEvent.create({
+      data: {
+        action: "user.seeded",
+        entityType: "user",
+        entityId: user.id,
+        metadata: { role: "SUPER_ADMIN" },
+      },
     });
-    console.log(`created ${s.role} ${s.email} (${s.name}) — passwordless OTP sign-in ready`);
-  }
+  });
+  console.log("created the first Super Admin (sign in with an e-mail code)");
 }
 
 /** Test/demo staff accounts (reserved .test domain) must never have access in a real deployment. */
@@ -222,7 +202,8 @@ async function disableTestAccounts() {
 async function main() {
   await registerTemplates();
   await ensureSpecialisations();
-  await ensureStaff();
+  await ensureFirstDepartment();
+  await ensureFirstSuperAdmin();
   await disableTestAccounts();
 }
 

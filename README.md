@@ -111,21 +111,22 @@ The application and supporting containers run on documented non-default external
 
 ---
 
-## 5. Approved Institutional Privileged Accounts
+## 5. Roles and the first account
 
-The production database bootstraps with **only** the approved institutional accounts. There are **zero** dummy candidates, fake vacancies, or sample recruitment applications created:
+No real account or e-mail address is stored in this repository. A new installation creates only the
+**first Super Admin**, from `BOOTSTRAP_SUPER_ADMIN_EMAIL` in the server-only file
+`secrets/override.env`; everyone else is added in the application (**Users & roles**). There are no
+demo candidates, vacancies or applications.
 
-| Identity / Name         | Official Email            | System Role   | Operational Scope & Permissions                                                                                                                                                                                |
-| :---------------------- | :------------------------ | :------------ | :------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| **Super Admin**         | `brittytino08@gmail.com`  | `SUPER_ADMIN` | **Super Admin**: Highest system privileges, user & role management, system settings, department management, full audit log access, security configuration, and full recruitment oversight.                     |
-| **Dr. S. Saravanan**    | `dean.admn@psgtech.ac.in` | `ADMIN`       | **Dean**: Recruitment administration, institution-wide application monitoring, bulk HOD assignment, summary review, and position-change oversight. _(No unrestricted system log or user administration)_       |
-| **Dr. G. Thilagavathi** | `principal@psgtech.ac.in` | `ADMIN`       | **Principal**: Recruitment administration, institution-wide application monitoring, bulk HOD assignment, summary review, and position-change oversight. _(No unrestricted system log or user administration)_  |
-| **HR / N4 Section**     | `admin.n4@psgtech.ac.in`  | `HR`          | **HR / N4 Section**: Vacancy and job profile creation/publishing, applicant qualification screening, complete PDF bundle downloads, approved summary review, and selective CSV export.                         |
-| **CSE HOD**             | `hod.cse@psgtech.ac.in`   | `HOD`         | **CSE Department HOD**: Department-scoped applicant reviews, recommendation recording (Accept, Reject with reason, Recommend Assoc to Asst Prof change), and department summary sheet generation and approval. |
-
-_Initial Department Configured_: `CSE` (Computer Science and Engineering, Code: `CSE`). All additional departments and HOD assignments are managed dynamically through the Super Admin interface.
-
----
+| Role | Who | Can do |
+| :--- | :--- | :--- |
+| `SUPER_ADMIN` | System owner (hidden from every other user) | Everything: users and every role, system settings, control centre, system logs, audit log. |
+| `MANAGER` — **Admin** | Recruitment and support lead | Everything HR and Dean / Principal can do, the help desk (including settings), and adding HR, HOD and Viewer accounts. No system settings, logs or audit log. |
+| `ADMIN` — **Dean / Principal** | Recruitment oversight | All applications, HOD assignment, position-change approval, summaries. |
+| `HR` — **HR – N4 Section** | Recruitment office | Job profiles, screening, departments and HOD invitations, exports, help desk, viewers. |
+| `HOD` | Head of a department | Reviews the applications assigned to them; approves the department summary sheet. |
+| `VIEWER` | Read-only | Lists and opens applications and their documents; nothing else. |
+| `CANDIDATE` | Applicants | Their own applications and help desk tickets. |
 
 ## 6. Strict 100% Passwordless Authentication & Email Infrastructure
 
@@ -135,7 +136,7 @@ The portal employs a zero-password, zero-magic-link authentication architecture.
 
 - **Dual-Provider Architecture**:
   - **Local Development & Automated Tests**: Uses **Mailpit** (`axllent/mailpit:v1.27.10`) on SMTP port `1025` (published on host at `2525`) and Web UI on port `8025`. Emails sent locally are captured in the Mailpit inbox without hitting real external mailboxes. The test adapter (`EMAIL_PROVIDER=test`) is used for isolated unit and integration test mock transport.
-  - **Production Delivery**: Uses real institutional SMTP (`EMAIL_PROVIDER=smtp`) with the official PSG Tech mailbox `recruitments@psgtech.ac.in`. Requires valid institutional SMTP host, port (587 STARTTLS / 465 SSL), and dedicated mailbox application password stored exclusively in private server environment configuration.
+  - **Production Delivery**: Uses real institutional SMTP (`EMAIL_PROVIDER=smtp`) with the official PSG Tech mailbox `recruitment@your-college.edu`. Requires valid institutional SMTP host, port (587 STARTTLS / 465 SSL), and dedicated mailbox application password stored exclusively in private server environment configuration.
 - **Fail-Fast Production Validation**:
   - Startup strictly forbids `EMAIL_PROVIDER=mailpit` or `EMAIL_PROVIDER=test` when `NODE_ENV=production`.
   - Requires non-empty `SMTP_HOST`, `SMTP_USER`, and `SMTP_PASSWORD` in production.

@@ -1,3 +1,4 @@
+import { DocumentViewer } from "~/components/document-viewer";
 import { Form, Link, redirect, useNavigation } from "react-router";
 import type { Route } from "./+types/documents";
 import { Alert, Badge, ConfirmDialog, CsrfInput, formatDateTime, statusTone } from "~/components/forms";
@@ -194,7 +195,10 @@ export default function Documents({ loaderData, actionData }: Route.ComponentPro
                 <tr key={d.id}>
                   <td>{DOCUMENT_TYPE_LABELS[d.type]}</td>
                   <td>
-                    <a href={`/files/documents/${d.id}`}>{d.name}</a>
+                    <span className="flex items-center gap-2">
+                      <DocumentViewer file={{ href: `/files/documents/${d.id}`, name: d.name }} />
+                      <a href={`/files/documents/${d.id}`}>{d.name}</a>
+                    </span>
                     <span className="block text-xs text-muted">{(d.size / 1024).toFixed(0)} KB</span>
                   </td>
                   <td>

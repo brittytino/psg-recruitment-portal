@@ -62,6 +62,13 @@ async function nextReference(tx: Tx): Promise<string> {
 const personName = (u: { email: string; profile: { fullName: string } | null } | null) =>
   u ? u.profile?.fullName?.trim() || u.email : null;
 
+/** Super Admin accounts, shown as "Administrator" to everyone else. */
+async function superAdminIds(): Promise<Set<string>> {
+  const rows = await prisma.userRole.findMany({ where: { role: "SUPER_ADMIN" }, select: { userId: true } });
+  return new Set(rows.map((r) => r.userId));
+}
+const HIDDEN_NAME = "Administrator";
+
 async function event(
   tx: Tx,
   ticketId: string,
@@ -511,6 +518,7 @@ function viewWhere(view: StaffView, userId: string): Prisma.SupportTicketWhereIn
 
 export async function staffTickets(user: SessionUser | null, q: StaffListQuery) {
   const u = requireSupport(user);
+  const supers = isSuperAdmin(u.grants) ? new Set<string>() : await superAdminIds();
   const ist = (d: string, end: boolean) => new Date(`${d}T${end ? "23:59:59.999" : "00:00:00"}+05:30`);
   const where: Prisma.SupportTicketWhereInput = {
     AND: [
@@ -567,7 +575,7 @@ export async function staffTickets(user: SessionUser | null, q: StaffListQuery) 
     rows: rows.map((r) => ({
       ...r,
       candidate: personName(r.createdBy),
-      assigneeName: personName(r.assignee),
+      assigneeName: r.assignee && supers.has(r.assignee.id) ? HIDDEN_NAME : personName(r.assignee),
       waitingOnTeam:
         r.status !== "RESOLVED" &&
         r.status !== "CLOSED" &&
@@ -593,7 +601,14 @@ export async function staffCounts(user: SessionUser | null) {
 }
 
 export async function staffTicket(user: SessionUser | null, id: string) {
-  requireSupport(user);
+  const viewer = requireSupport(user);
+  const hide = !isSuperAdmin(viewer.grants);
+  const supers = hide ? await superAdminIds() : new Set<string>();
+  const masked = <T extends { email: string; profile: { fullName: string } | null }>(
+    id: string | null,
+    u: T,
+  ): T =>
+    id && supers.has(id) ? { ...u, email: "", profile: { ...(u.profile ?? {}), fullName: HIDDEN_NAME } } : u;
   if (!UUID.test(id)) throw new NotFoundError("Ticket");
   const t = await prisma.supportTicket.findUnique({
     where: { id },
@@ -624,18 +639,23 @@ export async function staffTicket(user: SessionUser | null, id: string) {
     },
   });
   if (!t) throw new NotFoundError("Ticket");
-  const staff = await supportStaff();
+  const staff = await supportStaff(!hide);
   const nameOf = (id: string | null) => {
+    if (id && supers.has(id)) return HIDDEN_NAME;
     const s = staff.find((x) => x.id === id);
     return s ? personName(s) : id ? "Former staff member" : "Unassigned";
   };
   return {
-    ticket: t,
+    ticket: {
+      ...t,
+      assignee: t.assignee ? masked(t.assigneeId, t.assignee) : null,
+      messages: t.messages.map((m) => ({ ...m, author: masked(m.authorId, m.author) })),
+    },
     candidate: { ...t.createdBy, name: personName(t.createdBy) },
     staff: staff.map((s) => ({ id: s.id, name: personName(s)! })),
     events: t.events.map((e) => ({
       ...e,
-      actorName: personName(e.actor) ?? "System",
+      actorName: e.actorId && supers.has(e.actorId) ? HIDDEN_NAME : (personName(e.actor) ?? "System"),
       fromLabel: e.type === "assigned" ? nameOf(e.fromValue) : labelOf(e.fromValue),
       toLabel: e.type === "assigned" ? nameOf(e.toValue) : labelOf(e.toValue),
     })),
@@ -646,7 +666,7 @@ function labelOf(v: string | null): string | null {
   if (!v) return null;
   if (v in STAFF_STATUS_LABEL) return STAFF_STATUS_LABEL[v as TicketStatus];
   if (v in PRIORITY_LABEL) return PRIORITY_LABEL[v as Priority];
-  if (v === "SUPER_ADMIN") return "Super Admin";
+  if (v === "SUPER_ADMIN" || v === "SENIOR") return "Senior administrators";
   return v;
 }
 
@@ -746,8 +766,8 @@ export async function setTicketStatus(user: SessionUser | null, id: string, inpu
     throw new ConflictError(
       `A ${STAFF_STATUS_LABEL[t.status as TicketStatus]} ticket cannot be set to ${STAFF_STATUS_LABEL[to]}.`,
     );
-  if (t.status === "CLOSED" && !isSuperAdmin(u.grants))
-    throw new ForbiddenError("Only the Super Admin can reopen a closed ticket.");
+  if (t.status === "CLOSED" && !hasPermission(u.grants, "helpdesk:admin"))
+    throw new ForbiddenError("Only a senior administrator can reopen a closed ticket.");
   const summary = p.data.summary?.trim();
   if (NEEDS_SUMMARY.includes(to) && (!summary || summary.length < 10))
     throw new ValidationError("Please correct the highlighted fields", {
@@ -804,7 +824,7 @@ export async function assignTicket(
 ) {
   const u = requireSupport(user);
   if (assigneeId !== null && (!UUID.test(assigneeId) || !(await isSupportStaff(assigneeId))))
-    throw new ValidationError("Choose an active HR – N4 Section or Super Admin account");
+    throw new ValidationError("Choose an active support staff account");
   const t = await prisma.supportTicket.findUnique({ where: { id } });
   if (!t) throw new NotFoundError("Ticket");
   if (t.assigneeId === assigneeId) return;
@@ -869,7 +889,7 @@ export async function setTicketPriority(user: SessionUser | null, id: string, pr
   });
 }
 
-/** Escalation to the Super Admin, with a reason. Keeps the ticket's history and creator. */
+/** Escalation to the senior administrators (Admin and Super Admin), with a reason. Keeps history. */
 export async function escalateTicket(user: SessionUser | null, id: string, reason: string) {
   const u = requireSupport(user);
   const r = reason.trim();
@@ -883,7 +903,7 @@ export async function escalateTicket(user: SessionUser | null, id: string, reaso
   if (t.status === "RESOLVED" || t.status === "CLOSED")
     throw new ConflictError("Reopen the ticket before escalating it.");
   const admins = await prisma.user.findMany({
-    where: { status: "ACTIVE", roles: { some: { role: "SUPER_ADMIN" } } },
+    where: { status: "ACTIVE", roles: { some: { role: { in: ["SUPER_ADMIN", "MANAGER"] } } } },
     select: { id: true },
   });
   await prisma.$transaction(async (tx) => {
@@ -896,7 +916,7 @@ export async function escalateTicket(user: SessionUser | null, id: string, reaso
         priority: t.priority === "LOW" || t.priority === "NORMAL" ? "HIGH" : t.priority,
       },
     });
-    const e = await event(tx, id, u.id, "escalated", null, "SUPER_ADMIN", r.slice(0, 2000));
+    const e = await event(tx, id, u.id, "escalated", null, "SENIOR", r.slice(0, 2000));
     await audit(
       {
         actorId: u.id,
@@ -913,7 +933,7 @@ export async function escalateTicket(user: SessionUser | null, id: string, reaso
           tx,
           a.id,
           "helpdesk.staff.escalated",
-          `Ticket escalated to you — ${t.referenceNo}`,
+          `Ticket escalated — ${t.referenceNo}`,
           `${t.subject}\n\nReason: ${r.slice(0, 500)}`,
           {
             dedupeKey: `ticket:${id}:escalated:${e.id}`,

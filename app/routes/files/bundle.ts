@@ -1,5 +1,6 @@
 import { Readable } from "node:stream";
 import type { Route } from "./+types/bundle";
+import { fileHeaders } from "~/lib/file-response.server";
 import { requireUser } from "~/lib/http.server";
 import { clientIp } from "~/modules/auth/rate-limit.server";
 import { prisma } from "~/modules/core/db.server";
@@ -28,11 +29,7 @@ export async function loader({ request, params, context }: Route.LoaderArgs) {
   const name = `${app?.referenceNo ?? "application"}-r${rev?.revisionNo ?? 1}-v${g.version}.pdf`;
   return new Response(Readable.toWeb(file.stream) as ReadableStream, {
     headers: {
-      "Content-Type": "application/pdf",
-      "Content-Length": String(file.size),
-      "Content-Disposition": `attachment; filename="${name}"`,
-      "Cache-Control": "private, no-store",
-      "X-Content-Type-Options": "nosniff",
+      ...fileHeaders(request, { mimeType: "application/pdf", size: file.size, downloadName: name }),
       "X-Checksum-SHA256": g.sha256 ?? "",
     },
   });

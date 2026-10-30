@@ -205,7 +205,7 @@ export default function Departments({ loaderData, actionData }: Route.ComponentP
                             name="email"
                             type="email"
                             required
-                            placeholder={`hod.${d.code.toLowerCase()}@psgtech.ac.in`}
+                            placeholder={`hod.${d.code.toLowerCase()}@your-college.edu`}
                           />
                           <div className="sm:col-span-2">
                             <button type="submit" className="btn-primary btn-sm" disabled={busy}>
@@ -284,7 +284,7 @@ export default function Departments({ loaderData, actionData }: Route.ComponentP
                   name="hodEmail"
                   type="email"
                   required
-                  placeholder="hod.cse@psgtech.ac.in"
+                  placeholder="hod.department@your-college.edu"
                   hint="An invitation with the sign-in link is e-mailed."
                   error={fe?.hodEmail?.[0]}
                 />

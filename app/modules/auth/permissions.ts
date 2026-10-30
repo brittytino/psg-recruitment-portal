@@ -3,7 +3,10 @@
  * every loader/action/download re-checks on the server, together with record-level scope rules in
  * policy.server.ts. See docs/architecture/authorization-matrix.md.
  *
- *  - SUPER_ADMIN: full system access.
+ *  - SUPER_ADMIN: full system access. Hidden from every other user.
+ *  - MANAGER ("Admin"): runs recruitment and support day to day — everything HR – N4 Section and
+ *    Dean / Principal can do, the help desk (including its settings), and adding people in lower
+ *    roles (HR, HOD, Viewer). No system settings, system logs, audit log or Super Admin powers.
  *  - ADMIN: Dean and Principal. Recruitment oversight and assigning applications to HODs.
  *  - HR: HR – N4 Section. Job profiles, screening, departments + HOD invitations, research
  *    specialisations, the public "open positions" notice, summaries and exports.
@@ -12,17 +15,28 @@
  *    Super Admin or HR – N4 Section.
  *  - CANDIDATE: their own applications only.
  */
-export const ROLES = ["CANDIDATE", "HR", "HOD", "ADMIN", "SUPER_ADMIN", "VIEWER"] as const;
+export const ROLES = ["CANDIDATE", "HR", "HOD", "ADMIN", "SUPER_ADMIN", "VIEWER", "MANAGER"] as const;
 export type RoleName = (typeof ROLES)[number];
 
 /** Staff roles that Super Admin can grant (candidates register themselves). */
 export const STAFF_ROLES = [
   "SUPER_ADMIN",
+  "MANAGER",
   "ADMIN",
   "HR",
   "HOD",
   "VIEWER",
 ] as const satisfies readonly RoleName[];
+
+/**
+ * Roles each manager may grant, edit or remove. The Super Admin manages everyone; an Admin
+ * (MANAGER) manages lower roles only. Nobody else manages users.
+ */
+export function grantableRoles(grants: readonly RoleGrant[]): readonly StaffRole[] {
+  if (hasRole(grants, "SUPER_ADMIN")) return STAFF_ROLES;
+  if (hasRole(grants, "MANAGER")) return ["HR", "HOD", "VIEWER"];
+  return [];
+}
 export type StaffRole = (typeof STAFF_ROLES)[number];
 
 export type Permission =
@@ -118,6 +132,26 @@ export const ROLE_PERMISSIONS: Record<RoleName, readonly Permission[]> = {
   ],
   // Super Admin holds every staff permission, including ones added later (see ALL_STAFF_PERMISSIONS).
   SUPER_ADMIN: ALL_STAFF_PERMISSIONS,
+  // Admin: HR + Dean / Principal work, the help desk and lower-role management; not system-level.
+  MANAGER: [
+    "application:list",
+    "application:read",
+    "application:transition",
+    "application:assign",
+    "application:export",
+    "summary:read",
+    "summary:reopen",
+    "position:approve",
+    "document:download",
+    "document:regenerate",
+    "recruitment:manage",
+    "department:manage",
+    "notice:manage",
+    "helpdesk:handle",
+    "helpdesk:admin",
+    "viewer:manage",
+    "user:manage",
+  ],
   // Read only: no transition, assignment, export, decisions, help desk or configuration.
   VIEWER: ["application:list", "application:read", "document:download"],
 };
@@ -126,7 +160,8 @@ export const ROLE_LABELS: Record<RoleName, string> = {
   CANDIDATE: "Candidate",
   HR: "HR – N4 Section",
   HOD: "Head of Department (HOD)",
-  ADMIN: "Admin (Dean / Principal)",
+  ADMIN: "Dean / Principal",
+  MANAGER: "Admin",
   SUPER_ADMIN: "Super Admin",
   VIEWER: "Viewer (read only)",
 };
@@ -138,6 +173,8 @@ export const ROLE_DESCRIPTIONS: Record<RoleName, string> = {
   ADMIN:
     "Recruitment oversight: assigns applications to HODs, tracks progress, approves position changes and views summaries.",
   SUPER_ADMIN: "Full system access: users, roles, settings, audit logs and every recruitment operation.",
+  MANAGER:
+    "Runs recruitment and support: applications, HOD assignment, job profiles, departments, the help desk, and adding HR, HOD and Viewer accounts.",
   VIEWER: "Can open and read submitted applications and their documents. Cannot change anything.",
 };
 
@@ -163,8 +200,13 @@ export function isSuperAdmin(grants: readonly RoleGrant[]): boolean {
   return hasRole(grants, "SUPER_ADMIN");
 }
 
+/** Institution-wide recruitment office access: Dean / Principal, Admin and Super Admin. */
 export function isAdmin(grants: readonly RoleGrant[]): boolean {
-  return hasRole(grants, "ADMIN") || hasRole(grants, "SUPER_ADMIN");
+  return hasRole(grants, "ADMIN") || hasRole(grants, "MANAGER") || hasRole(grants, "SUPER_ADMIN");
+}
+
+export function isManager(grants: readonly RoleGrant[]): boolean {
+  return hasRole(grants, "MANAGER");
 }
 
 export function isHrOfficer(grants: readonly RoleGrant[]): boolean {
@@ -188,7 +230,8 @@ export function hodDepartments(grants: readonly RoleGrant[]): string[] {
 /** Highest-privilege role label, for headers and badges. */
 export function primaryRoleLabel(grants: readonly RoleGrant[]): string {
   if (isSuperAdmin(grants)) return "Super Admin";
-  if (isAdmin(grants)) return "Admin";
+  if (isManager(grants)) return "Admin";
+  if (isAdmin(grants)) return "Dean / Principal";
   if (isHrOfficer(grants)) return "HR – N4 Section";
   if (isHodReviewer(grants)) return "HOD";
   if (isViewer(grants)) return "Viewer (read only)";

@@ -271,7 +271,9 @@ function extractQualifications(def: FormDefinition, a: Answers) {
   const s = strOrNull;
   const numVal = (v: unknown) => (v == null || v === "" ? 1 : Number(v) || 1);
   if (def.version >= 2) {
-    const school = (["sslc", "hsc"] as const).map((p, i) => ({
+    // Diploma-after-SSLC candidates have no HSC row; their Diploma is a college qualification.
+    const levels = a.hscRoute === "DIPLOMA" ? (["sslc"] as const) : (["sslc", "hsc"] as const);
+    const school = levels.map((p, i) => ({
       sortOrder: i,
       category: "SCHOOL",
       level: p.toUpperCase(),

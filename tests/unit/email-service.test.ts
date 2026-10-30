@@ -18,11 +18,11 @@ describe("Email Service & Institutional Transporter", () => {
     process.env.EMAIL_PROVIDER = "test";
     process.env.SMTP_HOST = "localhost";
     process.env.SMTP_PORT = "1025";
-    process.env.SMTP_USER = "recruitments@psgtech.ac.in";
+    process.env.SMTP_USER = "recruitment@college.example";
     process.env.SMTP_PASSWORD = "test-mailbox-password";
     process.env.SMTP_FROM_NAME = "PSG College of Technology Recruitment";
-    process.env.SMTP_FROM_EMAIL = "recruitments@psgtech.ac.in";
-    process.env.MAIL_FROM = "PSG College of Technology Recruitment <recruitments@psgtech.ac.in>";
+    process.env.SMTP_FROM_EMAIL = "recruitment@college.example";
+    process.env.MAIL_FROM = "PSG College of Technology Recruitment <recruitment@college.example>";
     process.env.APP_ORIGIN = "http://localhost:6969";
     process.env.DATABASE_URL = "postgresql://srp_app:pass@localhost:5432/srportal";
     process.env.REDIS_URL = "redis://localhost:6379";
@@ -121,7 +121,7 @@ describe("Email Service & Institutional Transporter", () => {
       process.env.SMTP_HOST = "smtp.psgtech.ac.in";
       process.env.SMTP_PORT = "587";
       process.env.SMTP_SECURE = "false";
-      process.env.SMTP_USER = "recruitments@psgtech.ac.in";
+      process.env.SMTP_USER = "recruitment@college.example";
       process.env.SMTP_PASSWORD = "app-specific-secret";
       resetEnvCacheForTesting();
       resetTransporterForTesting();
@@ -145,7 +145,7 @@ describe("Email Service & Institutional Transporter", () => {
       expect(opts.port).toBe(587);
       expect(opts.secure).toBe(false);
       expect(opts.pool).toBe(true);
-      expect(opts.auth?.user).toBe("recruitments@psgtech.ac.in");
+      expect(opts.auth?.user).toBe("recruitment@college.example");
       expect(opts.auth?.pass).toBe("app-specific-secret");
     });
   });
@@ -155,7 +155,7 @@ describe("Email Service & Institutional Transporter", () => {
       process.env.EMAIL_PROVIDER = "smtp";
       process.env.SMTP_HOST = "unresolvable-domain-psgtech-test.invalid";
       process.env.SMTP_PORT = "587";
-      process.env.SMTP_USER = "recruitments@psgtech.ac.in";
+      process.env.SMTP_USER = "recruitment@college.example";
       process.env.SMTP_PASSWORD = "secretPassword123";
       resetEnvCacheForTesting();
       resetTransporterForTesting();
@@ -178,7 +178,7 @@ describe("Email Service & Institutional Transporter", () => {
       process.env.EMAIL_PROVIDER = "smtp";
       process.env.SMTP_HOST = "smtp.psgtech.ac.in";
       process.env.SMTP_PORT = "587";
-      process.env.SMTP_USER = "recruitments@psgtech.ac.in";
+      process.env.SMTP_USER = "recruitment@college.example";
       process.env.SMTP_PASSWORD = "wrongPassword123";
       resetEnvCacheForTesting();
       resetTransporterForTesting();

@@ -7,6 +7,7 @@ import {
   isHodReviewer,
   hodDepartments,
   homePath,
+  grantableRoles,
   hasPermission,
   primaryRoleLabel,
   type RoleGrant,
@@ -30,7 +31,7 @@ describe("Authentication & Authorization Security Controls", () => {
     process.env.EMAIL_PROVIDER = "test";
     process.env.SMTP_HOST = "smtp.psgtech.ac.in";
     process.env.SMTP_PORT = "587";
-    process.env.SMTP_USER = "recruitments@psgtech.ac.in";
+    process.env.SMTP_USER = "recruitment@college.example";
     process.env.SMTP_PASSWORD = "app-specific-secret";
     process.env.DEV_LOG_OTP = "false";
   });
@@ -75,7 +76,7 @@ describe("Authentication & Authorization Security Controls", () => {
 
       expect(() => env()).toThrow(/SMTP_USER is required for production/);
 
-      process.env.SMTP_USER = "recruitments@psgtech.ac.in";
+      process.env.SMTP_USER = "recruitment@college.example";
       process.env.SMTP_PASSWORD = "";
       resetEnvCacheForTesting();
 
@@ -86,7 +87,7 @@ describe("Authentication & Authorization Security Controls", () => {
       process.env.NODE_ENV = "production";
       process.env.EMAIL_PROVIDER = "smtp";
       process.env.SMTP_HOST = "smtp.psgtech.ac.in";
-      process.env.SMTP_USER = "recruitments@psgtech.ac.in";
+      process.env.SMTP_USER = "recruitment@college.example";
       process.env.SMTP_PASSWORD = "secure-password";
       process.env.DEV_LOG_OTP = "true";
       resetEnvCacheForTesting();
@@ -118,8 +119,28 @@ describe("Authentication & Authorization Security Controls", () => {
       expect(hasPermission(adminGrants, "position:approve")).toBe(true);
       expect(hasPermission(adminGrants, "recruitment:manage")).toBe(true);
       expect(hasPermission(adminGrants, "system:manage")).toBe(false); // only Super Admin
-      expect(primaryRoleLabel(adminGrants)).toBe("Admin");
+      expect(primaryRoleLabel(adminGrants)).toBe("Dean / Principal");
       expect(homePath(adminGrants)).toBe("/staff");
+    });
+
+    it("Admin (MANAGER) runs recruitment and support but is below the Super Admin", () => {
+      const m = [{ role: "MANAGER" as const, departmentId: null }];
+      expect(primaryRoleLabel(m)).toBe("Admin");
+      expect(isAdmin(m)).toBe(true);
+      expect(isSuperAdmin(m)).toBe(false);
+      for (const p of [
+        "application:assign",
+        "helpdesk:handle",
+        "helpdesk:admin",
+        "user:manage",
+        "viewer:manage",
+      ] as const)
+        expect(hasPermission(m, p)).toBe(true);
+      for (const p of ["settings:manage", "system:manage", "audit:read"] as const)
+        expect(hasPermission(m, p)).toBe(false);
+      expect([...grantableRoles(m)].sort()).toEqual(["HOD", "HR", "VIEWER"]);
+      expect(grantableRoles(adminGrants)).toEqual([]);
+      expect(grantableRoles([{ role: "SUPER_ADMIN", departmentId: null }])).toContain("MANAGER");
     });
 
     it("preserves HR (N4 Section) permissions", () => {
@@ -151,7 +172,7 @@ describe("Authentication & Authorization Security Controls", () => {
     it("evaluates staff application scope correctly for all institutional roles", () => {
       const mockUser = (grants: RoleGrant[], id = "user-1"): SessionUser => ({
         id,
-        email: "test@psgtech.ac.in",
+        email: "test@college.example",
         emailVerified: true,
         displayName: "Test User",
         grants,

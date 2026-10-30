@@ -35,7 +35,10 @@ export interface TableAttachmentConfig {
  */
 export interface Condition {
   key: string;
-  in: readonly string[];
+  /** Shown when the answer is one of these. */
+  in?: readonly string[];
+  /** Shown unless the answer is one of these (an unanswered question counts as "not in"). */
+  notIn?: readonly string[];
 }
 
 interface BaseField {

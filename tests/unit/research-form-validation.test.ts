@@ -56,7 +56,7 @@ describe("Research Application Form (V1)", () => {
       designation: "Professor",
       organisation: "PSG Tech",
       mobile: "9876543210",
-      email: "einstein@psgtech.ac.in",
+      email: "einstein@college.example",
       relationship: "Guide",
     };
 

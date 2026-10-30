@@ -1,3 +1,4 @@
+import { RichTextEditor } from "~/components/rich-text-editor";
 import { Check, Copy } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { Form, Link, useNavigation, useSearchParams } from "react-router";
@@ -63,8 +64,12 @@ export default function Ticket({ loaderData: L, actionData }: Route.ComponentPro
   const a = actionData as
     { message?: string; formError?: string; fieldErrors?: Record<string, string[]> } | undefined;
   const form = useRef<HTMLFormElement>(null);
+  const [sent, setSent] = useState(0);
   useEffect(() => {
-    if (a?.message) form.current?.reset();
+    if (a?.message) {
+      form.current?.reset();
+      setSent((n) => n + 1);
+    }
   }, [a?.message]);
   const status = t.status as TicketStatus;
 
@@ -154,15 +159,15 @@ export default function Ticket({ loaderData: L, actionData }: Route.ComponentPro
               <label htmlFor="f-body" className="sr-only">
                 Your message
               </label>
-              <textarea
+              <RichTextEditor
+                key={sent}
                 id="f-body"
                 name="body"
                 required
                 rows={5}
                 maxLength={TICKET_LIMITS.reply.max}
                 placeholder="Write your message"
-                aria-invalid={!!a?.fieldErrors?.body}
-                className="field-input"
+                invalid={!!a?.fieldErrors?.body}
               />
               {a?.fieldErrors?.body?.[0] && (
                 <p className="mt-1 text-sm text-danger">{a.fieldErrors.body[0]}</p>

@@ -133,7 +133,7 @@ create_env() {
 }
 
 # Secrets that live only on the server: generated once (or entered once) and never overwritten.
-SERVER_SECRETS=" POSTGRES_PASSWORD APP_DB_PASSWORD DATABASE_URL MIGRATION_DATABASE_URL SESSION_SECRET CONVERTER_TOKEN SMTP_PASSWORD SMTP_RELAY_PASSWORD DB_VIEWER_PASSWORD "
+SERVER_SECRETS=" POSTGRES_PASSWORD APP_DB_PASSWORD DATABASE_URL MIGRATION_DATABASE_URL SESSION_SECRET CONVERTER_TOKEN SMTP_PASSWORD SMTP_RELAY_PASSWORD DB_VIEWER_PASSWORD SMTP_USER SMTP_FROM_EMAIL MAIL_FROM BOOTSTRAP_SUPER_ADMIN_EMAIL BOOTSTRAP_SUPER_ADMIN_NAME "
 
 # The committed template is the source of truth for every non-secret setting: after `git pull`,
 # ./prod.sh applies changed values (e.g. a new domain) to .env. Secrets are kept. Server-only
@@ -174,6 +174,21 @@ sync_env() {
 ensure_smtp_password() {
   [ "$MODE" = prod ] || return 0
   [ "$(env_get EMAIL_PROVIDER)" = smtp ] || return 0
+  # First run only: the sending mailbox is a server value, never committed to the repository.
+  if [ -z "$(env_get SMTP_USER)" ]; then
+    local box="${SMTP_USER:-}"
+    if [ -z "$box" ] && [ -t 0 ]; then
+      echo
+      info "One-time setup: the mailbox that sends e-mails (e.g. recruitment@your-college.edu)"
+      read -rp "    Sending mailbox: " box
+    fi
+    box="$(printf '%s' "$box" | tr -d ' \r\n')"
+    case "$box" in *@*.*) ;; *) die "No sending mailbox. Run again interactively, or: SMTP_USER=mailbox@your-college.edu ./prod.sh" ;; esac
+    env_set SMTP_USER "$box"
+    env_set SMTP_FROM_EMAIL "$box"
+    env_set MAIL_FROM "\"PSG College of Technology Recruitment <$box>\""
+    ok "Saved the sending mailbox in .env (this server only)"
+  fi
   [ -n "$(env_get SMTP_PASSWORD)" ] && return 0
   local pw="${SMTP_PASSWORD:-}"
   if [ -z "$pw" ] && [ -f secrets/smtp_password ]; then pw="$(tr -d '\r\n' < secrets/smtp_password)"; fi
@@ -405,7 +420,7 @@ case "$CMD" in
   mail-account)
     [ -f .env ] || die "No .env yet. Run ./prod.sh first."
     addr="${MAIL_ACCOUNT:-}"
-    if [ -z "$addr" ]; then read -rp "    Sending mailbox (e.g. recruitment.office@psgtech.ac.in): " addr; fi
+    if [ -z "$addr" ]; then read -rp "    Sending mailbox (e.g. recruitment.office@your-college.edu): " addr; fi
     addr="$(printf '%s' "$addr" | tr -d ' \r\n')"
     case "$addr" in *@*.*) ;; *) die "That is not an e-mail address." ;; esac
     pw="${SMTP_PASSWORD:-}"

@@ -89,3 +89,33 @@ describe("read-only viewer", () => {
     );
   });
 });
+
+describe("Admin (MANAGER) user management", () => {
+  it("adds lower roles only, cannot see or touch the Super Admin, cannot change Dean / Principal", async () => {
+    const { createStaffUser, listStaff, setUserStatus } = await import("~/modules/users/service.server");
+    const admin = await makeUser("MANAGER");
+    const sa = await makeUser("SUPER_ADMIN");
+    const dean = await makeUser("ADMIN");
+    const email = (r: string) => `mgr-${r}-${randomUUID().slice(0, 6)}@it.example.test`;
+
+    await createStaffUser(admin, { email: email("hr"), fullName: "New HR", role: "HR", departmentIds: [] });
+    for (const role of ["ADMIN", "MANAGER", "SUPER_ADMIN"])
+      await expect(
+        createStaffUser(admin, { email: email(role), fullName: "No", role, departmentIds: [] }),
+      ).rejects.toThrow(/cannot give this role/);
+
+    expect((await listStaff(admin, sa.email)).some((u) => u.id === sa.id)).toBe(false);
+    expect((await listStaff(admin, dean.email)).some((u) => u.id === dean.id)).toBe(true);
+    await expect(setUserStatus(admin, sa.id, "DISABLED")).rejects.toThrow(/not found/i);
+    await expect(setUserStatus(admin, dean.id, "DISABLED")).rejects.toThrow(/Only the Super Admin/);
+
+    // The Super Admin sees everyone and may add an Admin.
+    expect((await listStaff(sa, sa.email)).some((u) => u.id === sa.id)).toBe(true);
+    await createStaffUser(sa, {
+      email: email("mgr"),
+      fullName: "New Admin",
+      role: "MANAGER",
+      departmentIds: [],
+    });
+  });
+});

@@ -1,3 +1,4 @@
+import { DocumentViewer } from "~/components/document-viewer";
 import { Form, Link, useSearchParams } from "react-router";
 import type { Route } from "./+types/receipt";
 import { Alert, Badge, ConfirmDialog, CsrfInput, formatDateTime, statusTone } from "~/components/forms";
@@ -147,13 +148,15 @@ export default function Receipt({ loaderData: L, actionData }: Route.ComponentPr
             <dt className="text-muted">Submitted Application PDF</dt>
             <dd>
               {L.applicationPdf ? (
-                <a
-                  href={`/files/bundles/${L.applicationPdf.id}`}
-                  className="font-medium text-brand-700 underline"
-                  download
-                >
-                  Download Application PDF ({L.applicationPdf.pageCount} pages)
-                </a>
+                <DocumentViewer
+                  file={{
+                    href: `/files/bundles/${L.applicationPdf.id}`,
+                    name: `Application PDF (${L.applicationPdf.pageCount} pages)`,
+                    mimeType: "application/pdf",
+                  }}
+                  triggerClassName="btn-secondary btn-sm"
+                  trigger={<>View application PDF ({L.applicationPdf.pageCount} pages)</>}
+                />
               ) : (
                 <span>{PROCESSING_LABELS[L.processingStatus] ?? L.processingStatus}</span>
               )}
@@ -163,13 +166,15 @@ export default function Receipt({ loaderData: L, actionData }: Route.ComponentPr
             <dt className="text-muted">Consolidated Bundle (Application + Attachments)</dt>
             <dd>
               {L.consolidatedBundle ? (
-                <a
-                  href={`/files/bundles/${L.consolidatedBundle.id}`}
-                  className="font-medium text-brand-700 underline"
-                  download
-                >
-                  Download Complete Bundle (PDF, {L.consolidatedBundle.pageCount} pages)
-                </a>
+                <DocumentViewer
+                  file={{
+                    href: `/files/bundles/${L.consolidatedBundle.id}`,
+                    name: `Application and attachments (${L.consolidatedBundle.pageCount} pages)`,
+                    mimeType: "application/pdf",
+                  }}
+                  triggerClassName="btn-secondary btn-sm"
+                  trigger={<>View complete bundle ({L.consolidatedBundle.pageCount} pages)</>}
+                />
               ) : (
                 <span className="text-muted">
                   {L.processingStatus === "PROCESSING" || L.processingStatus === "QUEUED"

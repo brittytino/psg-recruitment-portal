@@ -1,3 +1,5 @@
+import { RichTextEditor } from "~/components/rich-text-editor";
+import { isSuperAdmin } from "~/modules/auth/permissions";
 import { Form, Link, useNavigation, useSearchParams } from "react-router";
 import type { Route } from "./+types/help-desk-settings";
 import { Alert, Badge, CsrfInput, formatDateTime } from "~/components/forms";
@@ -17,7 +19,7 @@ export async function loader({ request, context }: Route.LoaderArgs) {
   const user = requireStaff(context, request, "helpdesk:admin");
   const [config, staff, articles] = await Promise.all([
     getHelpdeskConfig(),
-    supportStaff(),
+    supportStaff(isSuperAdmin(user.grants)),
     allArticles(user),
   ]);
   return {
@@ -25,7 +27,11 @@ export async function loader({ request, context }: Route.LoaderArgs) {
     staff: staff.map((s) => ({
       id: s.id,
       name: s.profile?.fullName?.trim() || s.email,
-      role: s.roles.some((r) => r.role === "SUPER_ADMIN") ? "Super Admin" : "HR – N4 Section",
+      role: s.roles.some((r) => r.role === "SUPER_ADMIN")
+        ? "Super Admin"
+        : s.roles.some((r) => r.role === "MANAGER")
+          ? "Admin"
+          : "HR – N4 Section",
     })),
     articles,
   };
@@ -104,7 +110,7 @@ export default function HelpDeskSettings({ loaderData: L, actionData }: Route.Co
             ))}
           </select>
           <p className="mt-1 text-xs text-muted">
-            Only active HR – N4 Section and Super Admin accounts can receive tickets.
+            Only active HR – N4 Section and Admin accounts can receive tickets.
           </p>
         </div>
         <label className="flex items-start gap-3 rounded-xl border border-line p-4">
@@ -227,15 +233,17 @@ export default function HelpDeskSettings({ loaderData: L, actionData }: Route.Co
               <label htmlFor="ar-body" className="block text-sm font-medium">
                 Article
               </label>
-              <p className="text-xs text-muted">Plain text. Leave a blank line between paragraphs.</p>
-              <textarea
+              <p className="text-xs text-muted">
+                Use the toolbar for bold, italic, lists and links. Leave a blank line between paragraphs.
+              </p>
+              <RichTextEditor
                 id="ar-body"
                 name="body"
                 required
                 rows={12}
                 maxLength={20000}
-                defaultValue={art?.body}
-                className="field-input mt-1"
+                defaultValue={art?.body ?? ""}
+                className="mt-1"
               />
               {fe.body?.[0] && <p className="text-sm text-danger">{fe.body[0]}</p>}
             </div>

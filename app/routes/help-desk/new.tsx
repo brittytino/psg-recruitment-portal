@@ -1,3 +1,4 @@
+import { RichTextEditor } from "~/components/rich-text-editor";
 import { useState } from "react";
 import { Form, redirect, useNavigation, useSearchParams } from "react-router";
 import type { Route } from "./+types/new";
@@ -189,7 +190,7 @@ export default function NewTicket({ loaderData: L, actionData }: Route.Component
               What were you doing, what did you expect, and what happened instead? Copy any error message
               exactly. Do not share sign-in codes.
             </p>
-            <textarea
+            <RichTextEditor
               id="f-description"
               name="description"
               required
@@ -197,10 +198,10 @@ export default function NewTicket({ loaderData: L, actionData }: Route.Component
               minLength={TICKET_LIMITS.body.min}
               maxLength={TICKET_LIMITS.body.max}
               value={desc}
-              onChange={(e) => setDesc(e.target.value)}
-              aria-invalid={!!fe.description}
+              onValueChange={setDesc}
+              invalid={!!fe.description}
               aria-describedby="f-description-hint"
-              className="field-input mt-1"
+              className="mt-1"
             />
             <p className="mt-1 text-right text-xs text-muted">
               {desc.length} / {TICKET_LIMITS.body.max}

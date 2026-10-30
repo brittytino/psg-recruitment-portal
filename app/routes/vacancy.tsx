@@ -1,3 +1,4 @@
+import { RichText } from "~/components/rich-text";
 import { originFrom, seo } from "~/lib/seo";
 import { jsonLd } from "~/lib/json-ld";
 import { Form, Link } from "react-router";
@@ -26,7 +27,7 @@ export const meta: Route.MetaFunction = ({ data, matches }) => {
   return seo({
     title: `${pos} — ${where}`,
     description: v.description
-      ? v.description
+      ? v.description.replace(/\*\*|[_*]|^\s*([-•]|\d+[.)])\s+/gm, "").replace(/\[([^\]]+)\]\([^)]+\)/g, "$1")
       : `Apply for ${pos} in ${where} at PSG College of Technology, Coimbatore. Online applications close on ${closes}.`,
     path: `/vacancies/${encodeURIComponent(v.code)}`,
     origin: originFrom(matches),
@@ -136,7 +137,7 @@ export default function Vacancy({ loaderData }: Route.ComponentProps) {
 
           <section className="card" aria-labelledby="about">
             <h2 id="about">About the position</h2>
-            <p className="mt-3 whitespace-pre-line text-ink/85">{v.description}</p>
+            <RichText text={v.description} className="mt-3 text-ink/85" />
           </section>
 
           <section className="card" aria-labelledby="eligibility">

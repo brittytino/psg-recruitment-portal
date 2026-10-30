@@ -39,7 +39,7 @@ On the first run `./prod.sh`:
 1. installs Docker if needed (asks for the sudo password),
 2. creates `.env` from the committed `.env.production` with **freshly generated** database passwords and
    secrets (they never leave the server),
-3. asks **once** for the Gmail app password of recruitments@psgtech.ac.in (hidden input). To run
+3. asks **once** for the Gmail app password of recruitment@your-college.edu (hidden input). To run
    without any prompt: `SMTP_PASSWORD='xxxx xxxx xxxx xxxx' ./prod.sh`, or put it in `secrets/smtp_password`,
 4. builds, migrates the database, creates the staff accounts and starts everything,
 5. configures Nginx for both domains (with the college certificate if configured) and prints the URLs.
@@ -52,18 +52,23 @@ Servers set up earlier with Let's Encrypt keep using those certificates (no long
 college certificate is configured, so HTTPS never drops during the switch. After that they can be
 removed: `sudo certbot delete --cert-name recruitments.psgtech.ac.in` (same for `recruitmentsdb…`).
 
-## 4. Staff accounts created by the seed
+## 4. The first account (new installations only)
 
-| Role                      | E-mail                  |
-| ------------------------- | ----------------------- |
-| Super Admin (full access) | brittytino08@gmail.com  |
-| Admin – Dean              | dean.admn@psgtech.ac.in |
-| Admin – Principal         | principal@psgtech.ac.in |
-| HR – N4 Section           | admin.n4@psgtech.ac.in  |
-| HOD – CSE                 | hod.cse@psgtech.ac.in   |
+Before the first `./prod.sh`, put the first Super Admin in the server-only file `secrets/override.env`:
 
-Everyone signs in with a 6-digit code e-mailed to them. HR – N4 adds further departments and HODs in
-**Departments & HODs**; each HOD receives an invitation e-mail.
+```sh
+mkdir -p secrets
+cat >> secrets/override.env <<'EOF'
+BOOTSTRAP_SUPER_ADMIN_EMAIL=superadmin@your-college.edu
+BOOTSTRAP_SUPER_ADMIN_NAME=Your Name
+EOF
+chmod 600 secrets/override.env
+```
+
+The seed creates that account only when no Super Admin exists; on a running installation it changes
+nothing. The Super Admin then adds everyone else in **Users & roles** (Admins, Dean / Principal, HR,
+HODs, Viewers). An Admin can add HR, HOD and Viewer accounts. Everyone signs in with a 6-digit code
+e-mailed to them; no passwords.
 
 ## 5. Day-to-day
 
@@ -111,7 +116,7 @@ Everyone signs in with an e-mailed code, so this blocks all sign-ins. Diagnose o
 
 ```sh
 sudo ./prod.sh mailtest                       # checks DNS, ports 587/465 and the Gmail login
-sudo ./prod.sh mailtest someone@psgtech.ac.in # also sends a test e-mail
+sudo ./prod.sh mailtest someone@your-college.edu # also sends a test e-mail
 ```
 
 It prints the cause and the fix:
@@ -119,7 +124,7 @@ It prints the cause and the fix:
 | Result | Fix |
 | --- | --- |
 | Ports 587 and 465 **not reachable** | The firewall blocks outgoing mail. Network team: allow outbound TCP 587 and 465 from this server to `smtp.gmail.com`. (The portal uses whichever of the two is open.) |
-| Gmail **rejected the login** (535) | App password wrong or revoked. Create a new one for recruitments@psgtech.ac.in (2-Step Verification must be on) and run `sudo ./prod.sh smtp-password`. |
+| Gmail **rejected the login** (535) | App password wrong or revoked. Create a new one for recruitment@your-college.edu (2-Step Verification must be on) and run `sudo ./prod.sh smtp-password`. |
 | Password **empty** | `sudo ./prod.sh smtp-password` |
 
 ## E-mail: Google Workspace SMTP Relay (main) with the Gmail account as fallback
@@ -146,7 +151,7 @@ address, put `SMTP_RELAY_USER` and `SMTP_RELAY_PASSWORD` in `secrets/override.en
 Check it on the server:
 
 ```sh
-sudo ./prod.sh mailtest someone@psgtech.ac.in   # tests the relay, then the Gmail fallback
+sudo ./prod.sh mailtest someone@your-college.edu   # tests the relay, then the Gmail fallback
 ```
 
 Budgets: `MAIL_RELAY_DAILY_BUDGET` (relay, default 9500) and `MAIL_DAILY_BUDGET` (Gmail account,

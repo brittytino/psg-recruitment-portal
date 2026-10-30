@@ -1,3 +1,4 @@
+import { DocumentViewer } from "~/components/document-viewer";
 import { useState } from "react";
 import { Form, Link, useLocation, useNavigation } from "react-router";
 import type { Route } from "./+types/application";
@@ -257,14 +258,26 @@ export default function StaffApplication({ loaderData, actionData }: Route.Compo
         <div className="flex flex-col items-start gap-2 sm:items-end">
           <Badge tone={statusTone(app.status)}>{STATUS_LABELS[app.status]}</Badge>
           {canDownload && app.applicationPdf && (
-            <a href={`/files/bundles/${app.applicationPdf.id}`} className="btn-secondary">
-              Download application ({app.applicationPdf.pageCount} pages)
-            </a>
+            <DocumentViewer
+              file={{
+                href: `/files/bundles/${app.applicationPdf.id}`,
+                name: `Application form (${app.applicationPdf.pageCount} pages)`,
+                mimeType: "application/pdf",
+              }}
+              triggerClassName="btn-secondary"
+              trigger={<>View application ({app.applicationPdf.pageCount} pages)</>}
+            />
           )}
           {canDownload && app.bundle && (
-            <a href={`/files/bundles/${app.bundle.id}`} className="btn-primary">
-              Download application + documents ({app.bundle.pageCount} pages)
-            </a>
+            <DocumentViewer
+              file={{
+                href: `/files/bundles/${app.bundle.id}`,
+                name: `Application and documents (${app.bundle.pageCount} pages)`,
+                mimeType: "application/pdf",
+              }}
+              triggerClassName="btn-primary"
+              trigger={<>View application + documents ({app.bundle.pageCount} pages)</>}
+            />
           )}
           {!app.bundle && (
             <Badge tone={statusTone(app.processingStatus)}>{PROCESSING_LABELS[app.processingStatus]}</Badge>
@@ -303,9 +316,14 @@ export default function StaffApplication({ loaderData, actionData }: Route.Compo
                           <span className="min-w-0">
                             <span className="block font-medium">{DOCUMENT_TYPE_LABELS[m.documentType]}</span>
                             {canDownload ? (
-                              <a href={`/files/documents/${m.documentId}`} className="break-all">
-                                {m.originalName}
-                              </a>
+                              <span className="flex items-center gap-2">
+                                <DocumentViewer
+                                  file={{ href: `/files/documents/${m.documentId}`, name: m.originalName }}
+                                />
+                                <a href={`/files/documents/${m.documentId}`} className="break-all">
+                                  {m.originalName}
+                                </a>
+                              </span>
                             ) : (
                               <span className="break-all">{m.originalName}</span>
                             )}

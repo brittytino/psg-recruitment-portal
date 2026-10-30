@@ -7,7 +7,7 @@ import { PriorityLabel, TicketStatusBadge } from "~/components/helpdesk";
 import { EmptyState, ListPagination, PageHeader } from "~/components/staff";
 import { handleAction, readForm, requireStaff } from "~/lib/http.server";
 import { cn } from "~/lib/utils";
-import { hasPermission } from "~/modules/auth/permissions";
+import { hasPermission, isSuperAdmin } from "~/modules/auth/permissions";
 import { supportStaff } from "~/modules/helpdesk/config.server";
 import {
   CATEGORY_KEYS,
@@ -32,7 +32,11 @@ export const meta: Route.MetaFunction = () => [
 export async function loader({ request, context }: Route.LoaderArgs) {
   const user = requireStaff(context, request, "helpdesk:handle");
   const q = staffListSchema.parse(Object.fromEntries(new URL(request.url).searchParams));
-  const [list, counts, staff] = await Promise.all([staffTickets(user, q), staffCounts(user), supportStaff()]);
+  const [list, counts, staff] = await Promise.all([
+    staffTickets(user, q),
+    staffCounts(user),
+    supportStaff(isSuperAdmin(user.grants)),
+  ]);
   return {
     q,
     ...list,

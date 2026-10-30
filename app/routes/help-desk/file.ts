@@ -1,5 +1,6 @@
 import { Readable } from "node:stream";
 import type { Route } from "./+types/file";
+import { fileHeaders } from "~/lib/file-response.server";
 import { requireUser } from "~/lib/http.server";
 import { audit } from "~/modules/audit/audit.server";
 import { hasPermission } from "~/modules/auth/permissions";
@@ -28,13 +29,10 @@ export async function loader({ request, params, context }: Route.LoaderArgs) {
     });
   const ext = a.mimeType === "application/pdf" ? "pdf" : a.mimeType === "image/png" ? "png" : "jpg";
   return new Response(Readable.toWeb(file.stream) as ReadableStream, {
-    headers: {
-      "Content-Type": a.mimeType,
-      "Content-Length": String(file.size),
-      "Content-Disposition": `attachment; filename="${a.ticket.referenceNo}-${a.id.slice(0, 8)}.${ext}"`,
-      "Cache-Control": "private, no-store",
-      "X-Content-Type-Options": "nosniff",
-      "Content-Security-Policy": "default-src 'none'; sandbox",
-    },
+    headers: fileHeaders(request, {
+      mimeType: a.mimeType,
+      size: file.size,
+      downloadName: `${a.ticket.referenceNo}-${a.id.slice(0, 8)}.${ext}`,
+    }),
   });
 }

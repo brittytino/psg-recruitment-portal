@@ -100,6 +100,16 @@ export const HSC_MAJOR_STREAMS = [
 
 export const MODES_OF_EDUCATION = ["Full-time", "Part-time", "Distance Education"] as const;
 
+/**
+ * After SSLC, candidates either completed HSC (Class 12) or a three-year Diploma (lateral entry into
+ * the degree). Applications saved before this question existed have no answer and are treated as HSC.
+ */
+export const HSC_ROUTES = [
+  { value: "HSC", label: "Completed HSC (Class 12)" },
+  { value: "DIPLOMA", label: "Diploma after SSLC, no HSC (lateral entry)" },
+] as const;
+export const NO_HSC = { key: "hscRoute", notIn: ["DIPLOMA"] } as const;
+
 export const QUALIFICATION_LEVELS = [
   { value: "UG", label: "UG — Under-graduate" },
   { value: "PG", label: "PG — Post-graduate" },

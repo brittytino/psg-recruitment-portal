@@ -1,3 +1,4 @@
+import { RichText } from "~/components/rich-text";
 import { originFrom, seo } from "~/lib/seo";
 import { Link } from "react-router";
 import type { Route } from "./+types/article";
@@ -35,11 +36,6 @@ export async function loader({ params, context }: Route.LoaderArgs) {
 
 export default function Article({ loaderData: L }: Route.ComponentProps) {
   const a = L.article;
-  // Plain text with blank lines between paragraphs; rendered as text, never as HTML.
-  const paragraphs = a.body
-    .split(/\n\s*\n/)
-    .map((p) => p.trim())
-    .filter(Boolean);
   return (
     <CandidateHelpDeskShell signedIn={L.signedIn}>
       <article className="page-stack max-w-3xl">
@@ -49,11 +45,7 @@ export default function Article({ loaderData: L }: Route.ComponentProps) {
           description={a.summary}
         />
         <div className="card space-y-4 text-[15px] leading-relaxed text-ink">
-          {paragraphs.map((p, i) => (
-            <p key={i} className="whitespace-pre-wrap">
-              {p}
-            </p>
-          ))}
+          <RichText text={a.body} />
           <p className="text-xs text-muted">Last updated {formatDateTime(a.updatedAt)}</p>
         </div>
         <section className="card flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
