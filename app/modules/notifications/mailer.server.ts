@@ -1,19 +1,12 @@
 import nodemailer, { type SendMailOptions, type Transporter } from "nodemailer";
 import { env } from "~/modules/core/env.server";
 import { logger } from "~/modules/core/logger.server";
-import {
-  countEmail,
-  markRelayDown,
-  relayIsDown,
-  routeHasRoom,
-  type MailPriority,
-  type MailRoute,
-} from "./budget.server";
+import { countEmail, hasRoom, type MailPriority } from "./budget.server";
 
-/** No route has room left today (or none is configured). The caller keeps the message in the app. */
+/** Today's e-mail budget is used up. The caller keeps the message in the app. */
 export class MailBudgetExceededError extends Error {
   constructor() {
-    super("Daily e-mail budget reached on every route");
+    super("Daily e-mail budget reached");
     this.name = "MailBudgetExceededError";
   }
 }
@@ -47,7 +40,6 @@ export function resetTransporterForTesting(): void {
   }
   transport = undefined;
   fallback = undefined;
-  relay = undefined;
 }
 
 /** Centralized transporter getter with connection pooling and timeouts. */
@@ -122,10 +114,10 @@ export function smtpFailureHint(err: unknown): string {
 }
 
 /**
- * Gmail account route: sends through the configured SMTP port; if the network blocks it (common on
- * campus firewalls for 587), retries once over the other Gmail port (465 implicit TLS, or 587).
+ * Sends through the configured SMTP port; if the network blocks it (common on campus firewalls for
+ * 587), retries once over the other port (465 implicit TLS, or 587).
  */
-async function deliverGmail(mail: SendMailOptions): Promise<void> {
+async function deliverSmtp(mail: SendMailOptions): Promise<void> {
   const e = env();
   try {
     await getTransporter().sendMail(mail);
@@ -151,80 +143,6 @@ async function deliverGmail(mail: SendMailOptions): Promise<void> {
     });
   }
   await fallback.sendMail(mail);
-}
-
-let relay: Transporter | undefined;
-
-export function relayConfigured(): boolean {
-  const e = env();
-  return e.EMAIL_PROVIDER === "smtp" && !!e.SMTP_RELAY_HOST;
-}
-
-/** Google Workspace SMTP Relay transport (pooled). */
-function getRelay(): Transporter {
-  if (!relay) {
-    const e = env();
-    relay = nodemailer.createTransport({
-      pool: true,
-      maxConnections: 5,
-      maxMessages: 100,
-      host: e.SMTP_RELAY_HOST,
-      port: e.SMTP_RELAY_PORT,
-      secure: e.SMTP_RELAY_SECURE,
-      ...(e.SMTP_RELAY_HELO ? { name: e.SMTP_RELAY_HELO } : {}),
-      auth: e.SMTP_RELAY_USER ? { user: e.SMTP_RELAY_USER, pass: e.SMTP_RELAY_PASSWORD } : undefined,
-      // Short timeouts: if the relay is unreachable the fallback must take over quickly.
-      connectionTimeout: 8_000,
-      greetingTimeout: 8_000,
-      socketTimeout: 20_000,
-      tls: { rejectUnauthorized: e.NODE_ENV === "production" },
-    });
-  }
-  return relay;
-}
-
-/**
- * Sends one e-mail: Google Workspace SMTP Relay first, the Gmail account as the fallback. A route is
- * used only while it has room in today's budget for this priority. A relay failure (not enabled yet,
- * relay denied, network) switches to the fallback immediately and pauses the relay for 10 minutes,
- * so people never wait for a broken route. Returns the route that delivered the e-mail.
- */
-async function deliver(mail: SendMailOptions, priority: MailPriority): Promise<MailRoute> {
-  const e = env();
-  if (e.EMAIL_PROVIDER !== "smtp") {
-    await getTransporter().sendMail(mail); // Mailpit / test: no routes or budgets
-    return "gmail";
-  }
-  const routes: MailRoute[] = [];
-  if (relayConfigured() && !(await relayIsDown()) && (await routeHasRoom("relay", priority)))
-    routes.push("relay");
-  if (await routeHasRoom("gmail", priority)) routes.push("gmail");
-  if (!routes.length) throw new MailBudgetExceededError();
-  let lastErr: unknown;
-  for (const route of routes) {
-    try {
-      if (route === "relay") await getRelay().sendMail(mail);
-      else await deliverGmail(mail);
-      void countEmail(route);
-      return route;
-    } catch (err) {
-      lastErr = err;
-      if (route === "relay") {
-        const r = err as { responseCode?: number; code?: string; message?: string };
-        await markRelayDown(`${r.responseCode ?? r.code ?? ""} ${r.message ?? ""}`.trim());
-        logger.warn(
-          {
-            event: "mail_relay_failed",
-            code: r.responseCode ?? r.code,
-            err: (r.message ?? "").slice(0, 200),
-            fallback: routes.includes("gmail"),
-          },
-          "Google Workspace SMTP relay failed; using the Gmail account and pausing the relay for 10 minutes",
-        );
-      }
-    }
-  }
-  throw lastErr;
 }
 
 /** Diagnostic check for SMTP connectivity without sending actual emails. */
@@ -308,8 +226,98 @@ export async function verifySmtpConnection(timeoutMs = 5000): Promise<SmtpDiagno
 }
 
 /**
- * Builds the accessible, responsive, institutional OTP email content.
+ * Sends one e-mail through the SMTP mailbox while today's budget has room for this priority (sign-in
+ * codes always go out). Mailpit / test providers have no budget.
  */
+async function deliver(mail: SendMailOptions, priority: MailPriority): Promise<void> {
+  const e = env();
+  const message: SendMailOptions = {
+    ...mail,
+    // Ask mail servers not to send out-of-office or other automatic replies to this mailbox.
+    headers: { "Auto-Submitted": "auto-generated", "X-Auto-Response-Suppress": "All", ...mail.headers },
+  };
+  if (e.EMAIL_PROVIDER !== "smtp") {
+    await getTransporter().sendMail(message);
+    return;
+  }
+  if (!(await hasRoom(priority))) throw new MailBudgetExceededError();
+  await deliverSmtp(message);
+  void countEmail();
+}
+
+// ---------------------------------------------------------------------------------------------------
+// Templates: one formal layout for every e-mail. Table-based with inline styles so it renders the same
+// in Gmail, Outlook and phone mail apps; a plain-text part is always included.
+// ---------------------------------------------------------------------------------------------------
+
+const C = {
+  ink: "#0f1c2e",
+  muted: "#545b66",
+  line: "#e3e0d8",
+  canvas: "#f4f3ef",
+  soft: "#f7f6f2",
+  brand: "#a3195b",
+  navy: "#10223b",
+};
+const SERIF = "Georgia,'Times New Roman',serif";
+const SANS = "'Segoe UI',Roboto,Helvetica,Arial,sans-serif";
+const ADDRESS = "PSG College of Technology, Avinashi Road, Peelamedu, Coimbatore - 641004";
+
+const esc = (s: string) =>
+  s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
+
+function helpDeskUrl(): string {
+  return `${env().APP_ORIGIN.replace(/\/$/, "")}/help-desk`;
+}
+
+/** The no-reply notice that ends every e-mail (plain text). */
+function textFooter(): string {
+  return `----------------------------------------
+This e-mail was sent from an unattended address. Replies are not read.
+For any question, please raise a ticket at the Help desk: ${helpDeskUrl()}
+
+PSG College of Technology, Coimbatore - Staff Recruitment
+${ADDRESS}`;
+}
+
+function layout(opts: { title: string; preheader: string; body: string }): string {
+  const help = helpDeskUrl();
+  return `<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="color-scheme" content="light">
+<title>${esc(opts.title)}</title>
+</head>
+<body style="margin:0;padding:0;background:${C.canvas};-webkit-text-size-adjust:100%;">
+<div style="display:none;max-height:0;overflow:hidden;opacity:0;">${esc(opts.preheader)}</div>
+<table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" style="background:${C.canvas};">
+<tr><td align="center" style="padding:32px 12px;">
+<table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" style="max-width:560px;background:#ffffff;border:1px solid ${C.line};border-radius:6px;">
+<tr><td style="height:4px;background:${C.brand};border-radius:6px 6px 0 0;font-size:0;line-height:0;">&nbsp;</td></tr>
+<tr><td style="padding:28px 40px 20px;border-bottom:1px solid ${C.line};">
+<p style="margin:0;font-family:${SERIF};font-size:18px;font-weight:bold;color:${C.navy};letter-spacing:0.3px;">PSG College of Technology, Coimbatore</p>
+<p style="margin:4px 0 0;font-family:${SANS};font-size:12px;color:${C.muted};letter-spacing:1.2px;text-transform:uppercase;">Staff Recruitment</p>
+</td></tr>
+<tr><td style="padding:32px 40px 8px;font-family:${SANS};font-size:15px;line-height:1.65;color:${C.ink};">
+${opts.body}
+</td></tr>
+<tr><td style="padding:24px 40px 32px;">
+<table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0"><tr><td style="border-top:1px solid ${C.line};padding-top:20px;font-family:${SANS};font-size:12px;line-height:1.6;color:${C.muted};">
+This e-mail was sent from an unattended address. Replies are not read.<br>
+For any question, please raise a ticket at the <a href="${esc(help)}" style="color:${C.brand};text-decoration:underline;">Help desk</a>.
+</td></tr></table>
+</td></tr>
+</table>
+<p style="margin:16px 0 0;font-family:${SANS};font-size:11px;line-height:1.6;color:${C.muted};text-align:center;">${ADDRESS}</p>
+</td></tr>
+</table>
+</body>
+</html>`;
+}
+
+/** Sign-in / verification code e-mail. */
 export function renderOtpEmail(
   code: string,
   purpose: string,
@@ -319,69 +327,62 @@ export function renderOtpEmail(
 
   const text = `PSG COLLEGE OF TECHNOLOGY, COIMBATORE
 Staff Recruitment
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
-Your 6-digit one-time password (OTP) for ${purpose} is:
+Your verification code for ${purpose}:
 
     ${code}
 
-• This verification code expires in ${minutes} minutes and can be used once.
-• If you did not request this code, please ignore this e-mail.
-• SECURITY WARNING: Never share this verification code with anyone. PSG Tech administrators will never ask for your code.
+The code expires in ${minutes} minutes and can be used only once.
+Never share this verification code with anyone. College staff will never ask for it.
+If you did not request it, you can safely ignore this e-mail.
 
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-PSG College of Technology, Peelamedu, Coimbatore - 641004
-This is an automated system message. Please do not reply to this email.`;
+${textFooter()}`;
 
-  const html = `<!DOCTYPE html>
-<html lang="en">
-<head>
-  <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>${code} - PSG Tech Recruitment Verification Code</title>
-</head>
-<body style="margin:0;padding:24px;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;background-color:#f6f8fa;color:#1f2328;">
-  <div style="max-width:540px;margin:0 auto;background:#ffffff;border:1px solid #d0d7de;border-radius:12px;overflow:hidden;box-shadow:0 4px 12px rgba(0,0,0,0.05);">
-    <div style="background-color:#0b2545;padding:24px 32px;text-align:center;">
-      <p style="margin:0;font-size:12px;letter-spacing:1.5px;text-transform:uppercase;color:#8da9c4;font-weight:600;">PSG College of Technology, Coimbatore</p>
-      <h1 style="margin:8px 0 0;font-size:20px;color:#ffffff;font-weight:700;">Staff Recruitment</h1>
-    </div>
-    <div style="padding:32px;">
-      <h2 style="margin:0 0 12px;font-size:18px;color:#1f2328;font-weight:600;">One-Time Verification Code</h2>
-      <p style="margin:0 0 20px;font-size:14px;line-height:1.6;color:#57606a;">
-        A request was made to authenticate your account for <strong>${purpose}</strong>. Use the 6-digit code below to proceed:
-      </p>
-      <div style="text-align:center;margin:24px 0;">
-        <div style="display:inline-block;padding:16px 28px;background:#f3f6fc;border:2px dashed #0b2545;border-radius:10px;font-family:Consolas,Monaco,'Courier New',Courier,monospace;font-size:36px;font-weight:700;letter-spacing:10px;color:#0b2545;">
-          ${code}
-        </div>
-      </div>
-      <div style="background-color:#fff8e6;border:1px solid #ffe199;border-radius:8px;padding:14px 18px;margin:24px 0;font-size:13px;line-height:1.5;color:#7a4b04;">
-        <strong>Important Security Notices:</strong>
-        <ul style="margin:6px 0 0;padding-left:20px;">
-          <li>This code is valid for <strong>${minutes} minutes</strong> and can only be used once.</li>
-          <li>Never share this code with anyone. PSG Tech staff will never ask for your code.</li>
-          <li>If you did not request this code, no action is needed; your account remains secure.</li>
-        </ul>
-      </div>
-      <p style="margin:20px 0 0;font-size:13px;color:#656d76;line-height:1.5;">
-        PSG College of Technology Staff Recruitment Section<br>
-        Avinashi Road, Peelamedu, Coimbatore – 641 004, Tamil Nadu, India
-      </p>
-    </div>
-    <div style="background-color:#f6f8fa;padding:16px 32px;border-top:1px solid #d0d7de;text-align:center;font-size:12px;color:#8c959f;">
-      This is an automated institutional message. Please do not reply directly to this email.
-    </div>
-  </div>
-</body>
-</html>`;
+  const html = layout({
+    title: `${code} - PSG Tech recruitment verification code`,
+    preheader: `Your verification code is ${code}. It expires in ${minutes} minutes.`,
+    body: `<p style="margin:0 0 6px;font-family:${SERIF};font-size:22px;color:${C.navy};">Verification code</p>
+<p style="margin:0 0 24px;color:${C.muted};">Use this code for ${esc(purpose)} on the recruitment portal.</p>
+<table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0"><tr>
+<td align="center" style="background:${C.soft};border:1px solid ${C.line};border-radius:4px;padding:22px 12px;">
+<span style="font-family:Consolas,'SFMono-Regular',Menlo,'Courier New',monospace;font-size:34px;font-weight:bold;letter-spacing:10px;color:${C.navy};">${code}</span>
+</td></tr></table>
+<p style="margin:16px 0 24px;font-size:13px;color:${C.muted};text-align:center;">Valid for <strong style="color:${C.ink};">${minutes} minutes</strong> &middot; single use</p>
+<p style="margin:0 0 8px;font-size:13px;color:${C.muted};">Never share this code with anyone. College staff will never ask for it.</p>
+<p style="margin:0;font-size:13px;color:${C.muted};">If you did not request it, you can safely ignore this e-mail.</p>`,
+  });
 
   return { subject, text, html };
 }
 
+/** Notification e-mail: the plain-text body becomes paragraphs in the same layout. */
+export function renderNotificationEmail(subject: string, body: string): { text: string; html: string } {
+  const paragraphs = body
+    .trim()
+    .split(/\n{2,}/)
+    .map(
+      (p) =>
+        `<p style="margin:0 0 16px;">${esc(p)
+          .replace(/\n/g, "<br>")
+          .replace(
+            /(https?:\/\/[^\s<]+)/g,
+            `<a href="$1" style="color:${C.brand};text-decoration:underline;word-break:break-all;">$1</a>`,
+          )}</p>`,
+    )
+    .join("\n");
+  return {
+    text: `${body.trim()}\n\n${textFooter()}`,
+    html: layout({
+      title: subject,
+      preheader: body.trim().split("\n")[0]?.slice(0, 120) ?? subject,
+      body: `<p style="margin:0 0 20px;font-family:${SERIF};font-size:20px;color:${C.navy};">${esc(subject)}</p>\n${paragraphs}`,
+    }),
+  };
+}
+
 /**
  * Sends a one-time code directly (not through the outbox) so the code is never stored in the
- * notifications table. Plain-text and accessible HTML parts.
+ * notifications table.
  */
 export async function sendOtpEmail(
   to: string,
@@ -413,35 +414,14 @@ export async function sendOtpEmail(
   }
 }
 
-/** Sends a plain-text notification. Bodies never contain application answers or documents. */
+/** Sends a notification. Bodies never contain application answers or documents. */
 export async function sendNotificationEmail(
   to: string,
   subject: string,
   body: string,
   priority: "critical" | "routine" = "routine",
-): Promise<MailRoute> {
+): Promise<void> {
   const e = env();
-  return deliver(
-    {
-      from: e.MAIL_FROM,
-      to,
-      subject,
-      text: `${body}\n\n—\nPSG College of Technology, Coimbatore — Staff Recruitment\nThis is an automated message. Please do not reply.`,
-    },
-    priority,
-  );
-}
-
-/** Checks the relay connection (Control centre); never sends. */
-export async function verifyRelay(timeoutMs = 6000): Promise<{ ok: boolean; message: string }> {
-  if (!relayConfigured()) return { ok: false, message: "Not configured" };
-  try {
-    await Promise.race([
-      getRelay().verify(),
-      new Promise((_, rej) => setTimeout(() => rej(new Error("timed out")), timeoutMs)),
-    ]);
-    return { ok: true, message: `Connected to ${env().SMTP_RELAY_HOST}` };
-  } catch (err) {
-    return { ok: false, message: ((err as Error).message || "Not reachable").slice(0, 160) };
-  }
+  const { text, html } = renderNotificationEmail(subject, body);
+  await deliver({ from: e.MAIL_FROM, to, subject, text, html }, priority);
 }

@@ -236,8 +236,15 @@ export function hodScope(user: SessionUser): Prisma.ApplicationWhereInput {
   };
 }
 
+/** Optional 1–5 star rating from a form field ("" = not rated). */
+const ratingField = z.preprocess(
+  (v) => (v === "" || v == null ? undefined : v),
+  z.coerce.number().int().min(1, "Choose 1 to 5 stars").max(5, "Choose 1 to 5 stars").optional(),
+);
+
 const decisionSchema = z
   .object({
+    rating: ratingField,
     decision: z.enum(["ACCEPT", "RECOMMEND_CHANGE", "REJECT"], { error: "Choose a decision" }),
     toPosition: z
       .enum(["ASSISTANT_PROFESSOR", "ASSOCIATE_PROFESSOR", "PROFESSOR"])
@@ -309,6 +316,7 @@ export async function recordHodDecision(
         hodDecision: d.decision,
         hodDecisionReason: d.reason || null,
         hodRemarks: d.remarks || null,
+        hodRating: d.rating ?? null,
         hodDecidedAt: new Date(),
       },
     });
@@ -368,8 +376,103 @@ export async function recordHodDecision(
         metadata: {
           decision: d.decision,
           toPosition: d.toPosition,
+          rating: d.rating,
           ...(app.assignedHodId !== u.id ? { onBehalfOfHod: app.assignedHodId } : {}),
         },
+      },
+      tx,
+    );
+  });
+}
+
+// ------------------------------------------------------------------------------------------------
+// Dean / Principal review
+// ------------------------------------------------------------------------------------------------
+
+const FINAL_REVIEWABLE: readonly AppStatus[] = [
+  "SUBMITTED",
+  "UNDER_HR_REVIEW",
+  "UNDER_DEPARTMENT_REVIEW",
+  "NEEDS_CLARIFICATION",
+  "ASSIGNED_TO_HOD",
+  "HOD_ACCEPTED",
+  "HOD_RECOMMENDED_CHANGE",
+  "HOD_REJECTED",
+  "SHORTLISTED",
+  "REJECTED",
+  "APPROVED",
+];
+
+const finalSchema = z
+  .object({
+    decision: z.enum(["ACCEPT", "REJECT"], { error: "Choose accept or reject" }),
+    rating: ratingField,
+    remarks: z.string().trim().max(3000).default(""),
+  })
+  .refine((d) => d.decision === "ACCEPT" || d.remarks.length >= 10, {
+    path: ["remarks"],
+    message: "Give the reason (at least 10 characters)",
+  });
+
+/** Whether this application can take a Dean / Principal decision now. */
+export const finalReviewOpen = (status: string) => FINAL_REVIEWABLE.includes(status as AppStatus);
+
+/**
+ * Dean / Principal decision with an optional 1–5 star rating. Allowed at any stage after submission,
+ * including after a HOD rejection, and can be changed later. It is recorded alongside the HOD decision
+ * (never erasing it), written to the review history and the audit log.
+ */
+export async function recordFinalDecision(
+  user: SessionUser | null,
+  applicationId: string,
+  input: unknown,
+  ip?: string,
+) {
+  const u = requirePermission(user, "review:final");
+  const p = finalSchema.safeParse(input);
+  if (!p.success) throw new ValidationError("Please correct the highlighted fields", fieldErrors(p.error));
+  const d = p.data;
+  const app = await prisma.application.findUnique({
+    where: { id: applicationId },
+    select: { id: true, status: true, finalDecision: true },
+  });
+  if (!app) throw new NotFoundError("Application");
+  if (!finalReviewOpen(app.status))
+    throw new ConflictError("This application cannot be reviewed now (draft or withdrawn).");
+  await prisma.$transaction(async (tx) => {
+    await tx.application.update({
+      where: { id: app.id },
+      data: {
+        finalDecision: d.decision,
+        finalRating: d.rating ?? null,
+        finalRemarks: d.remarks || null,
+        finalDecidedAt: new Date(),
+        finalDecidedById: u.id,
+      },
+    });
+    await tx.review.create({
+      data: {
+        applicationId: app.id,
+        reviewerId: u.id,
+        stage: "HR",
+        recommendation: d.decision === "ACCEPT" ? "APPROVE" : "REJECT",
+        score: d.rating ?? null,
+        comments: [
+          d.decision === "ACCEPT" ? "Dean / Principal: accepted." : "Dean / Principal: rejected.",
+          d.remarks,
+        ]
+          .filter(Boolean)
+          .join("\n"),
+      },
+    });
+    await audit(
+      {
+        actorId: u.id,
+        action: "review.final_decision",
+        entityType: "application",
+        entityId: app.id,
+        ip,
+        metadata: { decision: d.decision, rating: d.rating, previous: app.finalDecision },
       },
       tx,
     );
@@ -609,4 +712,14 @@ export async function listSummarySheets(user: SessionUser | null, departmentId?:
     take: 300,
     include: { department: { select: { id: true, name: true, code: true } } },
   });
+}
+
+/** Display name of the person who recorded the Dean / Principal decision. */
+export async function reviewerName(id: string | null): Promise<string | null> {
+  if (!id) return null;
+  const u = await prisma.user.findUnique({
+    where: { id },
+    select: { email: true, profile: { select: { fullName: true } } },
+  });
+  return u ? (u.profile?.fullName ?? u.email) : null;
 }

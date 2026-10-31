@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { ArrowLeftRight, CheckCircle2, Clock, Download, FileText, Plus, Users, XCircle } from "lucide-react";
+import { StarRatingView } from "~/components/star-rating";
 import { Form, Link, redirect, useLocation, useNavigation, useSearchParams } from "react-router";
 import type { Route } from "./+types/index";
 import { Alert, Badge, ConfirmDialog, CsrfInput, formatDate, statusTone } from "~/components/forms";
@@ -708,6 +709,16 @@ export default function StaffIndex({ loaderData, actionData }: Route.ComponentPr
                       <td className="whitespace-nowrap">{formatDate(r.submittedAt)}</td>
                       <td>
                         <Badge tone={statusTone(r.status)}>{STATUS_LABELS[r.status as AppStatus]}</Badge>
+                        {r.finalDecision && (
+                          <span
+                            className={`mt-1 block text-xs font-semibold ${r.finalDecision === "ACCEPT" ? "text-success" : "text-danger"}`}
+                          >
+                            Principal: {r.finalDecision === "ACCEPT" ? "accepted" : "rejected"}
+                          </span>
+                        )}
+                        {(r.finalRating ?? r.hodRating) ? (
+                          <StarRatingView value={r.finalRating ?? r.hodRating} className="mt-1 flex" />
+                        ) : null}
                         {r.processingStatus !== "READY" && (
                           <span className="mt-1 block text-xs text-muted">
                             {PROCESSING_LABELS[r.processingStatus]}

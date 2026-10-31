@@ -47,6 +47,8 @@ export type Permission =
   | "application:assign"
   | "application:export"
   | "review:record"
+  /** Dean / Principal review: accept or reject with a rating, even after the HOD decision. */
+  | "review:final"
   | "summary:generate"
   | "summary:read"
   | "summary:reopen"
@@ -75,6 +77,7 @@ export const ALL_STAFF_PERMISSIONS: readonly Permission[] = [
   "application:assign",
   "application:export",
   "review:record",
+  "review:final",
   "summary:generate",
   "summary:read",
   "summary:reopen",
@@ -126,6 +129,7 @@ export const ROLE_PERMISSIONS: Record<RoleName, readonly Permission[]> = {
     "summary:read",
     "summary:reopen",
     "position:approve",
+    "review:final",
     "document:download",
     "document:regenerate",
     "recruitment:manage",
@@ -142,6 +146,7 @@ export const ROLE_PERMISSIONS: Record<RoleName, readonly Permission[]> = {
     "summary:read",
     "summary:reopen",
     "position:approve",
+    "review:final",
     "document:download",
     "document:regenerate",
     "recruitment:manage",

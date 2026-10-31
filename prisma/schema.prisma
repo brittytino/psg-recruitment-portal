@@ -94,6 +94,12 @@ enum HodDecision {
   REJECT
 }
 
+/// Dean / Principal review, independent of (and able to overrule) the HOD decision.
+enum FinalDecision {
+  ACCEPT
+  REJECT
+}
+
 enum ChangeRequestStatus {
   PENDING
   APPROVED
@@ -441,6 +447,15 @@ model Application {
   hodDecisionReason    String?
   hodRemarks           String?
   hodDecidedAt         DateTime?                  @db.Timestamptz(3)
+  /// HOD's screening rating, 1–5 stars.
+  hodRating            Int?
+  /// Dean / Principal review: may accept or reject at any point after submission, including after
+  /// a HOD rejection. Does not change the workflow status; the recruitment office acts on it.
+  finalDecision        FinalDecision?
+  finalRating          Int?
+  finalRemarks         String?
+  finalDecidedAt       DateTime?                  @db.Timestamptz(3)
+  finalDecidedById     String?                    @db.Uuid
   /// Internal review note recorded by N4 HR (never visible to candidates).
   internalNote         String?
   /// Interview call sent by HR – N4 Section after the department review (e-mailed to the candidate).

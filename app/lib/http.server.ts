@@ -33,8 +33,18 @@ export function requireStaff(context: Ctx, request: Request, p: Permission): Ses
 
 /** Only allow relative, same-site redirect targets (prevents open redirects). */
 export function safeNext(next: string | null | undefined, fallback = "/"): string {
-  if (!next || !next.startsWith("/") || next.startsWith("//") || next.startsWith("/\\")) return fallback;
-  return next;
+  if (!next || next.length > 2000 || !next.startsWith("/")) return fallback;
+  // Browsers drop tabs/newlines and treat a backslash as "/" in URLs, so "/<tab>/evil.org" would
+  // become "//evil.org". Reject those characters outright, then confirm the target stays on this site.
+  // eslint-disable-next-line no-control-regex -- rejecting control characters is the point
+  if (/[\\\u0000-\u001f\u007f]/.test(next) || next.startsWith("//")) return fallback;
+  try {
+    const u = new URL(next, "http://portal.invalid");
+    if (u.origin !== "http://portal.invalid") return fallback;
+    return u.pathname + u.search + u.hash;
+  } catch {
+    return fallback;
+  }
 }
 
 /** Reads form data and verifies the CSRF token for the current session. */
@@ -65,9 +75,9 @@ export async function handleAction<T>(
     return await fn();
   } catch (e) {
     if (e instanceof Response) throw e;
-    if (e && typeof e === "object" && "type" in e && (e as { type: string }).type === "DataWithResponseInit")
-      throw e;
     if (e instanceof UnauthenticatedError) throw redirect("/login");
+    // Domain errors are checked before data() responses: they share data()'s shape (so loaders render
+    // a proper error page) but in an action they must come back as an inline message, not an error page.
     if (isDomainError(e)) {
       const fieldErrors =
         e.details && typeof e.details === "object" && !Array.isArray(e.details)
@@ -80,6 +90,8 @@ export async function handleAction<T>(
         { status: e.status, headers },
       );
     }
+    if (e && typeof e === "object" && "type" in e && (e as { type: string }).type === "DataWithResponseInit")
+      throw e;
     logger.error({ event: "app_error", err: e instanceof Error ? e.message : String(e) }, "action failed");
     return data<ActionResult>({ formError: "Something went wrong. Please try again." }, { status: 500 });
   }

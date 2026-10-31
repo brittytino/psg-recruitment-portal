@@ -10,6 +10,8 @@ import {
   type RouterContextProvider,
 } from "react-router";
 import { nonceContext } from "./context";
+import { NonceContext } from "./lib/nonce-context";
+import { newNonce } from "./lib/nonce.server";
 import { logger } from "./modules/core/logger.server";
 import { PRIVATE_PATHS } from "./lib/seo";
 
@@ -48,7 +50,12 @@ export default function handleRequest(
   routerContext: EntryContext,
   loadContext: RouterContextProvider,
 ) {
-  const nonce = loadContext.get(nonceContext);
+  // Unknown addresses match no route, so the root middleware never ran: create the nonce here.
+  let nonce = loadContext.get(nonceContext);
+  if (!nonce) {
+    nonce = newNonce();
+    loadContext.set(nonceContext, nonce);
+  }
   securityHeaders(responseHeaders, nonce);
   // Private pages (sign-in, accounts, staff, admin, ticket pages) never appear in search results.
   // Error pages are not indexed either.
@@ -68,7 +75,9 @@ export default function handleRequest(
     );
 
     const { pipe, abort } = renderToPipeableStream(
-      <ServerRouter context={routerContext} url={request.url} nonce={nonce} />,
+      <NonceContext.Provider value={nonce}>
+        <ServerRouter context={routerContext} url={request.url} nonce={nonce} />
+      </NonceContext.Provider>,
       {
         nonce,
         [readyOption]() {

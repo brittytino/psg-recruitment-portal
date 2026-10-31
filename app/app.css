@@ -455,3 +455,21 @@ html[data-contrast="high"] a { text-decoration-thickness: 2px; }
 .usage-bar.usage-warning::-moz-progress-bar { background: var(--color-warning); }
 .usage-bar.usage-danger::-webkit-progress-value { background: var(--color-danger); }
 .usage-bar.usage-danger::-moz-progress-bar { background: var(--color-danger); }
+
+/* 404 game: marks draw themselves in. */
+.nf-draw {
+  stroke-dasharray: 1;
+  stroke-dashoffset: 1;
+  animation: nf-draw 0.32s ease-out forwards;
+}
+@keyframes nf-draw {
+  to {
+    stroke-dashoffset: 0;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .nf-draw {
+    animation: none;
+    stroke-dashoffset: 0;
+  }
+}

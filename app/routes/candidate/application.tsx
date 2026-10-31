@@ -93,7 +93,15 @@ export function shouldRevalidate({
 
 export async function action({ request, params, context }: Route.ActionArgs) {
   const user = requireUser(context, request);
-  const form = await readForm(request, context);
+  let form: FormData;
+  try {
+    form = await readForm(request, context);
+  } catch (e) {
+    // Expired session during an autosave: show the message in the form, not an error page.
+    if (e && typeof e === "object" && "type" in e && (e as { type: string }).type === "DataWithResponseInit")
+      return e as ReturnType<typeof data>;
+    throw e;
+  }
   return handleAction(async () => {
     let answers: unknown;
     try {

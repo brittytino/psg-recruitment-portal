@@ -8,7 +8,8 @@ import { clientIp, handleAction, readForm, requireStaff } from "~/lib/http.serve
 import { FORM_LABELS, POSITION_LABELS } from "~/lib/labels";
 import { getStaffApplication, transition, updateInternalNote } from "~/modules/applications/service.server";
 import { INTERVIEW_FROM, inviteForInterview } from "~/modules/applications/interview.server";
-import { CalendarCheck } from "lucide-react";
+import { CalendarCheck, Download, Eye, Gavel } from "lucide-react";
+import { StarRatingInput, StarRatingView } from "~/components/star-rating";
 import {
   APPLICATION_STATUSES,
   ASSIGNABLE,
@@ -32,7 +33,10 @@ import {
   assignToHod,
   canApprovePositionChange,
   decidePositionChange,
+  finalReviewOpen,
+  recordFinalDecision,
   recordHodDecision,
+  reviewerName,
   unassign,
 } from "~/modules/reviews/service.server";
 import { hodsForDepartment } from "~/modules/users/service.server";
@@ -111,6 +115,16 @@ export async function loader({ request, params, context }: Route.LoaderArgs) {
       hodReason: app.hodDecisionReason,
       hodRemarks: app.hodRemarks,
       hodDecidedAt: app.hodDecidedAt,
+      hodRating: app.hodRating,
+      final: app.finalDecision
+        ? {
+            decision: app.finalDecision,
+            rating: app.finalRating,
+            remarks: app.finalRemarks,
+            at: app.finalDecidedAt,
+            by: await reviewerName(app.finalDecidedById),
+          }
+        : null,
       interview: app.interviewInvitedAt
         ? {
             at: app.interviewAt,
@@ -131,6 +145,7 @@ export async function loader({ request, params, context }: Route.LoaderArgs) {
     canDownload: hasPermission(user.grants, "document:download"),
     canRegenerate: isOffice && hasPermission(user.grants, "document:regenerate"),
     canApprove: await canApprovePositionChange(user),
+    canFinal: hasPermission(user.grants, "review:final") && finalReviewOpen(app.status),
     canAssign: isOffice && hasPermission(user.grants, "application:assign"),
     canInterview:
       isOffice &&
@@ -155,6 +170,9 @@ export async function action({ request, params, context }: Route.ActionArgs) {
       case "decision":
         await recordHodDecision(user, params.id, Object.fromEntries(form), ip);
         return { message: "Your decision has been recorded." };
+      case "final":
+        await recordFinalDecision(user, params.id, Object.fromEntries(form), ip);
+        return { message: "Your review has been recorded." };
       case "position":
         await decidePositionChange(
           user,
@@ -202,6 +220,7 @@ export default function StaffApplication({ loaderData, actionData }: Route.Compo
     canRegenerate,
     canApprove,
     canAssign,
+    canFinal,
     hods,
     changeOptions,
   } = loaderData;
@@ -216,6 +235,7 @@ export default function StaffApplication({ loaderData, actionData }: Route.Compo
   const pending = app.positionChanges.find((p) => p.status === "PENDING");
   const fe = actionData && "fieldErrors" in actionData ? actionData.fieldErrors : undefined;
   const [decision, setDecision] = useState<string>(app.hodDecision ?? "");
+  const [finalChoice, setFinalChoice] = useState<string>(app.final?.decision ?? "");
   const answers = app.revision?.answers ?? {};
 
   return (
@@ -258,26 +278,58 @@ export default function StaffApplication({ loaderData, actionData }: Route.Compo
         <div className="flex flex-col items-start gap-2 sm:items-end">
           <Badge tone={statusTone(app.status)}>{STATUS_LABELS[app.status]}</Badge>
           {canDownload && app.applicationPdf && (
-            <DocumentViewer
-              file={{
-                href: `/files/bundles/${app.applicationPdf.id}`,
-                name: `Application form (${app.applicationPdf.pageCount} pages)`,
-                mimeType: "application/pdf",
-              }}
-              triggerClassName="btn-secondary"
-              trigger={<>View application ({app.applicationPdf.pageCount} pages)</>}
-            />
+            <div className="flex w-full gap-2 sm:w-auto">
+              <DocumentViewer
+                file={{
+                  href: `/files/bundles/${app.applicationPdf.id}`,
+                  name: `Application (${app.applicationPdf.pageCount} pages)`,
+                  mimeType: "application/pdf",
+                }}
+                triggerClassName="btn-secondary flex-1 sm:flex-none"
+                trigger={
+                  <>
+                    <Eye className="h-4 w-4" aria-hidden="true" /> View application (
+                    {app.applicationPdf.pageCount} pages)
+                  </>
+                }
+              />
+              <a
+                href={`/files/bundles/${app.applicationPdf.id}`}
+                download
+                className="btn-secondary px-3"
+                aria-label="Download the application form"
+                title="Download"
+              >
+                <Download className="h-4 w-4" aria-hidden="true" />
+              </a>
+            </div>
           )}
           {canDownload && app.bundle && (
-            <DocumentViewer
-              file={{
-                href: `/files/bundles/${app.bundle.id}`,
-                name: `Application and documents (${app.bundle.pageCount} pages)`,
-                mimeType: "application/pdf",
-              }}
-              triggerClassName="btn-primary"
-              trigger={<>View application + documents ({app.bundle.pageCount} pages)</>}
-            />
+            <div className="flex w-full gap-2 sm:w-auto">
+              <DocumentViewer
+                file={{
+                  href: `/files/bundles/${app.bundle.id}`,
+                  name: `Application + documents (${app.bundle.pageCount} pages)`,
+                  mimeType: "application/pdf",
+                }}
+                triggerClassName="btn-primary flex-1 sm:flex-none"
+                trigger={
+                  <>
+                    <Eye className="h-4 w-4" aria-hidden="true" /> View application + documents (
+                    {app.bundle.pageCount} pages)
+                  </>
+                }
+              />
+              <a
+                href={`/files/bundles/${app.bundle.id}`}
+                download
+                className="btn-primary px-3"
+                aria-label="Download the application with documents"
+                title="Download"
+              >
+                <Download className="h-4 w-4" aria-hidden="true" />
+              </a>
+            </div>
           )}
           {!app.bundle && (
             <Badge tone={statusTone(app.processingStatus)}>{PROCESSING_LABELS[app.processingStatus]}</Badge>
@@ -368,6 +420,123 @@ export default function StaffApplication({ loaderData, actionData }: Route.Compo
         </div>
 
         <aside className="space-y-6">
+          {(canFinal || app.final) && (
+            <section className="card space-y-4 border-brand-600/30" aria-labelledby="final">
+              <div className="flex items-start gap-3">
+                <span className="grid h-9 w-9 shrink-0 place-items-center rounded-xl bg-brand-50 text-brand-700">
+                  <Gavel className="h-5 w-5" aria-hidden="true" />
+                </span>
+                <div>
+                  <h2 id="final" className="text-xl">
+                    Dean / Principal review
+                  </h2>
+                  <p className="mt-0.5 text-sm text-muted">
+                    {app.hodDecision === "REJECT"
+                      ? "The HOD rejected this application. You can still accept or reject it."
+                      : "Recorded next to the HOD decision. You can change it later."}
+                  </p>
+                </div>
+              </div>
+              {app.final && (
+                <div className="rounded-xl bg-soft p-3 text-sm">
+                  <p className="flex flex-wrap items-center gap-2">
+                    <Badge tone={app.final.decision === "ACCEPT" ? "success" : "danger"}>
+                      {app.final.decision === "ACCEPT" ? "Accepted" : "Rejected"}
+                    </Badge>
+                    <StarRatingView value={app.final.rating} />
+                  </p>
+                  <p className="mt-1.5 text-xs text-muted">
+                    {app.final.by ? `${app.final.by} · ` : ""}
+                    {formatDateTime(app.final.at)}
+                  </p>
+                  {app.final.remarks && <p className="mt-2 whitespace-pre-line">{app.final.remarks}</p>}
+                </div>
+              )}
+              {canFinal && (
+                <Form method="post" className="space-y-4">
+                  <CsrfInput />
+                  <input type="hidden" name="intent" value="final" />
+                  <fieldset>
+                    <legend className="text-sm font-semibold">
+                      {app.final ? "Change your decision" : "Decision"}
+                    </legend>
+                    <div className="mt-1.5 grid grid-cols-2 gap-2">
+                      {(
+                        [
+                          ["ACCEPT", "Accept"],
+                          ["REJECT", "Reject"],
+                        ] as const
+                      ).map(([v, l]) => (
+                        <label
+                          key={v}
+                          className={`flex cursor-pointer items-center justify-center gap-2 rounded-xl border p-2.5 text-sm font-semibold transition-colors has-[:focus-visible]:ring-2 has-[:focus-visible]:ring-brand-600 ${
+                            finalChoice === v
+                              ? v === "ACCEPT"
+                                ? "border-success bg-success-50 text-success"
+                                : "border-danger bg-danger-50 text-danger"
+                              : "border-line hover:bg-soft"
+                          }`}
+                        >
+                          <input
+                            type="radio"
+                            name="decision"
+                            value={v}
+                            checked={finalChoice === v}
+                            onChange={() => setFinalChoice(v)}
+                            className="sr-only"
+                            required
+                          />
+                          {l}
+                        </label>
+                      ))}
+                    </div>
+                    {fe?.decision && <p className="mt-1 text-sm text-danger">{fe.decision[0]}</p>}
+                  </fieldset>
+                  <StarRatingInput
+                    name="rating"
+                    label="Rating"
+                    defaultValue={app.final?.rating}
+                    error={fe?.rating?.[0]}
+                  />
+                  <div>
+                    <label htmlFor="fremarks" className="block text-sm font-semibold">
+                      Remarks{" "}
+                      {finalChoice === "REJECT" ? (
+                        <span className="text-danger">*</span>
+                      ) : (
+                        <span className="font-normal text-muted">(optional)</span>
+                      )}
+                    </label>
+                    <textarea
+                      id="fremarks"
+                      name="remarks"
+                      rows={3}
+                      maxLength={3000}
+                      minLength={finalChoice === "REJECT" ? 10 : undefined}
+                      required={finalChoice === "REJECT"}
+                      defaultValue={app.final?.remarks ?? ""}
+                      className="field-input mt-1"
+                      aria-invalid={!!fe?.remarks}
+                    />
+                    {fe?.remarks && <p className="mt-1 text-sm text-danger">{fe.remarks[0]}</p>}
+                  </div>
+                  <ConfirmDialog
+                    trigger={app.final ? "Update review" : "Record review"}
+                    triggerClassName="btn-primary w-full"
+                    tone={finalChoice === "REJECT" ? "danger" : "primary"}
+                    title={finalChoice === "REJECT" ? "Reject this application?" : "Accept this application?"}
+                    confirmLabel={finalChoice === "REJECT" ? "Reject" : "Accept"}
+                    disabled={!finalChoice || busy}
+                  >
+                    <p>
+                      Your decision is recorded with your name and time, shown to the recruitment office and
+                      kept in the audit log. The HOD decision is not erased.
+                    </p>
+                  </ConfirmDialog>
+                </Form>
+              )}
+            </section>
+          )}
           {isAssignedHod && HOD_STAGE.includes(app.status) && (
             <section className="card space-y-4 border-brand-600/30" aria-labelledby="decide">
               <div>
@@ -445,6 +614,12 @@ export default function StaffApplication({ loaderData, actionData }: Route.Compo
                     {fe?.reason && <p className="mt-1 text-sm text-danger">{fe.reason[0]}</p>}
                   </div>
                 )}
+                <StarRatingInput
+                  name="rating"
+                  label="Screening rating"
+                  defaultValue={app.hodRating}
+                  error={fe?.rating?.[0]}
+                />
                 <div>
                   <label htmlFor="remarks" className="block text-sm font-semibold">
                     Remarks <span className="font-normal text-muted">(optional)</span>
@@ -498,6 +673,7 @@ export default function StaffApplication({ loaderData, actionData }: Route.Compo
                         : "Position change recommended"}
                   </span>{" "}
                   · {formatDateTime(app.hodDecidedAt)}
+                  {app.hodRating ? <StarRatingView value={app.hodRating} className="mt-1 flex" /> : null}
                   {app.hodReason && (
                     <span className="mt-1 block whitespace-pre-line text-muted">{app.hodReason}</span>
                   )}

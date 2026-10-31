@@ -127,35 +127,16 @@ It prints the cause and the fix:
 | Gmail **rejected the login** (535) | App password wrong or revoked. Create a new one for recruitment@your-college.edu (2-Step Verification must be on) and run `sudo ./prod.sh smtp-password`. |
 | Password **empty** | `sudo ./prod.sh smtp-password` |
 
-## E-mail: Google Workspace SMTP Relay (main) with the Gmail account as fallback
+## E-mail
 
-Every e-mail (sign-in codes included) is sent through the **Google Workspace SMTP Relay**
-(`smtp-relay.gmail.com`, about 10 000 a day) first. If the relay is not enabled yet, refuses a message,
-cannot be reached or has used its daily budget, the same e-mail goes out through the **Gmail account**
-(`SMTP_*`, about 500 a day) straight away, so users are never affected. After a relay failure the relay
-is skipped for 10 minutes (no delay for people signing in) and then tried again.
-
-**IT team — enable the relay** (Google Admin console → Apps → Google Workspace → Gmail → Routing →
-SMTP relay service → Configure):
-
-| Setting | Value |
-| --- | --- |
-| Allowed senders | Only addresses in my domains |
-| Authentication | Only accept mail from the specified IP addresses → this server's **public** IP |
-| Encryption | Require TLS encryption |
-
-The repository already sets `SMTP_RELAY_HOST=smtp-relay.gmail.com`, port 587 and
-`SMTP_RELAY_HELO=recruitments.psgtech.ac.in`. If IT prefers SMTP authentication instead of the IP
-address, put `SMTP_RELAY_USER` and `SMTP_RELAY_PASSWORD` in `secrets/override.env`.
-
-Check it on the server:
+Every e-mail goes through the SMTP mailbox (`SMTP_*`). `MAIL_DAILY_BUDGET` (default 450) keeps it below
+the mailbox's daily limit: sign-in codes always go out, routine updates stop at 80 % and then appear in the
+app only (bell icon). The Control centre shows today's usage. Every e-mail says the address is not
+monitored and points people to the Help desk.
 
 ```sh
-sudo ./prod.sh mailtest someone@your-college.edu   # tests the relay, then the Gmail fallback
+sudo ./prod.sh mailtest someone@your-college.edu
 ```
-
-Budgets: `MAIL_RELAY_DAILY_BUDGET` (relay, default 9500) and `MAIL_DAILY_BUDGET` (Gmail account,
-default 450). The Control centre shows both routes, today's usage and whether the relay is working.
 
 ## Read-only Viewers
 

@@ -203,6 +203,9 @@ export async function listApplications(user: SessionUser | null, q: ListQuery) {
         appliedPosition: true,
         effectivePosition: true,
         hodDecision: true,
+        hodRating: true,
+        finalDecision: true,
+        finalRating: true,
         assignedHod: { select: { email: true, profile: { select: { fullName: true } } } },
         currentRevision: {
           select: {

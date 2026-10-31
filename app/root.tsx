@@ -1,5 +1,7 @@
 import { consoleHello } from "~/lib/console-hello";
 import { seo } from "~/lib/seo";
+import { NotFoundGame } from "~/components/not-found-game";
+import { useNonce } from "~/lib/nonce-context";
 import { useEffect, useState } from "react";
 import { newNonce } from "./lib/nonce.server";
 import {
@@ -168,6 +170,8 @@ export const links: Route.LinksFunction = () => [
 
 export function Layout({ children }: { children: React.ReactNode }) {
   const root = useRouteLoaderData<typeof loader>("root");
+  const contextNonce = useNonce();
+  const nonce = root?.nonce || contextNonce || undefined;
   return (
     <html lang="en">
       <head>
@@ -176,12 +180,12 @@ export function Layout({ children }: { children: React.ReactNode }) {
         <meta name="theme-color" content="#10223b" />
         <Meta />
         <Links />
-        <script nonce={root?.nonce} dangerouslySetInnerHTML={{ __html: READING_SCRIPT }} />
+        <script nonce={nonce} dangerouslySetInnerHTML={{ __html: READING_SCRIPT }} />
       </head>
       <body className="min-h-dvh">
         {children}
-        <ScrollRestoration nonce={root?.nonce} />
-        <Scripts nonce={root?.nonce} />
+        <ScrollRestoration nonce={nonce} />
+        <Scripts nonce={nonce} />
       </body>
     </html>
   );
@@ -737,6 +741,14 @@ export default function App() {
 }
 
 export function ErrorBoundary({ error }: Route.ErrorBoundaryProps) {
+  if (isRouteErrorResponse(error) && error.status === 404)
+    return (
+      <>
+        <title>Page not found — PSG Tech Recruitment</title>
+        <meta name="robots" content="noindex" />
+        <NotFoundGame />
+      </>
+    );
   let status = 500;
   let title = "Something went wrong";
   let detail =

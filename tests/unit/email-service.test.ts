@@ -54,6 +54,8 @@ describe("Email Service & Institutional Transporter", () => {
       expect(text).toContain("Staff Recruitment");
       expect(text).toContain(code);
       expect(text).toContain("expires in 5 minutes");
+      expect(text).toContain("Replies are not read");
+      expect(text).toContain("http://localhost:6969/help-desk");
       expect(text).toContain("Never share this verification code with anyone");
       expect(text).toContain("Peelamedu, Coimbatore - 641004");
       expect(text).not.toContain("password reset"); // no password reset link
@@ -65,6 +67,8 @@ describe("Email Service & Institutional Transporter", () => {
       expect(html).toContain(code);
       expect(html).toContain("5 minutes");
       expect(html).toContain("Never share this code with anyone");
+      expect(html).toContain("unattended address");
+      expect(html).toContain("/help-desk");
       expect(html).toContain("Peelamedu, Coimbatore");
       expect(html).toContain("<!DOCTYPE html>");
       // High contrast and monospace letter-spacing for the OTP digits

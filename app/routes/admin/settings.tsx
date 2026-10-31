@@ -159,67 +159,38 @@ export default function Settings({ loaderData, actionData }: Route.ComponentProp
               {status.mail.failed ? ` · ${status.mail.failed} failed` : ""}
             </p>
           </div>
-          <div className="mt-3 grid gap-4 md:grid-cols-2">
-            {(
-              [
-                status.mail.relay
-                  ? {
-                      name: "Google Workspace SMTP Relay (main)",
-                      detail: status.mail.relay.detail,
-                      ok: status.mail.relay.ok,
-                      sent: status.mail.relay.sent,
-                      budget: status.mail.relay.budget,
-                    }
-                  : {
-                      name: "Google Workspace SMTP Relay (main)",
-                      detail: "Not configured — set SMTP_RELAY_HOST to use it",
-                      ok: false,
-                      sent: 0,
-                      budget: 0,
-                    },
-                {
-                  name: status.mail.relay ? "Gmail account (fallback)" : "Gmail account",
-                  detail: `Routine updates stop at ${status.mail.gmail.routineLimit}; sign-in codes always go out`,
-                  ok: true,
-                  sent: status.mail.gmail.sent,
-                  budget: status.mail.gmail.budget,
-                },
-              ] as const
-            ).map((r) => (
-              <div key={r.name}>
+          {(() => {
+            const m = status.mail.smtp;
+            const level =
+              m.sent >= m.budget * 0.95 ? "usage-danger" : m.sent >= m.budget * 0.7 ? "usage-warning" : "";
+            return (
+              <div className="mt-3">
                 <div className="flex items-baseline justify-between gap-2 text-sm">
                   <span className="flex items-center gap-1.5 font-medium text-ink">
-                    {r.budget ? (
-                      r.ok ? (
-                        <CheckCircle2 className="h-4 w-4 text-success" aria-hidden="true" />
-                      ) : (
-                        <XCircle className="h-4 w-4 text-danger" aria-hidden="true" />
-                      )
-                    ) : null}
-                    {r.name}
+                    {m.ok ? (
+                      <CheckCircle2 className="h-4 w-4 text-success" aria-hidden="true" />
+                    ) : (
+                      <XCircle className="h-4 w-4 text-danger" aria-hidden="true" />
+                    )}
+                    Mail server {m.host ? `(${m.host})` : ""}
                   </span>
-                  {r.budget > 0 && (
-                    <span className="text-muted tabular-nums">
-                      {r.sent.toLocaleString("en-IN")} / {r.budget.toLocaleString("en-IN")}
-                    </span>
-                  )}
+                  <span className="text-muted tabular-nums">
+                    {m.sent.toLocaleString("en-IN")} / {m.budget.toLocaleString("en-IN")}
+                  </span>
                 </div>
-                {r.budget > 0 && (
-                  <progress
-                    className={`usage-bar mt-2 ${r.sent >= r.budget * 0.95 ? "usage-danger" : r.sent >= r.budget * 0.7 ? "usage-warning" : ""}`}
-                    max={r.budget}
-                    value={Math.min(r.sent, r.budget)}
-                    aria-label={`${r.name}: e-mails sent today`}
-                  />
-                )}
-                <p className="mt-1 text-xs text-muted">{r.detail}</p>
+                <progress
+                  className={`usage-bar mt-2 ${level}`}
+                  max={m.budget}
+                  value={Math.min(m.sent, m.budget)}
+                  aria-label="E-mails sent today"
+                />
+                <p className="mt-1 text-xs text-muted">
+                  Routine updates stop at {m.routineLimit.toLocaleString("en-IN")} and then appear in the app
+                  only; sign-in codes always go out.
+                </p>
               </div>
-            ))}
-          </div>
-          <p className="mt-3 text-xs text-muted">
-            Every e-mail tries the relay first. If the relay is not enabled, refuses the message or reaches
-            its budget, the Gmail account sends it instead, so nobody misses an e-mail.
-          </p>
+            );
+          })()}
         </div>
         <p className="text-xs text-muted">
           Version {status.version} · E-mails sent from {status.mailFrom} · Roles:{" "}

@@ -21,9 +21,12 @@ import {
   assignToDepartmentHods,
   assignToHod,
   decidePositionChange,
+  recordFinalDecision,
   recordHodDecision,
   reopenSummarySheet,
 } from "~/modules/reviews/service.server";
+import { handleAction } from "~/lib/http.server";
+import { ValidationError } from "~/modules/core/errors";
 import { inviteForInterview } from "~/modules/applications/interview.server";
 import { createDepartment, updateVacancy } from "~/modules/recruitment/service.server";
 import { revokeRole, setUserStatus } from "~/modules/users/service.server";
@@ -543,5 +546,67 @@ describe("keep me signed in", () => {
 
     const plain = await createSession(cand.id, null);
     expect(plain).toMatch(/Max-Age=43200/); // 12 hours
+  });
+});
+
+describe("Dean / Principal review and star ratings", () => {
+  it("the Principal can accept after a HOD rejection; ratings are 1-5; the HOD decision is kept", async () => {
+    const { app } = await submitted();
+    const admin = await makeUser("ADMIN");
+    const hod = await makeUser("HOD", deptId);
+    await assignToHod(admin, { hodId: hod.id, applicationIds: [app.id] });
+    await expect(
+      recordHodDecision(hod, app.id, {
+        decision: "REJECT",
+        reason: "Does not meet the criteria.",
+        rating: "7",
+      }),
+    ).rejects.toThrow(/highlighted/);
+    await recordHodDecision(hod, app.id, {
+      decision: "REJECT",
+      reason: "Does not meet the criteria.",
+      rating: "2",
+    });
+
+    // Rejecting needs a reason; accepting does not.
+    await expect(recordFinalDecision(admin, app.id, { decision: "REJECT", remarks: "" })).rejects.toThrow(
+      /highlighted/,
+    );
+    await recordFinalDecision(admin, app.id, { decision: "ACCEPT", rating: "5", remarks: "" });
+    const a = await prisma.application.findUniqueOrThrow({ where: { id: app.id } });
+    expect(a.status).toBe("HOD_REJECTED");
+    expect(a.hodDecision).toBe("REJECT");
+    expect(a.hodRating).toBe(2);
+    expect(a.finalDecision).toBe("ACCEPT");
+    expect(a.finalRating).toBe(5);
+    expect(a.finalDecidedById).toBe(admin.id);
+    expect(
+      await prisma.auditEvent.count({ where: { entityId: app.id, action: "review.final_decision" } }),
+    ).toBe(1);
+
+    // The Admin role can review too; HODs, HR and Viewers cannot.
+    await recordFinalDecision(await makeUser("MANAGER"), app.id, {
+      decision: "REJECT",
+      remarks: "Reconsidered after the interview panel.",
+    });
+    for (const role of ["HOD", "HR", "VIEWER"] as const)
+      await expect(
+        recordFinalDecision(await makeUser(role, role === "HOD" ? deptId : undefined), app.id, {
+          decision: "ACCEPT",
+        }),
+      ).rejects.toThrow(/permission/);
+  });
+
+  it("form validation errors come back inline (422 data), not as an error page", async () => {
+    const res = await handleAction(async () => {
+      throw new ValidationError("Some answers are invalid", { phone: ["Enter a valid number"] });
+    });
+    const r = res as unknown as {
+      init: { status: number };
+      data: { formError: string; fieldErrors: unknown };
+    };
+    expect(r.init.status).toBe(422);
+    expect(r.data.formError).toBe("Some answers are invalid");
+    expect(r.data.fieldErrors).toEqual({ phone: ["Enter a valid number"] });
   });
 });
