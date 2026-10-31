@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { ArrowLeftRight, CheckCircle2, Clock, Download, FileText, Plus, Users, XCircle } from "lucide-react";
+import { recruitmentName } from "~/modules/reporting/years";
 import { StarRatingView } from "~/components/star-rating";
 import { Form, Link, redirect, useLocation, useNavigation, useSearchParams } from "react-router";
 import type { Route } from "./+types/index";
@@ -23,6 +24,7 @@ import {
   filterOptions,
   listApplications,
   parseListQuery,
+  recruitmentYears,
 } from "~/modules/reporting/applications.server";
 import { PAGE_SIZES } from "~/modules/reporting/constants";
 import { assignToDepartmentHods, assignToHod } from "~/modules/reviews/service.server";
@@ -39,11 +41,12 @@ export async function loader({ request, context }: Route.LoaderArgs) {
   if (isHodReviewer(user.grants) && !isAdmin(user.grants) && !isHrOfficer(user.grants))
     throw redirect("/staff/review");
   const q = parseListQuery(new URL(request.url));
-  const [list, counts, departments, options] = await Promise.all([
+  const [list, counts, departments, options, years] = await Promise.all([
     listApplications(user, q),
     dashboardCounts(user),
-    departmentCounts(user, { position: q.position }),
+    departmentCounts(user, { position: q.position, year: q.year }),
     filterOptions(),
+    recruitmentYears(),
   ]);
   const canAssign = hasPermission(user.grants, "application:assign");
   return {
@@ -51,6 +54,7 @@ export async function loader({ request, context }: Route.LoaderArgs) {
     counts,
     departments,
     options,
+    years,
     q,
     canExport: hasPermission(user.grants, "application:export"),
     canAssign,
@@ -109,6 +113,7 @@ export default function StaffIndex({ loaderData, actionData }: Route.ComponentPr
     counts,
     departments,
     options,
+    years,
     q,
     canExport,
     canAssign,
@@ -140,6 +145,7 @@ export default function StaffIndex({ loaderData, actionData }: Route.ComponentPr
   const deptName = options.departments.find((d) => d.id === q.departmentId)?.name;
   const chips: [string, string][] = [];
   if (q.q) chips.push(["q", `Search: ${q.q}`]);
+  if (q.year) chips.push(["year", recruitmentName(q.year)]);
   if (deptName) chips.push(["departmentId", deptName]);
   if (q.position) chips.push(["position", POSITION_LABELS[q.position]!]);
   if (q.status) chips.push(["status", STATUS_LABELS[q.status]]);
@@ -377,6 +383,15 @@ export default function StaffIndex({ loaderData, actionData }: Route.ComponentPr
               className="field-input mt-1"
             />
           </div>
+          {years.length > 1 && (
+            <FilterSelect
+              name="year"
+              label="Recruitment year"
+              value={q.year}
+              allLabel="All years"
+              options={years.map((y) => [y.year, recruitmentName(y.year)])}
+            />
+          )}
           <FilterSelect
             name="departmentId"
             label="Department"

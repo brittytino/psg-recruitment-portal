@@ -138,3 +138,14 @@ export async function setNoticeActive(user: SessionUser | null, id: string, acti
     );
   });
 }
+
+/** Any uploaded notice (active or hidden), for staff to view or download it. */
+export async function noticeFile(user: SessionUser | null, id: string) {
+  requirePermission(user, "notice:manage");
+  const n = await prisma.publicNotice.findUnique({
+    where: { id },
+    select: { id: true, originalName: true, storageKey: true },
+  });
+  if (!n) throw new NotFoundError("Notice");
+  return n;
+}

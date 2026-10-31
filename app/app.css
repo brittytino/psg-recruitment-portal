@@ -164,6 +164,16 @@
   @apply inline-flex min-h-10 items-center justify-center gap-2 rounded-lg px-4 py-2 text-sm font-semibold whitespace-nowrap no-underline transition-colors duration-150 select-none disabled:cursor-not-allowed disabled:opacity-50;
 }
 
+@utility no-scrollbar {
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+  &::-webkit-scrollbar {
+    display: none;
+    width: 0;
+    height: 0;
+  }
+}
+
 @layer components {
   /* ---------- Layout ---------- */
   .page-container {
@@ -435,6 +445,21 @@ html[data-contrast="high"] a { text-decoration-thickness: 2px; }
 }
 [data-collapsed="true"] .sidebar-heading::after { opacity: 1; transition-delay: 120ms; }
 [data-collapsed="true"] .sidebar-hide { opacity: 0; }
+
+/* Sidebar scrollable navigation: scrolls smoothly while completely hiding scrollbar track & thumb */
+.sidebar-nav,
+.staff-grid aside nav,
+#staff-drawer nav {
+  scrollbar-width: none; /* Firefox */
+  -ms-overflow-style: none; /* IE and Edge */
+}
+.sidebar-nav::-webkit-scrollbar,
+.staff-grid aside nav::-webkit-scrollbar,
+#staff-drawer nav::-webkit-scrollbar {
+  display: none; /* Chrome, Safari, Edge, Opera */
+  width: 0;
+  height: 0;
+}
 @media (prefers-reduced-motion: reduce) {
   .ui-pop, .ui-fade { animation: none !important; }
   .staff-grid, .sidebar-label { transition: none; }
@@ -471,5 +496,25 @@ html[data-contrast="high"] a { text-decoration-thickness: 2px; }
   .nf-draw {
     animation: none;
     stroke-dashoffset: 0;
+  }
+}
+
+/* Printing a report: only the page content, on white. */
+@media print {
+  .staff-grid > aside,
+  .staff-grid header,
+  body > header,
+  footer {
+    display: none !important;
+  }
+  .staff-grid {
+    display: block !important;
+  }
+  body {
+    background: #fff !important;
+  }
+  .card {
+    break-inside: avoid;
+    box-shadow: none !important;
   }
 }

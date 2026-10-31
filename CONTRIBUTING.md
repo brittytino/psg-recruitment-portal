@@ -44,6 +44,9 @@ All of them must pass. Add or update tests for the behaviour you change.
 
 ## Pull requests
 
+- Branch from **`dev`** and open the pull request **against `dev`**. `qa` is for testing and `main` is
+  production; see the [branch flow in the README](./README.md#13a-branches-and-release-flow).
+
 - One topic per pull request, with a short description of **what** changed and **why**.
 - Screenshots for visible changes (desktop and phone width).
 - Link the issue it closes (`Closes #12`).

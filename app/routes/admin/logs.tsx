@@ -61,7 +61,7 @@ export default function Logs({ loaderData }: Route.ComponentProps) {
   return (
     <div className="page-stack">
       <PageHeader
-        eyebrow="Super Admin"
+        eyebrow="System"
         title="System logs"
         description={`Technical events from the web app and background worker: sign-in codes and e-mail delivery, PDF generation, rate limits and errors. Kept for ${LOG_RETENTION_DAYS} days. For who-did-what, see the audit log.`}
         actions={

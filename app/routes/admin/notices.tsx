@@ -1,5 +1,7 @@
 import { Form, useNavigation } from "react-router";
-import { ExternalLink, FileText, Upload } from "lucide-react";
+import { Download, ExternalLink, FileText, Upload } from "lucide-react";
+import { DocumentViewer } from "~/components/document-viewer";
+import { Modal, ModalActions, ModalClose } from "~/components/modal";
 import type { Route } from "./+types/notices";
 import {
   Alert,
@@ -83,11 +85,88 @@ export default function Notices({ loaderData, actionData }: Route.ComponentProps
         description="Upload the recruitment advertisements as PDFs: one for faculty positions and one for research positions. Each opens from its own button on the home page."
         actions={
           <div className="flex flex-wrap gap-2">
+            <Modal
+              size="md"
+              trigger={
+                <>
+                  <Upload className="h-4 w-4" aria-hidden="true" /> Upload PDF
+                </>
+              }
+              icon={<Upload className="h-5 w-5" aria-hidden="true" />}
+              title="Upload an open-positions PDF"
+              description="It replaces the PDF currently shown for the chosen positions."
+            >
+              <Form method="post" encType="multipart/form-data" className="space-y-4">
+                <CsrfInput />
+                <input type="hidden" name="intent" value="upload" />
+                <fieldset className="space-y-2">
+                  <legend className="text-sm font-medium">
+                    Positions{" "}
+                    <span className="text-danger" aria-hidden="true">
+                      *
+                    </span>
+                  </legend>
+                  <div className="grid grid-cols-2 gap-2">
+                    {categories.map((c, i) => (
+                      <label
+                        key={c.value}
+                        className="flex cursor-pointer items-center gap-2 rounded-lg border border-line px-3 py-2.5 text-sm font-medium has-[:checked]:border-brand-600 has-[:checked]:bg-brand-50 has-[:checked]:text-brand-800"
+                      >
+                        <input
+                          type="radio"
+                          name="category"
+                          value={c.value}
+                          defaultChecked={i === 0}
+                          required
+                        />
+                        {c.value === "RESEARCH" ? "Research" : "Faculty"}
+                      </label>
+                    ))}
+                  </div>
+                  {fe?.category?.[0] && <p className="text-sm text-danger">{fe.category[0]}</p>}
+                </fieldset>
+                <TextInput
+                  label="Title"
+                  name="title"
+                  required
+                  placeholder="Faculty recruitment 2026-27 — advertisement"
+                  error={fe?.title?.[0]}
+                />
+                <div className="space-y-1">
+                  <label htmlFor="f-file" className="block text-sm font-medium">
+                    PDF file{" "}
+                    <span className="text-danger" aria-hidden="true">
+                      *
+                    </span>
+                  </label>
+                  <p id="f-file-hint" className="text-xs text-muted">
+                    PDF only, up to {maxMb} MB. It replaces the PDF currently shown for the chosen positions.
+                  </p>
+                  <input
+                    id="f-file"
+                    name="file"
+                    type="file"
+                    accept="application/pdf,.pdf"
+                    required
+                    aria-describedby="f-file-hint"
+                    aria-invalid={!!fe?.file}
+                    className="file-input"
+                  />
+                  {fe?.file?.[0] && <p className="text-sm text-danger">{fe.file[0]}</p>}
+                </div>
+                <ModalActions>
+                  <ModalClose className="btn-secondary">Cancel</ModalClose>
+                  <button type="submit" className="btn-primary" disabled={busy}>
+                    <Upload className="h-4 w-4" aria-hidden="true" /> {busy ? "Uploading…" : "Publish PDF"}
+                  </button>
+                </ModalActions>
+              </Form>
+            </Modal>
             {categories
               .filter((c) => notices.some((n) => n.active && n.category === c.value))
               .map((c) => (
                 <a key={c.value} href={c.path} target="_blank" rel="noreferrer" className="btn-secondary">
-                  <ExternalLink className="h-4 w-4" aria-hidden="true" /> View {c.label.toLowerCase()} PDF
+                  <ExternalLink className="h-4 w-4" aria-hidden="true" /> Public {c.label.toLowerCase()} PDF
                 </a>
               ))}
           </div>
@@ -97,12 +176,12 @@ export default function Notices({ loaderData, actionData }: Route.ComponentProps
       {a?.formError && !summary.length && <Alert tone="danger">{a.formError}</Alert>}
       <ErrorSummary messages={summary} />
 
-      <div className="grid gap-6 xl:grid-cols-[1fr_24rem] xl:items-start">
+      <div>
         <section className="card p-0" aria-label="Uploaded notices">
           {notices.length === 0 ? (
             <div className="p-6">
               <EmptyState title="No notice uploaded yet">
-                Until a PDF is uploaded, the home page buttons open the list of vacancies instead.
+                Use “Upload PDF”. Until then, the home page buttons open the list of vacancies.
               </EmptyState>
             </div>
           ) : (
@@ -124,6 +203,24 @@ export default function Notices({ loaderData, actionData }: Route.ComponentProps
                   <Badge tone={n.active ? "success" : "neutral"}>
                     {n.active ? "On home page" : "Hidden"}
                   </Badge>
+                  <span className="flex gap-1.5">
+                    <DocumentViewer
+                      file={{
+                        href: `/admin/notices/${n.id}/file`,
+                        name: n.title,
+                        mimeType: "application/pdf",
+                      }}
+                    />
+                    <a
+                      href={`/admin/notices/${n.id}/file`}
+                      download
+                      className="inline-grid h-8 w-8 place-items-center rounded-lg border border-line bg-paper text-ink transition-colors hover:border-brand-200 hover:bg-brand-50 hover:text-brand-700"
+                      aria-label={`Download ${n.title}`}
+                      title="Download"
+                    >
+                      <Download className="h-4 w-4" aria-hidden="true" />
+                    </a>
+                  </span>
                   <Form method="post">
                     <CsrfInput />
                     <input type="hidden" name="intent" value="toggle" />
@@ -151,71 +248,6 @@ export default function Notices({ loaderData, actionData }: Route.ComponentProps
             </ul>
           )}
         </section>
-
-        <aside className="card space-y-4 xl:sticky xl:top-24">
-          <div className="flex items-center gap-3">
-            <span className="icon-tile">
-              <Upload className="h-5 w-5" aria-hidden="true" />
-            </span>
-            <h2 className="text-lg">Upload a PDF</h2>
-          </div>
-          <Form method="post" encType="multipart/form-data" className="space-y-4">
-            <CsrfInput />
-            <input type="hidden" name="intent" value="upload" />
-            <fieldset className="space-y-2">
-              <legend className="text-sm font-medium">
-                Positions{" "}
-                <span className="text-danger" aria-hidden="true">
-                  *
-                </span>
-              </legend>
-              <div className="grid grid-cols-2 gap-2">
-                {categories.map((c, i) => (
-                  <label
-                    key={c.value}
-                    className="flex cursor-pointer items-center gap-2 rounded-lg border border-line px-3 py-2.5 text-sm font-medium has-[:checked]:border-brand-600 has-[:checked]:bg-brand-50 has-[:checked]:text-brand-800"
-                  >
-                    <input type="radio" name="category" value={c.value} defaultChecked={i === 0} required />
-                    {c.value === "RESEARCH" ? "Research" : "Faculty"}
-                  </label>
-                ))}
-              </div>
-              {fe?.category?.[0] && <p className="text-sm text-danger">{fe.category[0]}</p>}
-            </fieldset>
-            <TextInput
-              label="Title"
-              name="title"
-              required
-              placeholder="Faculty recruitment 2026-27 — advertisement"
-              error={fe?.title?.[0]}
-            />
-            <div className="space-y-1">
-              <label htmlFor="f-file" className="block text-sm font-medium">
-                PDF file{" "}
-                <span className="text-danger" aria-hidden="true">
-                  *
-                </span>
-              </label>
-              <p id="f-file-hint" className="text-xs text-muted">
-                PDF only, up to {maxMb} MB. It replaces the PDF currently shown for the chosen positions.
-              </p>
-              <input
-                id="f-file"
-                name="file"
-                type="file"
-                accept="application/pdf,.pdf"
-                required
-                aria-describedby="f-file-hint"
-                aria-invalid={!!fe?.file}
-                className="file-input"
-              />
-              {fe?.file?.[0] && <p className="text-sm text-danger">{fe.file[0]}</p>}
-            </div>
-            <button type="submit" className="btn-primary w-full" disabled={busy}>
-              {busy ? "Uploading…" : "Publish PDF"}
-            </button>
-          </Form>
-        </aside>
       </div>
     </div>
   );

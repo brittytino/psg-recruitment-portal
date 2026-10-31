@@ -358,52 +358,107 @@ function PublicHeader() {
 
 function Footer() {
   return (
-    <footer className="mt-16 border-t border-line bg-paper">
-      <div className="page-container grid gap-10 py-12 sm:grid-cols-2 lg:grid-cols-[2fr_1fr_1fr]">
-        <div className="space-y-4">
-          <Brand to="/" subtitle="Faculty & Research Recruitment" />
-          <p className="max-w-md text-sm text-muted">
+    <footer className="mt-16 bg-navy-900 text-white/75">
+      <div className="h-1 bg-gradient-to-r from-brand-700 via-brand-600 to-gold-400" aria-hidden="true" />
+      <div className="page-container grid gap-10 py-14 sm:grid-cols-2 lg:grid-cols-[1.6fr_1fr_1fr_1fr]">
+        <div className="space-y-5">
+          <Link to="/" className="flex items-center gap-3 no-underline">
+            <span className="grid h-12 w-12 shrink-0 place-items-center rounded-xl bg-white shadow-sm">
+              <img src="/images/psg_logo.png" alt="" className="h-10 w-auto" />
+            </span>
+            <span className="leading-tight">
+              <span className="block font-display text-lg font-semibold text-white">
+                PSG College of Technology
+              </span>
+              <span className="block text-xs tracking-[0.14em] text-white/60 uppercase">
+                Faculty &amp; Research Recruitment
+              </span>
+            </span>
+          </Link>
+          <p className="max-w-sm text-sm leading-relaxed">
             Avinashi Road, Peelamedu, Coimbatore – 641 004, Tamil Nadu. An autonomous institution affiliated
             to Anna University.
           </p>
-          <div className="flex items-center gap-3 opacity-80">
-            <img src="/images/75yearsLogo.png" alt="75 years of PSG Tech" className="h-8 w-auto" />
-            <img src="/images/100yearsLogo.png" alt="100 years of PSG" className="h-8 w-auto" />
+          <div className="flex items-center gap-2">
+            <span className="rounded-lg bg-white px-2 py-1.5">
+              <img src="/images/75yearsLogo.png" alt="75 years of PSG Tech" className="h-7 w-auto" />
+            </span>
+            <span className="rounded-lg bg-white px-2 py-1.5">
+              <img src="/images/100yearsLogo.png" alt="100 years of PSG" className="h-7 w-auto" />
+            </span>
           </div>
         </div>
-        <div>
-          <h2 className="label-caps font-sans">Candidates</h2>
-          <ul className="mt-4 space-y-2 text-sm">
-            <li>
-              <Link to="/vacancies">Open vacancies</Link>
-            </li>
-            <li>
-              <Link to="/register">Create an account</Link>
-            </li>
-            <li>
-              <Link to="/help">Help &amp; FAQ</Link>
-            </li>
-          </ul>
-        </div>
-        <div>
-          <h2 className="label-caps font-sans">Institution</h2>
-          <ul className="mt-4 space-y-2 text-sm">
-            <li>
-              <Link to="/privacy">Privacy notice</Link>
-            </li>
-            <li>
-              <Link to="/help#contact">Contact</Link>
-            </li>
-            <li>
-              <Link to="/login">Staff sign in</Link>
-            </li>
-          </ul>
-        </div>
+        {(
+          [
+            [
+              "Candidates",
+              [
+                ["Open vacancies", "/vacancies"],
+                ["Create an account", "/register"],
+                ["Sign in", "/login"],
+                ["Faculty positions (PDF)", "/open-positions.pdf"],
+              ],
+            ],
+            [
+              "Support",
+              [
+                ["Help desk", "/help-desk"],
+                ["Help & FAQ", "/help"],
+                ["Raise a ticket", "/help-desk/new"],
+                ["Contact", "/help#contact"],
+              ],
+            ],
+            [
+              "Institution",
+              [
+                ["psgtech.edu", "https://www.psgtech.edu"],
+                ["Privacy notice", "/privacy"],
+                ["Staff sign in", "/login"],
+              ],
+            ],
+          ] as const
+        ).map(([heading, links]) => (
+          <nav key={heading} aria-label={heading}>
+            <h2 className="font-sans text-xs font-semibold tracking-[0.16em] text-white uppercase">
+              {heading}
+            </h2>
+            <ul className="mt-4 space-y-2.5 text-sm">
+              {links.map(([label, to]) => (
+                <li key={label}>
+                  {to.startsWith("http") || to.endsWith(".pdf") ? (
+                    <a
+                      href={to}
+                      {...(to.startsWith("http") ? { target: "_blank", rel: "noreferrer" } : {})}
+                      className="text-white/75 no-underline transition-colors hover:text-white"
+                    >
+                      {label}
+                    </a>
+                  ) : (
+                    <Link to={to} className="text-white/75 no-underline transition-colors hover:text-white">
+                      {label}
+                    </Link>
+                  )}
+                </li>
+              ))}
+            </ul>
+          </nav>
+        ))}
       </div>
-      <div className="border-t border-line">
-        <p className="page-container py-4 text-xs text-muted">
-          © {new Date().getFullYear()} PSG College of Technology. All rights reserved.
-        </p>
+      <div className="border-t border-white/10">
+        <div className="page-container flex flex-col gap-2 py-5 text-xs text-white/55 sm:flex-row sm:items-center sm:justify-between">
+          <p>© {new Date().getFullYear()} PSG College of Technology. All rights reserved.</p>
+          <p>
+            Open source under the MIT licence ·{" "}
+            <a
+              href="https://github.com/brittytino/PSG-SRPortal"
+              target="_blank"
+              rel="noreferrer"
+              className="text-white/75 underline-offset-2 hover:text-white"
+            >
+              Contribute on GitHub
+            </a>
+          </p>
+        </div>
       </div>
     </footer>
   );
@@ -459,7 +514,10 @@ function StaffSidebarContent({
         </Link>
       </div>
 
-      <nav aria-label="Staff" className="flex-1 space-y-4 overflow-x-clip overflow-y-auto px-3 pt-2 pb-6">
+      <nav
+        aria-label="Staff"
+        className="sidebar-nav no-scrollbar flex-1 space-y-4 overflow-x-clip overflow-y-auto overscroll-y-contain px-3 pt-2 pb-6"
+      >
         {groups.map((g) => (
           <div key={g.title}>
             <p className="sidebar-heading flex items-center px-3 text-[11px] font-semibold tracking-[0.12em] text-white/45 uppercase">

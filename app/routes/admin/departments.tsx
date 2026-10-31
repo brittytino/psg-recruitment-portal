@@ -1,5 +1,6 @@
 import { Form, useNavigation, useSearchParams } from "react-router";
-import { Building2, Mail, Plus, UserMinus, Send } from "lucide-react";
+import { Building2, FlaskConical, Mail, Plus, Send, UserMinus, UserPlus } from "lucide-react";
+import { Modal, ModalActions, ModalClose } from "~/components/modal";
 import type { Route } from "./+types/departments";
 import {
   Alert,
@@ -92,6 +93,103 @@ export default function Departments({ loaderData, actionData }: Route.ComponentP
         eyebrow="HR – N4 Section"
         title="Departments & HODs"
         description="Add departments with their Head of Department. The HOD receives an e-mail invitation and signs in with a one-time code."
+        actions={
+          tab === "departments" ? (
+            <Modal
+              size="lg"
+              trigger={
+                <>
+                  <Plus className="h-4 w-4" aria-hidden="true" /> New department
+                </>
+              }
+              icon={<Building2 className="h-5 w-5" aria-hidden="true" />}
+              title="New department"
+              description="The HOD named here is invited by e-mail straight away."
+            >
+              <Form method="post" className="space-y-4">
+                <CsrfInput />
+                <input type="hidden" name="intent" value="department" />
+                <div className="grid gap-4 sm:grid-cols-[10rem_1fr]">
+                  <TextInput label="Short code" name="code" required hint="e.g. CSE" error={fe?.code?.[0]} />
+                  <TextInput
+                    label="Department name"
+                    name="name"
+                    required
+                    placeholder="Computer Science and Engineering"
+                    error={fe?.name?.[0]}
+                  />
+                </div>
+                <fieldset className="grid gap-4 rounded-xl border border-line p-4 sm:grid-cols-2">
+                  <legend className="px-1 text-sm font-semibold">Head of Department</legend>
+                  <TextInput
+                    label="HOD name"
+                    name="hodName"
+                    required
+                    placeholder="Dr. R. Kumar"
+                    error={fe?.hodName?.[0]}
+                  />
+                  <TextInput
+                    label="HOD e-mail"
+                    name="hodEmail"
+                    type="email"
+                    required
+                    placeholder="hod.department@your-college.edu"
+                    error={fe?.hodEmail?.[0]}
+                  />
+                </fieldset>
+                <ModalActions>
+                  <ModalClose className="btn-secondary">Cancel</ModalClose>
+                  <button type="submit" className="btn-primary" disabled={busy}>
+                    Create department
+                  </button>
+                </ModalActions>
+              </Form>
+            </Modal>
+          ) : (
+            <Modal
+              size="md"
+              trigger={
+                <>
+                  <Plus className="h-4 w-4" aria-hidden="true" /> New specialisation
+                </>
+              }
+              icon={<FlaskConical className="h-5 w-5" aria-hidden="true" />}
+              title="New research specialisation"
+            >
+              <Form method="post" className="space-y-4">
+                <CsrfInput />
+                <input type="hidden" name="intent" value="specialisation" />
+                <TextInput
+                  label="Name"
+                  name="name"
+                  required
+                  placeholder="Artificial Intelligence & Machine Learning"
+                  error={fe?.name?.[0]}
+                />
+                <TextInput
+                  label="Description"
+                  name="description"
+                  placeholder="Deep learning, computer vision, NLP"
+                  error={fe?.description?.[0]}
+                />
+                <TextInput
+                  label="Display order"
+                  name="sortOrder"
+                  type="number"
+                  defaultValue="0"
+                  hint="Lower numbers appear first."
+                  error={fe?.sortOrder?.[0]}
+                />
+                <ModalActions>
+                  <ModalClose className="btn-secondary">Cancel</ModalClose>
+                  <button type="submit" className="btn-primary" disabled={busy}>
+                    Add specialisation
+                  </button>
+                </ModalActions>
+              </Form>
+            </Modal>
+          )
+        }
       />
       {a?.message && <Alert tone="success">{a.message}</Alert>}
       {a?.formError && !summary.length && <Alert tone="danger">{a.formError}</Alert>}
@@ -107,12 +205,12 @@ export default function Departments({ loaderData, actionData }: Route.ComponentP
       />
 
       {tab === "departments" && (
-        <div className="grid gap-6 xl:grid-cols-[1fr_24rem] xl:items-start">
+        <div>
           <section aria-label="Departments" className="space-y-4">
             {departments.length === 0 ? (
-              <EmptyState title="No departments yet">Add the first department with the form.</EmptyState>
+              <EmptyState title="No departments yet">Use “New department” to add the first one.</EmptyState>
             ) : (
-              <ul className="grid gap-4 lg:grid-cols-2">
+              <ul className="grid gap-4 md:grid-cols-2 2xl:grid-cols-3">
                 {departments.map((d) => (
                   <li key={d.id} className="card flex flex-col gap-4 p-5">
                     <div className="flex items-start justify-between gap-3">
@@ -129,7 +227,48 @@ export default function Departments({ loaderData, actionData }: Route.ComponentP
                     </div>
 
                     <div>
-                      <p className="label-caps">Head of Department</p>
+                      <div className="flex items-center justify-between gap-2">
+                        <p className="label-caps">Head of Department</p>
+                        <Modal
+                          size="md"
+                          triggerClassName="btn-ghost btn-sm"
+                          trigger={
+                            <>
+                              <Plus className="h-4 w-4" aria-hidden="true" /> Add HOD
+                            </>
+                          }
+                          icon={<UserPlus className="h-5 w-5" aria-hidden="true" />}
+                          title={`Add a HOD — ${d.code}`}
+                          description={`${d.name}. They receive an e-mail invitation and sign in with a one-time code.`}
+                        >
+                          <Form method="post" className="space-y-4">
+                            <CsrfInput />
+                            <input type="hidden" name="intent" value="hod" />
+                            <input type="hidden" name="departmentId" value={d.id} />
+                            <TextInput
+                              label="Full name"
+                              name="fullName"
+                              required
+                              placeholder="Dr. R. Kumar"
+                              error={fe?.fullName?.[0]}
+                            />
+                            <TextInput
+                              label="Official e-mail"
+                              name="email"
+                              type="email"
+                              required
+                              placeholder={`hod.${d.code.toLowerCase()}@your-college.edu`}
+                              error={fe?.email?.[0]}
+                            />
+                            <ModalActions>
+                              <ModalClose className="btn-secondary">Cancel</ModalClose>
+                              <button type="submit" className="btn-primary" disabled={busy}>
+                                <Mail className="h-4 w-4" aria-hidden="true" /> Add & send invitation
+                              </button>
+                            </ModalActions>
+                          </Form>
+                        </Modal>
+                      </div>
                       {d.roles.length === 0 ? (
                         <p className="mt-1 text-sm text-muted">Not added yet.</p>
                       ) : (
@@ -191,29 +330,6 @@ export default function Departments({ loaderData, actionData }: Route.ComponentP
                           ))}
                         </ul>
                       )}
-                      <details className="disclosure mt-3">
-                        <summary>
-                          <Plus className="h-4 w-4" aria-hidden="true" /> Add a HOD
-                        </summary>
-                        <Form method="post" className="mt-3 grid gap-3 sm:grid-cols-2">
-                          <CsrfInput />
-                          <input type="hidden" name="intent" value="hod" />
-                          <input type="hidden" name="departmentId" value={d.id} />
-                          <TextInput label="Full name" name="fullName" required placeholder="Dr. R. Kumar" />
-                          <TextInput
-                            label="Official e-mail"
-                            name="email"
-                            type="email"
-                            required
-                            placeholder={`hod.${d.code.toLowerCase()}@your-college.edu`}
-                          />
-                          <div className="sm:col-span-2">
-                            <button type="submit" className="btn-primary btn-sm" disabled={busy}>
-                              <Mail className="h-4 w-4" aria-hidden="true" /> Add & send invitation
-                            </button>
-                          </div>
-                        </Form>
-                      </details>
                     </div>
 
                     <div className="mt-auto border-t border-line pt-4">
@@ -245,65 +361,16 @@ export default function Departments({ loaderData, actionData }: Route.ComponentP
               </ul>
             )}
           </section>
-
-          <aside className="card space-y-4 xl:sticky xl:top-24">
-            <div className="flex items-center gap-3">
-              <span className="icon-tile">
-                <Building2 className="h-5 w-5" aria-hidden="true" />
-              </span>
-              <h2 className="text-lg">New department</h2>
-            </div>
-            <Form method="post" className="space-y-4">
-              <CsrfInput />
-              <input type="hidden" name="intent" value="department" />
-              <TextInput
-                label="Short code"
-                name="code"
-                required
-                hint="Used in reference numbers, e.g. CSE"
-                error={fe?.code?.[0]}
-              />
-              <TextInput
-                label="Department name"
-                name="name"
-                required
-                placeholder="Computer Science and Engineering"
-                error={fe?.name?.[0]}
-              />
-              <fieldset className="space-y-4 rounded-lg border border-line p-4">
-                <legend className="px-1 text-sm font-semibold">Head of Department</legend>
-                <TextInput
-                  label="HOD name"
-                  name="hodName"
-                  required
-                  placeholder="Dr. R. Kumar"
-                  error={fe?.hodName?.[0]}
-                />
-                <TextInput
-                  label="HOD e-mail"
-                  name="hodEmail"
-                  type="email"
-                  required
-                  placeholder="hod.department@your-college.edu"
-                  hint="An invitation with the sign-in link is e-mailed."
-                  error={fe?.hodEmail?.[0]}
-                />
-              </fieldset>
-              <button type="submit" className="btn-primary w-full" disabled={busy}>
-                Create department
-              </button>
-            </Form>
-          </aside>
         </div>
       )}
 
       {tab === "specialisations" && (
-        <div className="grid gap-6 xl:grid-cols-[1fr_24rem] xl:items-start">
+        <div>
           <section className="card p-0" aria-label="Research specialisations">
             {researchSpecialisations.length === 0 ? (
               <div className="p-6">
                 <EmptyState title="No research specialisations yet">
-                  Add one to start posting research positions.
+                  Use “New specialisation” to start posting research positions.
                 </EmptyState>
               </div>
             ) : (
@@ -364,37 +431,6 @@ export default function Departments({ loaderData, actionData }: Route.ComponentP
               </div>
             )}
           </section>
-          <aside className="card space-y-4 xl:sticky xl:top-24">
-            <h2 className="text-lg">New research specialisation</h2>
-            <Form method="post" className="space-y-4">
-              <CsrfInput />
-              <input type="hidden" name="intent" value="specialisation" />
-              <TextInput
-                label="Name"
-                name="name"
-                required
-                placeholder="Artificial Intelligence & Machine Learning"
-                error={fe?.name?.[0]}
-              />
-              <TextInput
-                label="Description"
-                name="description"
-                placeholder="Deep learning, computer vision, NLP"
-                error={fe?.description?.[0]}
-              />
-              <TextInput
-                label="Display order"
-                name="sortOrder"
-                type="number"
-                defaultValue="0"
-                hint="Lower numbers appear first."
-                error={fe?.sortOrder?.[0]}
-              />
-              <button type="submit" className="btn-primary w-full" disabled={busy}>
-                Add specialisation
-              </button>
-            </Form>
-          </aside>
         </div>
       )}
     </div>

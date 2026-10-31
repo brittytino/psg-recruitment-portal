@@ -60,6 +60,7 @@ export default [
   route("admin/vacancies/:id/edit", "routes/admin/vacancy-edit.tsx"),
   route("admin/departments", "routes/admin/departments.tsx"),
   route("admin/notices", "routes/admin/notices.tsx"),
+  route("admin/notices/:id/file", "routes/admin/notice-file.ts"),
   route("admin/users", "routes/admin/users.tsx"),
   route("admin/viewers", "routes/admin/viewers.tsx"),
   route("admin/settings", "routes/admin/settings.tsx"),

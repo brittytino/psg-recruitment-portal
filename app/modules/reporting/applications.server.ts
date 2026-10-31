@@ -15,6 +15,7 @@ import type { Answers, TableRow } from "~/modules/forms/types";
 import { DEFAULT_EXPORT_COLUMNS, EXPORT_COLUMNS, type ExportColumnKey } from "./columns";
 
 import { DEFAULT_PAGE_SIZE, PAGE_SIZES } from "./constants";
+import { YEAR_PATTERN, yearOfVacancy, yearRange } from "./years";
 export { PAGE_SIZES };
 const SORTS = [
   "submittedAt",
@@ -35,6 +36,8 @@ const optionalDate = z
 
 export const listQuerySchema = z.object({
   q: z.string().trim().max(100).optional().catch(undefined),
+  /** Recruitment (academic) year, e.g. "2026-27". */
+  year: z.string().regex(YEAR_PATTERN).optional().catch(undefined),
   departmentId: z.string().uuid().optional().catch(undefined),
   disciplineId: z.string().uuid().optional().catch(undefined),
   vacancyId: z.string().uuid().optional().catch(undefined),
@@ -96,8 +99,20 @@ const PHD_STATUS: Record<string, string> = {
   pursuing: "Pursuing",
 };
 
+/** Applications whose vacancy belongs to this recruitment year (stored or derived from opening date). */
+export function yearWhere(year: string): Prisma.ApplicationWhereInput {
+  const { from, to } = yearRange(year);
+  return {
+    OR: [
+      { vacancy: { academicYear: year } },
+      { vacancy: { academicYear: null, opensAt: { gte: from, lt: to } } },
+    ],
+  };
+}
+
 function filterWhere(q: ListQuery): Prisma.ApplicationWhereInput {
   const and: Prisma.ApplicationWhereInput[] = [];
+  if (q.year) and.push(yearWhere(q.year));
   if (q.recruitmentCategory) and.push({ recruitmentCategory: q.recruitmentCategory });
   if (q.researchSpecialisationId)
     and.push({ vacancy: { researchSpecialisationId: q.researchSpecialisationId } });
@@ -301,6 +316,8 @@ export async function departmentCounts(user: SessionUser | null, q: Partial<List
       scope,
       q.position ? { vacancy: { position: q.position } } : {},
       q.departmentId ? { departmentId: q.departmentId } : {},
+      q.year ? yearWhere(q.year) : {},
+      q.recruitmentCategory ? { recruitmentCategory: q.recruitmentCategory } : {},
     ],
   };
   const groups = await prisma.application.groupBy({
@@ -604,4 +621,99 @@ export async function previewExport(
   const rows = batch.map((r, i) => columns.map((c) => exportValue(c, r, i + 1)));
   const total = await prisma.application.count({ where });
   return { headers, rows, total };
+}
+
+/** Recruitment years that have vacancies, newest first, with vacancy and application counts. */
+export async function recruitmentYears() {
+  const vacancies = await prisma.vacancy.findMany({
+    select: {
+      academicYear: true,
+      opensAt: true,
+      _count: { select: { applications: { where: { status: { not: "DRAFT" } } } } },
+    },
+  });
+  const years = new Map<string, { year: string; vacancies: number; applications: number }>();
+  for (const v of vacancies) {
+    const y = yearOfVacancy(v);
+    const e = years.get(y) ?? { year: y, vacancies: 0, applications: 0 };
+    e.vacancies += 1;
+    e.applications += v._count.applications;
+    years.set(y, e);
+  }
+  return [...years.values()].sort((a, b) => b.year.localeCompare(a.year));
+}
+
+/**
+ * Report figures for the summary page: pipeline by status, position mix, stream, Dean / Principal
+ * decisions, average ratings and submissions per week — all within the user's scope and filters.
+ */
+export async function reportStats(user: SessionUser | null, q: ListQuery) {
+  const u = requirePermission(user, "application:list");
+  const where = scopedWhere(u, q);
+  const [byStatus, byPosition, byCategory, byFinal, ratings, submitted] = await Promise.all([
+    prisma.application.groupBy({ by: ["status"], where, _count: { _all: true } }),
+    prisma.application.groupBy({ by: ["appliedPosition"], where, _count: { _all: true } }),
+    prisma.application.groupBy({ by: ["recruitmentCategory"], where, _count: { _all: true } }),
+    prisma.application.groupBy({ by: ["finalDecision"], where, _count: { _all: true } }),
+    prisma.application.aggregate({ where, _avg: { hodRating: true, finalRating: true } }),
+    prisma.application.findMany({
+      where: { AND: [where, { submittedAt: { not: null } }] },
+      select: { submittedAt: true },
+      take: 20000,
+    }),
+  ]);
+  const n = (...st: string[]) =>
+    byStatus.filter((b) => st.includes(b.status)).reduce((t, b) => t + b._count._all, 0);
+  // Submissions per week (IST), last 12 weeks that have data.
+  const week = (d: Date) => {
+    const ist = new Date(d.getTime() + 330 * 60_000);
+    const day = (ist.getUTCDay() + 6) % 7; // Monday = 0
+    ist.setUTCDate(ist.getUTCDate() - day);
+    return ist.toISOString().slice(0, 10);
+  };
+  const weeks = new Map<string, number>();
+  for (const a of submitted) weeks.set(week(a.submittedAt!), (weeks.get(week(a.submittedAt!)) ?? 0) + 1);
+  // Continuous weeks (empty weeks show as zero) up to the latest one with submissions; last 12.
+  const keys = [...weeks.keys()].sort();
+  const trend: [string, number][] = [];
+  if (keys.length) {
+    const end = new Date(`${keys[keys.length - 1]}T00:00:00Z`);
+    for (let i = 11; i >= 0; i--) {
+      const d = new Date(end.getTime() - i * 7 * 86400_000).toISOString().slice(0, 10);
+      if (d >= keys[0]! || trend.length) trend.push([d, weeks.get(d) ?? 0]);
+    }
+  }
+  return {
+    total: byStatus.reduce((t, b) => t + b._count._all, 0),
+    pipeline: [
+      {
+        key: "new",
+        label: "Not yet with HOD",
+        value: n("SUBMITTED", "UNDER_HR_REVIEW", "UNDER_DEPARTMENT_REVIEW"),
+      },
+      { key: "hod", label: "With HOD", value: n("ASSIGNED_TO_HOD") },
+      { key: "accepted", label: "HOD accepted", value: n("HOD_ACCEPTED") },
+      { key: "changed", label: "Position change", value: n("HOD_RECOMMENDED_CHANGE") },
+      { key: "rejected", label: "Rejected", value: n("HOD_REJECTED", "REJECTED") },
+      { key: "shortlisted", label: "Shortlisted / approved", value: n("SHORTLISTED", "APPROVED") },
+      { key: "other", label: "Clarification / withdrawn", value: n("NEEDS_CLARIFICATION", "WITHDRAWN") },
+    ],
+    positions: byPosition
+      .map((p) => ({
+        label: p.appliedPosition ? (POSITION_LABELS[p.appliedPosition] ?? p.appliedPosition) : "Research",
+        value: p._count._all,
+      }))
+      .sort((a, b) => b.value - a.value),
+    categories: byCategory.map((c) => ({
+      label: c.recruitmentCategory === "RESEARCH" ? "Research" : "Faculty",
+      value: c._count._all,
+    })),
+    final: {
+      accepted: byFinal.find((f) => f.finalDecision === "ACCEPT")?._count._all ?? 0,
+      rejected: byFinal.find((f) => f.finalDecision === "REJECT")?._count._all ?? 0,
+    },
+    avgHodRating: ratings._avg.hodRating,
+    avgFinalRating: ratings._avg.finalRating,
+    trend: trend.map(([weekOf, value]) => ({ weekOf, value })),
+  };
 }

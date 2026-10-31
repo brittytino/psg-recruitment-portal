@@ -342,6 +342,36 @@ All quality gates pass cleanly:
 
 ---
 
+## 13a. Branches and release flow
+
+The repository has three long-lived branches. **Production servers only ever pull `main`.**
+
+| Branch | Purpose | Who merges into it |
+| :--- | :--- | :--- |
+| `dev` | Integration branch. Every feature and fix lands here first. | Maintainers, after review of a pull request |
+| `qa` | Testing / staging. What QA checks before a release. | Maintainers, by merging `dev` when it is ready to test |
+| `main` | Production. The college server runs `git pull origin main && sudo ./prod.sh up`. | Maintainers only, by merging `qa` after it passes testing |
+
+```
+feature/my-change ──PR──▶ dev ──merge──▶ qa ──(tested)──▶ main ──▶ production server
+                                                  ▲
+hotfix/urgent-fix ─────────────PR─────────────────┘   (then merged back into qa and dev)
+```
+
+**Contributors:**
+
+1. Fork the repository (or create a branch if you have access) **from `dev`**:
+   `git checkout dev && git pull && git checkout -b feature/short-description`.
+2. Make the change with tests; run the checks in [CONTRIBUTING.md](./CONTRIBUTING.md).
+3. Open the pull request **against `dev`** (never against `main` or `qa`).
+
+**Maintainers:** merge `dev` into `qa` for a test round, and `qa` into `main` for a release. Urgent
+production fixes go in a `hotfix/…` branch from `main`, are merged into `main`, and then merged back
+into `qa` and `dev` so the branches never drift apart. Database migrations must stay additive on every
+branch, because `main` runs against the live database.
+
+---
+
 ## 14. Authors and licence
 
 - **Tino Britty J** ([GitHub](https://github.com/brittytino) · [LinkedIn](https://www.linkedin.com/in/brittytino/)) — lead developer and architect

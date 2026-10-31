@@ -100,7 +100,7 @@ export default function Settings({ loaderData, actionData }: Route.ComponentProp
   return (
     <div className="page-stack max-w-6xl">
       <PageHeader
-        eyebrow="Super Admin"
+        eyebrow="System"
         title="Control centre"
         description="Live system status, switches, recruitment rules and emergency actions in one place. Every change here is recorded in the audit log."
       />
@@ -108,18 +108,53 @@ export default function Settings({ loaderData, actionData }: Route.ComponentProp
       {a?.formError && <Alert tone="danger">{a.formError}</Alert>}
 
       {/* System status */}
-      <section className="card space-y-4" aria-labelledby="st">
-        <div className="flex flex-wrap items-center justify-between gap-3">
-          <h2 id="st" className="flex items-center gap-2 text-xl">
-            <Activity className="h-5 w-5 text-brand-600" aria-hidden="true" /> System status
-          </h2>
-          <span className={`text-sm font-semibold ${allOk ? "text-success" : "text-danger"}`}>
-            {allOk ? "All systems working" : "Attention needed"}
+      <section
+        className="relative overflow-hidden rounded-2xl bg-navy-900 p-6 text-white shadow-[var(--shadow-float)] sm:p-8"
+        aria-labelledby="st"
+      >
+        <div
+          aria-hidden="true"
+          className="pointer-events-none absolute -top-24 -right-16 h-72 w-72 rounded-full bg-brand-600/30 blur-3xl"
+        />
+        <div
+          aria-hidden="true"
+          className="pointer-events-none absolute -bottom-28 left-1/3 h-64 w-64 rounded-full bg-gold-400/10 blur-3xl"
+        />
+        <div className="relative flex flex-wrap items-end justify-between gap-6">
+          <div>
+            <p className="flex items-center gap-2 text-xs font-semibold tracking-[0.16em] text-white/60 uppercase">
+              <Activity className="h-4 w-4" aria-hidden="true" /> System status
+            </p>
+            <h2 id="st" className="mt-2 font-display text-3xl font-semibold text-white sm:text-4xl">
+              {allOk ? "All systems working" : "Attention needed"}
+            </h2>
+            <p className="mt-1 text-sm text-white/70">
+              {status.checks.filter((c) => c.ok).length} of {status.checks.length} services healthy · version{" "}
+              <span className="font-mono">{status.version.slice(0, 7)}</span>
+            </p>
+          </div>
+          <span
+            className={`inline-flex items-center gap-2 rounded-full px-3 py-1.5 text-sm font-semibold ${allOk ? "bg-success/20 text-[#9fe3b8]" : "bg-danger/25 text-[#ffb4ab]"}`}
+          >
+            <span className="relative flex h-2.5 w-2.5">
+              <span
+                className={`absolute inline-flex h-full w-full animate-ping rounded-full opacity-60 motion-reduce:animate-none ${allOk ? "bg-[#4ade80]" : "bg-[#f87171]"}`}
+              />
+              <span
+                className={`relative inline-flex h-2.5 w-2.5 rounded-full ${allOk ? "bg-[#4ade80]" : "bg-[#f87171]"}`}
+              />
+            </span>
+            {allOk ? "Operational" : "Degraded"}
           </span>
         </div>
+      </section>
+      <section className="card space-y-4" aria-label="Services and usage">
         <ul className="grid gap-3 sm:grid-cols-2 lg:grid-cols-5">
           {status.checks.map((c) => (
-            <li key={c.name} className="rounded-xl border border-line p-3">
+            <li
+              key={c.name}
+              className={`rounded-xl border p-3 ${c.ok ? "border-line" : "border-danger/40 bg-danger-50"}`}
+            >
               <p className="flex items-center gap-1.5 text-sm font-semibold text-ink">
                 {c.ok ? (
                   <CheckCircle2 className="h-4 w-4 text-success" aria-hidden="true" />
@@ -137,7 +172,7 @@ export default function Settings({ loaderData, actionData }: Route.ComponentProp
             [
               ["Submitted applications", status.counts.applications],
               ["Candidates", roleCount("CANDIDATE")],
-              ["Staff (HR / HOD / Admin)", roleCount("HR") + roleCount("HOD") + roleCount("ADMIN")],
+              ["Staff", roleCount("HR") + roleCount("HOD") + roleCount("ADMIN") + roleCount("MANAGER")],
               ["Signed-in sessions", status.counts.sessions],
               ["Sign-ins (24 h)", status.counts.signIns24h],
               ["Wrong codes (24 h)", status.counts.failedCodes24h],
@@ -194,7 +229,7 @@ export default function Settings({ loaderData, actionData }: Route.ComponentProp
         </div>
         <p className="text-xs text-muted">
           Version {status.version} · E-mails sent from {status.mailFrom} · Roles:{" "}
-          {(["SUPER_ADMIN", "ADMIN", "HR", "HOD"] as const)
+          {(["SUPER_ADMIN", "MANAGER", "ADMIN", "HR", "HOD", "VIEWER"] as const)
             .map((r) => `${ROLE_LABELS[r]} ${roleCount(r)}`)
             .join(" · ")}
         </p>
@@ -310,9 +345,11 @@ export default function Settings({ loaderData, actionData }: Route.ComponentProp
             <li key={to}>
               <Link
                 to={to}
-                className="flex h-full items-start gap-3 rounded-xl border border-line bg-paper p-4 no-underline transition-colors hover:border-brand-200 hover:bg-brand-50/40"
+                className="group flex h-full items-start gap-3 rounded-xl border border-line bg-paper p-4 no-underline transition hover:-translate-y-0.5 hover:border-brand-200 hover:shadow-[var(--shadow-soft)]"
               >
-                <Icon className="mt-0.5 h-5 w-5 shrink-0 text-brand-600" aria-hidden="true" />
+                <span className="grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-brand-50 text-brand-700 transition-colors group-hover:bg-brand-600 group-hover:text-white">
+                  <Icon className="h-5 w-5" aria-hidden="true" />
+                </span>
                 <span>
                   <span className="block font-semibold text-ink">{title}</span>
                   <span className="text-sm text-muted">{text}</span>

@@ -616,3 +616,55 @@ export async function updateVacancy(user: SessionUser | null, id: string, input:
     );
   });
 }
+
+const extendSchema = z.object({
+  closesAt: dateTime,
+  reason: z.string().trim().max(500).default(""),
+});
+
+/**
+ * Extends a vacancy's last date (HR – N4 Section, Admin, Dean / Principal). Works before or after
+ * the old date has passed: the vacancy simply carries on, drafts already started can be finished
+ * and submitted, and a closed vacancy is opened again. Nothing about existing applications changes.
+ */
+export async function extendDeadline(user: SessionUser | null, id: string, input: unknown) {
+  const u = requirePermission(user, "recruitment:manage");
+  const p = extendSchema.safeParse(input);
+  if (!p.success) throw new ValidationError("Please correct the highlighted fields", fieldErrors(p.error));
+  const v = await prisma.vacancy.findUnique({ where: { id } });
+  if (!v) throw new NotFoundError("Vacancy");
+  const to = p.data.closesAt;
+  if (to <= new Date())
+    throw new ValidationError("Choose a date in the future", { closesAt: ["Choose a date in the future"] });
+  if (to <= v.closesAt)
+    throw new ValidationError("The new last date must be later than the current one", {
+      closesAt: ["Must be later than the current last date"],
+    });
+  if (to <= v.opensAt)
+    throw new ValidationError("The last date must be after the opening date", {
+      closesAt: ["Must be after the opening date"],
+    });
+  await prisma.$transaction(async (tx) => {
+    await tx.vacancy.update({
+      where: { id },
+      data: { closesAt: to, ...(v.status === "CLOSED" ? { status: "PUBLISHED" as const } : {}) },
+    });
+    await audit(
+      {
+        actorId: u.id,
+        action: "vacancy.deadline_extended",
+        entityType: "vacancy",
+        entityId: id,
+        metadata: {
+          code: v.code,
+          from: v.closesAt.toISOString(),
+          to: to.toISOString(),
+          reopened: v.status === "CLOSED",
+          reason: p.data.reason || undefined,
+        },
+      },
+      tx,
+    );
+  });
+  return { reopened: v.status === "CLOSED" };
+}
