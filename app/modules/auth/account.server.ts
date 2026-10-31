@@ -20,7 +20,14 @@ const RESET_TTL_MS = 60 * 60 * 1000;
 export const registerSchema = z.object({
   fullName: z.string().trim().min(2, "Enter your full name").max(120),
   email: z.string().trim().toLowerCase().email("Enter a valid e-mail address").max(200),
-  phone: z.string().trim().optional().or(z.literal("")),
+  phone: z
+    .string()
+    .trim()
+    .min(1, "Enter your mobile number")
+    .refine(
+      (v) => /^(?:\+91[-\s]?)?[6-9]\d{9}$/.test(v.replace(/[\s-]/g, "")),
+      "Enter a valid 10-digit Indian mobile number",
+    ),
   privacy: z.literal("on", { error: "You must accept the privacy notice to continue" }),
 });
 
@@ -48,6 +55,7 @@ export async function registerCandidate(input: unknown, ip: string): Promise<str
       z.flattenError(parsed.error).fieldErrors,
     );
   const { fullName, email, phone } = parsed.data;
+  const cleanPhone = phone.replace(/[\s-]/g, "").replace(/^\+91/, "");
 
   const existing = await prisma.user.findUnique({ where: { email }, include: { roles: true } });
   if (existing) {
@@ -76,7 +84,7 @@ export async function registerCandidate(input: unknown, ip: string): Promise<str
         profile: {
           create: {
             fullName,
-            phone: phone || null,
+            phone: cleanPhone || phone,
             privacyVersion: PRIVACY_NOTICE_VERSION,
             privacyAcceptedAt: new Date(),
           },

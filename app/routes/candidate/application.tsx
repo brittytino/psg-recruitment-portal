@@ -14,12 +14,13 @@ import type { Route } from "./+types/application";
 import { SectionFields } from "~/components/application-form";
 import { Alert, Badge, ErrorSummary, formatDateTime, statusTone, useCsrf } from "~/components/forms";
 import { UploadsPanel, type UploadedDoc } from "~/components/uploads-panel";
-import { handleAction, readForm, requireUser } from "~/lib/http.server";
+import { readForm, requireUser } from "~/lib/http.server";
+import { logger } from "~/modules/core/logger.server";
 import { FORM_LABELS, POSITION_LABELS } from "~/lib/labels";
 import { getOwnApplication, saveDraft } from "~/modules/applications/service.server";
 import { EDITABLE, STATUS_LABELS, type AppStatus } from "~/modules/applications/workflow";
 import { env } from "~/modules/core/env.server";
-import { ValidationError } from "~/modules/core/errors";
+import { isDomainError } from "~/modules/core/errors";
 import type { DocType } from "~/modules/documents/policy";
 import { getFormDefinition, isDocxForm } from "~/modules/forms/registry";
 import type { Answers, FormCode, SectionDef } from "~/modules/forms/types";
@@ -102,20 +103,42 @@ export async function action({ request, params, context }: Route.ActionArgs) {
       return e as ReturnType<typeof data>;
     throw e;
   }
-  return handleAction(async () => {
-    let answers: unknown;
-    try {
-      answers = JSON.parse(String(form.get("answers") ?? "{}"));
-    } catch {
-      throw new ValidationError("The form data could not be read");
-    }
+  let answers: unknown;
+  try {
+    answers = JSON.parse(String(form.get("answers") ?? "{}"));
+  } catch {
+    return data<SaveResponse>({ ok: false, formError: "The form data could not be read" });
+  }
+  try {
     const r = await saveDraft(user, params.id, answers, Number(form.get("version")));
-    return data({ ok: true as const, version: r.version, savedAt: r.savedAt.toISOString() });
-  });
+    return data<SaveResponse>({
+      ok: true,
+      version: r.version,
+      savedAt: r.savedAt.toISOString(),
+      issues: r.issues,
+    });
+  } catch (e) {
+    if (isDomainError(e)) {
+      return data<SaveResponse>({
+        ok: false,
+        formError: e.message,
+        details: e.details,
+      });
+    }
+    logger.error(
+      { event: "save_draft_error", err: e instanceof Error ? e.message : String(e) },
+      "save draft failed",
+    );
+    return data<SaveResponse>({
+      ok: false,
+      formError: "Something went wrong while saving. Please try again.",
+    });
+  }
 }
 
 type SaveResponse =
-  { ok: true; version: number; savedAt: string } | { formError?: string; details?: unknown; ok?: undefined };
+  | { ok: true; version: number; savedAt: string; issues?: FieldIssue[] }
+  | { ok: false; formError?: string; details?: unknown };
 
 type StepState = "complete" | "errors" | "todo";
 
@@ -204,7 +227,7 @@ export default function ApplicationEditor({ loaderData }: Route.ComponentProps) 
       setSavedAt(d.savedAt);
       setDirty(false);
       dirtyRef.current = false;
-      setServerIssues([]);
+      setServerIssues(d.issues ?? []);
       setError(null);
       if (afterSave.current) navigate(afterSave.current);
       afterSave.current = null;
@@ -502,5 +525,27 @@ function StepList({
         </Link>
       </li>
     </ol>
+  );
+}
+
+export function ErrorBoundary() {
+  return (
+    <div className="page-stack">
+      <div className="rounded-xl border border-danger-200 bg-danger-50 p-6 text-center">
+        <h2 className="text-xl font-bold text-danger-900">Application editor</h2>
+        <p className="mt-2 text-sm text-danger-700">
+          An error occurred while loading this section. Your draft responses in previous sections remain
+          saved.
+        </p>
+        <div className="mt-6 flex justify-center gap-3">
+          <button type="button" className="btn-primary" onClick={() => window.location.reload()}>
+            Reload section
+          </button>
+          <Link to="/my-applications" className="btn-secondary">
+            Back to my applications
+          </Link>
+        </div>
+      </div>
+    </div>
   );
 }

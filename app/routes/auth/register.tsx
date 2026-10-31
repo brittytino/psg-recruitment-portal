@@ -3,7 +3,6 @@ import { AuthShell } from "~/components/auth-shell";
 import type { Route } from "./+types/register";
 import { Alert, CsrfInput, ErrorSummary, errorFor, TextInput } from "~/components/forms";
 import { clientIp, handleAction, readForm } from "~/lib/http.server";
-import { PRIVACY_NOTICE_VERSION } from "~/lib/privacy";
 import { userContext } from "~/context";
 import { registerCandidate } from "~/modules/auth/account.server";
 import { pendingCookie } from "~/modules/auth/otp.server";
@@ -70,9 +69,10 @@ export default function Register({ actionData }: Route.ComponentProps) {
               placeholder="e.g. rajesh@example.com"
             />
             <TextInput
-              label="Mobile number (optional)"
+              label="Mobile number"
               name="phone"
               type="tel"
+              required
               autoComplete="tel"
               error={errorFor(fe, "phone")}
               placeholder="e.g. 9876543210"
@@ -92,7 +92,10 @@ export default function Register({ actionData }: Route.ComponentProps) {
                   aria-describedby={errorFor(fe, "privacy") ? "f-privacy-error" : undefined}
                 />
                 <label htmlFor="f-privacy" className="text-sm">
-                  I have read the <Link to="/privacy">privacy notice</Link> (version {PRIVACY_NOTICE_VERSION})
+                  I have read the{" "}
+                  <Link to="/privacy" className="font-medium text-brand-600 underline hover:text-brand-700">
+                    privacy notice
+                  </Link>{" "}
                   and agree to my data being processed for recruitment.
                 </label>
               </div>

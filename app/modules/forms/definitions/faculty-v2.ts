@@ -47,6 +47,10 @@ const MOBILE = {
   regex: "^(\\+91[\\s-]?)?[6-9][0-9]{9}$",
   message: "Enter a valid 10-digit Indian mobile number",
 };
+const PHONE_OR_MOBILE = {
+  regex: "^[0-9+()\\-\\s/.]{6,40}$",
+  message: "Enter a valid phone or mobile number",
+};
 const EMAIL = { regex: "^[^\\s@]+@[^\\s@]+\\.[^\\s@]+$", message: "Enter a valid e-mail address" };
 const YEAR = { min: 1950, max: 2100, integer: true, placeholder: "YYYY" };
 
@@ -912,11 +916,11 @@ function commonSections(): SectionDef[] {
               requirement: "required",
               maxLength: 200,
             }),
-            text("mobile", "Mobile number", 12, "Mobile No.", {
+            text("mobile", "Contact / mobile number", 12, "Mobile No.", {
               requirement: "required",
               inputMode: "tel",
-              maxLength: 16,
-              pattern: MOBILE,
+              maxLength: 40,
+              pattern: PHONE_OR_MOBILE,
             }),
             text("email", "E-mail", 12, "E-mail", { inputMode: "email", maxLength: 200, pattern: EMAIL }),
             select(

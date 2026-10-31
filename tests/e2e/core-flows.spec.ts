@@ -40,6 +40,7 @@ test("candidate registers, verifies the e-mail with a code and signs in", async 
   await page.goto("/register");
   await page.getByLabel("Full name").fill("E2E Candidate");
   await page.getByLabel("E-mail address").fill(email);
+  await page.getByLabel("Mobile number").fill("9876543210");
   await page.getByRole("textbox", { name: "Password", exact: true }).fill("a long e2e pass phrase");
   await page.getByLabel("Confirm password").fill("a long e2e pass phrase");
   await page.getByLabel(/privacy notice/).check();

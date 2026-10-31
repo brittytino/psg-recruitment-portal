@@ -174,7 +174,6 @@ export async function saveDraft(
   const structural = issues.filter((i) => i.message.startsWith("Unknown field") || i.path === "");
   if (structural.length)
     throw new ValidationError("The submitted data does not match the application form", structural);
-  if (issues.length) throw new ValidationError("Some answers are invalid", issues);
   const clean = stripDerived(def, answers as Answers);
   const savedAt = new Date();
   const res = await prisma.application.updateMany({
@@ -195,7 +194,7 @@ export async function saveDraft(
       { currentVersion: current?.draftVersion, lastSavedAt: current?.lastSavedAt },
     );
   }
-  return { version: expectedVersion + 1, savedAt, issues: [] };
+  return { version: expectedVersion + 1, savedAt, issues };
 }
 
 /** Context for derived values (department, post, age, experience totals). */
