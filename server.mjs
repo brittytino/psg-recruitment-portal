@@ -1,6 +1,6 @@
 /**
  * PSG College of Technology — Staff & Faculty Recruitment Portal: production HTTP server.
- * Copyright (c) 2026 Tino Britty J and contributors. MIT License (see LICENSE).
+ * Copyright (c) 2026 Tino Britty J. All rights reserved. Proprietary (see LICENSE).
  */
 
 import express from "express";

@@ -12,7 +12,8 @@ Built for **PSG College of Technology, Coimbatore**.
 
 ## For future maintainers
 
-- Keep the copyright notice in [LICENSE](./LICENSE) in every copy or fork.
+- The Software is proprietary (see [LICENSE](./LICENSE)). Keep the copyright notice in every file
+  and copy; contributions are assigned to the owner under clause 5 of the LICENSE.
 - If you make a substantial change, add your name under _Later contributors_ with a one-line summary.
 - Keep the project's ground rules:
   - TypeScript / Node.js only (web, worker and scripts).

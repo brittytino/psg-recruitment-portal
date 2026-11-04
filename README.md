@@ -377,5 +377,10 @@ branch, because `main` runs against the live database.
 - **Tino Britty J** ([GitHub](https://github.com/brittytino) · [LinkedIn](https://www.linkedin.com/in/brittytino/)) — lead developer and architect
 - **Hari Anand Balaji** ([LinkedIn](https://www.linkedin.com/in/hari-anand-balaji/)) — developer
 
-Built for **PSG College of Technology**, Coimbatore. Released under the [MIT License](./LICENSE),
-Copyright (c) 2026 Tino Britty J and contributors. See [CONTRIBUTORS.md](./CONTRIBUTORS.md) for maintainer guidelines.
+First built for and running at **PSG College of Technology**, Coimbatore.
+
+**Licence:** proprietary, all rights reserved. Copyright (c) 2026 Tino Britty J. The source is visible
+so licensed institutions can install and update it; it is not open source. PSG College of Technology
+holds a free licence for its own recruitment; every other institution needs a written licence or
+subscription. Versions published before 4 November 2026 under the MIT License stay under that licence
+for those who obtained them. See [LICENSE](./LICENSE) and [CONTRIBUTORS.md](./CONTRIBUTORS.md).

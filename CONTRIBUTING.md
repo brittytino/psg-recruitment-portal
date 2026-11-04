@@ -1,8 +1,9 @@
 # Contributing
 
 Thank you for helping improve the PSG College of Technology faculty and research recruitment system.
-It is open source under the [MIT License](./LICENSE) and is **in production**: real candidates apply
-through it. Please read this page before opening a pull request.
+It is **proprietary software** (see [LICENSE](./LICENSE)) and is **in production**: real candidates apply
+through it. Contributions are welcome from invited contributors only; by submitting one you assign
+its rights to the owner as described in clause 5 of the LICENSE. Please read this page before opening a pull request.
 
 ## Ground rules
 

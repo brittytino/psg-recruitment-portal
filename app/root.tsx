@@ -448,14 +448,14 @@ function Footer() {
         <div className="page-container flex flex-col gap-2 py-5 text-xs text-white/55 sm:flex-row sm:items-center sm:justify-between">
           <p>© {new Date().getFullYear()} PSG College of Technology. All rights reserved.</p>
           <p>
-            Open source under the MIT licence ·{" "}
+            Recruitment platform by{" "}
             <a
-              href="https://github.com/brittytino/PSG-SRPortal"
+              href="https://github.com/brittytino"
               target="_blank"
               rel="noreferrer"
               className="text-white/75 underline-offset-2 hover:text-white"
             >
-              Contribute on GitHub
+              Tino Britty J
             </a>
           </p>
         </div>
