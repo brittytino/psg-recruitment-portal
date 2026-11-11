@@ -2,11 +2,9 @@
   "name": "psg-staff-recruitment",
   "private": true,
   "version": "1.0.0",
-  "description": "Institutional staff and faculty recruitment management portal for PSG College of Technology",
-  "author": "Tino Britty J (https://github.com/brittytino)",
-  "contributors": [
-    "Hari Anand Balaji (https://www.linkedin.com/in/hari-anand-balaji/)"
-  ],
+  "description": "Selection Desk — faculty and staff recruitment platform for colleges and universities",
+  "author": "Selection Desk (https://selectiondesk.in)",
+  "homepage": "https://selectiondesk.in",
   "license": "SEE LICENSE IN LICENSE",
   "repository": {
     "type": "git",

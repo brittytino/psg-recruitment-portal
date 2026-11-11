@@ -1,6 +1,7 @@
 /**
- * PSG College of Technology — Staff & Faculty Recruitment Portal: production HTTP server.
- * Copyright (c) 2026 Tino Britty J. All rights reserved. Proprietary (see LICENSE).
+ * Selection Desk — recruitment platform: production HTTP server.
+ * Copyright (c) 2026 Selection Desk (https://selectiondesk.in). All rights reserved.
+ * Proprietary software; see LICENSE.
  */
 
 import express from "express";
@@ -11,9 +12,9 @@ import { createRequestHandler } from "@react-router/express";
 const app = express();
 app.disable("x-powered-by");
 
-// Credits header (visible in browser DevTools → Network).
+// Platform header (no version or stack details are disclosed).
 app.use((_req, res, next) => {
-  res.setHeader("X-Engineered-By", "Tino Britty J (@brittytino)");
+  res.setHeader("X-Platform", "Selection Desk");
   next();
 });
 

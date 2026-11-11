@@ -1,11 +1,13 @@
 Proprietary Software Licence
 
-Copyright (c) 2026 Tino Britty J. All rights reserved.
+Selection Desk (https://selectiondesk.in)
+Copyright (c) 2026 Selection Desk. All rights reserved.
 
 1. Ownership
    This software, including its source code, object code, documentation, designs, application
    forms, database schema and related material (together, "the Software"), is owned by
-   Tino Britty J ("the Owner").
+   Tino Britty J, trading as Selection Desk ("the Owner"). "Selection Desk" and the
+   selectiondesk.in name and logo are trade marks of the Owner.
 
 2. No licence unless granted
    The Software is visible in this repository so that licensed institutions can install and
@@ -24,7 +26,7 @@ Copyright (c) 2026 Tino Britty J. All rights reserved.
 4. Commercial licences
    Every other institution or organisation needs a written licence or subscription agreement
    from the Owner before installing, running or using the Software.
-   Contact: https://github.com/brittytino
+   Contact: https://selectiondesk.in
 
 5. Contributions
    By submitting a contribution (code, documentation, designs or other material) you confirm

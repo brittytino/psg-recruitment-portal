@@ -272,23 +272,33 @@ export async function filteredIds(user: SessionUser | null, q: ListQuery, limit 
 }
 
 /** Dashboard counters, all computed from the database within scope. Draft counts are Admin/HR only. */
-export async function dashboardCounts(user: SessionUser | null) {
+export async function dashboardCounts(
+  user: SessionUser | null,
+  q: Pick<Partial<ListQuery>, "recruitmentCategory" | "year"> = {},
+) {
   const u = requirePermission(user, "application:list");
   const scope = staffApplicationScope(u);
   if (!scope) throw new ForbiddenError();
+  const filter: Prisma.ApplicationWhereInput = {
+    AND: [
+      q.recruitmentCategory ? { recruitmentCategory: q.recruitmentCategory } : {},
+      q.year ? yearWhere(q.year) : {},
+    ],
+  };
+  const where: Prisma.ApplicationWhereInput = { AND: [scope, filter] };
   const byStatus = await prisma.application.groupBy({
     by: ["status"],
-    where: scope,
+    where,
     _count: { _all: true },
   });
   const failed = await prisma.application.count({
-    where: { AND: [scope, { processingStatus: "FAILED" }] },
+    where: { AND: [where, { processingStatus: "FAILED" }] },
   });
   const count = (...s: string[]) =>
     byStatus.filter((b) => s.includes(b.status)).reduce((n, b) => n + b._count._all, 0);
   let drafts: number | null = null;
   if (isAdmin(u.grants) || isHrOfficer(u.grants))
-    drafts = await prisma.application.count({ where: { status: "DRAFT" } });
+    drafts = await prisma.application.count({ where: { AND: [filter, { status: "DRAFT" }] } });
   return {
     total: byStatus.reduce((n, b) => n + b._count._all, 0),
     drafts,

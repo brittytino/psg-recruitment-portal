@@ -43,8 +43,12 @@ export async function loader({ request, context }: Route.LoaderArgs) {
   const q = parseListQuery(new URL(request.url));
   const [list, counts, departments, options, years] = await Promise.all([
     listApplications(user, q),
-    dashboardCounts(user),
-    departmentCounts(user, { position: q.position, year: q.year }),
+    dashboardCounts(user, { recruitmentCategory: q.recruitmentCategory, year: q.year }),
+    departmentCounts(user, {
+      position: q.position,
+      year: q.year,
+      recruitmentCategory: q.recruitmentCategory,
+    }),
     filterOptions(),
     recruitmentYears(),
   ]);

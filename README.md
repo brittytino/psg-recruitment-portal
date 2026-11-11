@@ -238,17 +238,7 @@ The portal provides an auditable, Excel-compatible CSV export engine:
 
 Candidates raise support tickets at `/help-desk`; HR – N4 Section and senior administrators answer them at `/staff/help-desk`. E-mail is kept within the daily mail quota with a budget, one-e-mail-per-event keys and in-app notifications (bell icon). See [docs/help-desk.md](docs/help-desk.md).
 
-## 10. Team Work Allocation: Tino vs Hari
-
-| Ownership Dimension         | Tino (Technical Lead)                                                                                                                                                                                                                                                                                                                                                                                                                                                                | Hari (Senior Full-Stack Engineer)                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                            |
-| :-------------------------- | :------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | :--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| **Core Workstream**         | **Workstream A: Foundation, Security & Integration**                                                                                                                                                                                                                                                                                                                                                                                                                                               | **Workstream B: Recruitment Experience & Workflows**                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                         |
-| **Primary Modules**         | - Authentication & Session Architecture (Passwordless OTP)<br>- RBAC & Scopes (all staff roles)<br>- Database Schema, Relations & Prisma Migrations<br>- Account Provisioning & Security Auditing<br>- Department & Vacancy Administrative Interfaces<br>- Bulk HOD Assignment Workflow & Authorization Guards<br>- Docker Multi-Stage Builds, Volumes & Host Ports<br>- Blue-Green Deployment & VPS Production Automation<br>- CI/CD Pipeline & End-to-End System Integration | - Candidate Recruitment Portal & Public Vacancies<br>- Section-based Application Wizard (Steps 1–12)<br>- Academic Qualification & Arrear Form Controls<br>- Work Experience, Overlap Detection & Calculation<br>- Research Metrics, Publications & Patents UI<br>- Document Upload Experience & Validation<br>- Application Review Screen & Watermarked PDF Preview<br>- Candidate Receipt & Consolidated Bundle Downloads<br>- HR & HOD Dashboards & Filter Composability<br>- Department Summary Sheet Approval UI<br>- CSV Export Selection, Live Counts & Preview Table |
-| **Shared Responsibilities** | - Shared TypeScript API contracts and route loaders/actions<br>- Official form field mapping and PDF verification<br>- Automated unit, integration, and security test coverage<br>- WCAG 2.2 AA accessibility verification<br>- Code reviews (mandatory cross-developer pull request review)                                                                                                                                                                                                       | - Shared TypeScript API contracts and route loaders/actions<br>- Official form field mapping and PDF verification<br>- Automated unit, integration, and security test coverage<br>- WCAG 2.2 AA accessibility verification<br>- Code reviews (mandatory cross-developer pull request review)                                                                                                                                                                                                                                                                                 |
-
----
-
-## 11. Developer & Production Runbook
+## 10. Developer & Production Runbook
 
 ### Prerequisites
 
@@ -310,7 +300,7 @@ docker compose -f compose.yaml -f compose.dev.yaml run --rm migrate
 
 ---
 
-## 12. Blue-Green Production Deployment & Rollback
+## 11. Blue-Green Production Deployment & Rollback
 
 The production configuration (`compose.production.yaml`) runs two independent deployment slots (`app-blue` and `app-green`) behind an Nginx reverse proxy:
 
@@ -331,7 +321,7 @@ ENV_FILE=.env.production ./infrastructure/blue-green/deploy.sh <image-tag>
 
 ---
 
-## 13. Verification & Testing Evidence
+## 12. Verification & Testing Evidence
 
 All quality gates pass cleanly:
 
@@ -342,7 +332,7 @@ All quality gates pass cleanly:
 
 ---
 
-## 13a. Branches and release flow
+## 13. Branches and release flow
 
 The repository has three long-lived branches. **Production servers only ever pull `main`.**
 
@@ -358,11 +348,11 @@ feature/my-change ──PR──▶ dev ──merge──▶ qa ──(tested)�
 hotfix/urgent-fix ─────────────PR─────────────────┘   (then merged back into qa and dev)
 ```
 
-**Contributors:**
+**Engineering team:**
 
-1. Fork the repository (or create a branch if you have access) **from `dev`**:
+1. Create a branch **from `dev`**:
    `git checkout dev && git pull && git checkout -b feature/short-description`.
-2. Make the change with tests; run the checks in [CONTRIBUTING.md](./CONTRIBUTING.md).
+2. Make the change with tests; run the checks in [docs/DEVELOPMENT.md](./docs/DEVELOPMENT.md).
 3. Open the pull request **against `dev`** (never against `main` or `qa`).
 
 **Maintainers:** merge `dev` into `qa` for a test round, and `qa` into `main` for a release. Urgent
@@ -372,15 +362,17 @@ branch, because `main` runs against the live database.
 
 ---
 
-## 14. Authors and licence
+## 14. Product and licence
 
-- **Tino Britty J** ([GitHub](https://github.com/brittytino) · [LinkedIn](https://www.linkedin.com/in/brittytino/)) — lead developer and architect
-- **Hari Anand Balaji** ([LinkedIn](https://www.linkedin.com/in/hari-anand-balaji/)) — developer
+**Selection Desk** — faculty and staff recruitment platform for colleges and universities.
+Website: [selectiondesk.in](https://selectiondesk.in)
 
-First built for and running at **PSG College of Technology**, Coimbatore.
+First deployed at **PSG College of Technology**, Coimbatore.
 
-**Licence:** proprietary, all rights reserved. Copyright (c) 2026 Tino Britty J. The source is visible
-so licensed institutions can install and update it; it is not open source. PSG College of Technology
-holds a free licence for its own recruitment; every other institution needs a written licence or
-subscription. Versions published before 4 November 2026 under the MIT License stay under that licence
-for those who obtained them. See [LICENSE](./LICENSE) and [CONTRIBUTORS.md](./CONTRIBUTORS.md).
+**Licence:** proprietary software. Copyright (c) 2026 Selection Desk. All rights reserved.
+"Selection Desk" and its name and logo are trade marks of the owner. The source is visible so licensed
+institutions can install and update it; it is not open source and may not be copied, hosted or
+redistributed. PSG College of Technology holds a free licence for its own recruitment; every other
+institution needs a written licence or subscription from Selection Desk. Versions published before
+4 November 2026 under the MIT License stay under that licence for those who obtained them.
+See [LICENSE](./LICENSE).

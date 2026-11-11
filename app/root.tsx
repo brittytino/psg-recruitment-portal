@@ -448,15 +448,16 @@ function Footer() {
         <div className="page-container flex flex-col gap-2 py-5 text-xs text-white/55 sm:flex-row sm:items-center sm:justify-between">
           <p>© {new Date().getFullYear()} PSG College of Technology. All rights reserved.</p>
           <p>
-            Recruitment platform by{" "}
+            Powered by{" "}
             <a
-              href="https://github.com/brittytino"
+              href="https://selectiondesk.in"
               target="_blank"
               rel="noreferrer"
-              className="text-white/75 underline-offset-2 hover:text-white"
+              className="font-semibold text-white/85 no-underline hover:text-white"
             >
-              Tino Britty J
-            </a>
+              Selection Desk
+            </a>{" "}
+            · © {new Date().getFullYear()} Selection Desk. All rights reserved.
           </p>
         </div>
       </div>
@@ -604,6 +605,14 @@ function StaffSidebarContent({
             </button>
           </Tooltip>
         )}
+        <a
+          href="https://selectiondesk.in"
+          target="_blank"
+          rel="noreferrer"
+          className="sidebar-hide block px-3 pt-2 pb-1 text-[11px] text-white/40 no-underline hover:text-white/70"
+        >
+          Powered by <span className="font-semibold text-white/60">Selection Desk</span>
+        </a>
       </div>
       <SignOutDialog intent={signOut ? "signout" : null} onClose={() => setSignOut(false)} />
     </div>

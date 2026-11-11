@@ -1,9 +1,9 @@
-# Contributing
+# Development guidelines
 
-Thank you for helping improve the PSG College of Technology faculty and research recruitment system.
-It is **proprietary software** (see [LICENSE](./LICENSE)) and is **in production**: real candidates apply
-through it. Contributions are welcome from invited contributors only; by submitting one you assign
-its rights to the owner as described in clause 5 of the LICENSE. Please read this page before opening a pull request.
+Internal engineering guide for **Selection Desk** (https://selectiondesk.in). The software is
+**proprietary** (see [LICENSE](../LICENSE)) and **in production**: real candidates apply through it.
+Only the Selection Desk engineering team works on this code; all work is owned by Selection Desk
+under clause 5 of the LICENSE.
 
 ## Ground rules
 
@@ -46,7 +46,7 @@ All of them must pass. Add or update tests for the behaviour you change.
 ## Pull requests
 
 - Branch from **`dev`** and open the pull request **against `dev`**. `qa` is for testing and `main` is
-  production; see the [branch flow in the README](./README.md#13a-branches-and-release-flow).
+  production; see the [branch flow in the README](../README.md#13-branches-and-release-flow).
 
 - One topic per pull request, with a short description of **what** changed and **why**.
 - Screenshots for visible changes (desktop and phone width).
@@ -67,4 +67,4 @@ All of them must pass. Add or update tests for the behaviour you change.
 
 ## Reporting security problems
 
-Please do **not** open a public issue. See [SECURITY.md](./SECURITY.md).
+Please do **not** open a public issue. See [SECURITY.md](../SECURITY.md).

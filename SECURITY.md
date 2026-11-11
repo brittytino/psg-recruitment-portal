@@ -6,8 +6,8 @@ This system handles personal data of job applicants and runs in production.
 
 Please report security problems **privately** — not in a public issue or pull request:
 
-- use GitHub's **Security → Report a vulnerability** (private advisory) on this repository, or
-- contact the maintainer through their GitHub profile ([@brittytino](https://github.com/brittytino)).
+- contact the Selection Desk security team through [selectiondesk.in](https://selectiondesk.in), or
+- the recruitment office of your institution, who will pass it on.
 
 Include what you found, how to reproduce it, and the impact. Please do not access, change or download
 other people's data while testing, and give us reasonable time to fix the problem before disclosing it.
