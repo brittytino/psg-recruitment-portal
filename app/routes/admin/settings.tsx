@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Form, Link, useNavigation } from "react-router";
 import {
   Activity,
@@ -375,7 +375,20 @@ function ChannelEditor({
           <select
             name={p("transport")}
             value={transport}
-            onChange={(e) => setTransport(e.target.value as MailTransport)}
+            onChange={(e) => {
+              const next = e.target.value as MailTransport;
+              setTransport(next);
+              if (next === "brevo-api") {
+                setHost("api.brevo.com");
+                setPort("443");
+                setSecure(true);
+                setUseEnvPassword(false);
+              } else if (host === "api.brevo.com") {
+                setHost("smtp-relay.brevo.com");
+                setPort("587");
+                setSecure(false);
+              }
+            }}
             className="input mt-1"
           >
             <option value="smtp">SMTP (port 587 / 465)</option>
@@ -574,6 +587,9 @@ export default function Settings({ loaderData, actionData }: Route.ComponentProp
   const allOk = status.checks.every((c) => c.ok);
   const roleCount = (r: RoleName) => status.counts.usersByRole[r] ?? 0;
   const [strategy, setStrategy] = useState<MailStrategy>(mailConfig.strategy);
+  useEffect(() => {
+    setStrategy(mailConfig.strategy);
+  }, [mailConfig.strategy]);
   const [testRecipient, setTestRecipient] = useState(userEmail);
 
   const channelList = [status.mail.channels.primary, status.mail.channels.fallback];

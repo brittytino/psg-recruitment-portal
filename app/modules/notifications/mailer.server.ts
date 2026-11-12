@@ -235,7 +235,7 @@ export function classifyMailError(err: unknown): MailErrorClassification {
     status === 429 ||
     error.brevoCode === "not_enough_credits" ||
     error.brevoCode === "too_many_requests" ||
-    /5\.4\.5|daily.*sending limit|daily.*limit exceeded|quota exceeded|too many messages|credits exhausted/i.test(
+    /5\.4\.5|daily.*limit|sending limit|limit exceeded|quota|too many.*messages|credits exhausted|not_enough_credits|rate limit/i.test(
       errMsg,
     )
   ) {
@@ -436,14 +436,18 @@ async function deliverBrevoApi(ch: MailChannelConfig, mail: SendMailOptions, e: 
   });
 
   if (!res.ok) {
-    let bodyText = "";
+    const rawText =
+      typeof res.text === "function"
+        ? await res.text().catch(() => res.statusText)
+        : JSON.stringify(await res.json().catch(() => ({})));
+    let bodyText = rawText;
     let brevoCode: string | undefined;
     try {
-      const json = (await res.json()) as { code?: string; message?: string };
+      const json = JSON.parse(rawText) as { code?: string; message?: string };
       brevoCode = json.code;
-      bodyText = json.message ?? JSON.stringify(json);
+      bodyText = json.message ?? rawText;
     } catch {
-      bodyText = await res.text().catch(() => res.statusText);
+      // Non-JSON error payload (e.g. upstream HTML gateway error)
     }
     const err = new Error(`Brevo API error (${res.status}): ${bodyText || res.statusText}`) as Error & {
       httpStatus?: number;
