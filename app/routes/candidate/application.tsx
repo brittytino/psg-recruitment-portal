@@ -19,8 +19,8 @@ import { logger } from "~/modules/core/logger.server";
 import { FORM_LABELS, POSITION_LABELS } from "~/lib/labels";
 import { getOwnApplication, saveDraft } from "~/modules/applications/service.server";
 import { EDITABLE, STATUS_LABELS, type AppStatus } from "~/modules/applications/workflow";
-import { env } from "~/modules/core/env.server";
 import { isDomainError } from "~/modules/core/errors";
+import { runtimeEnvSync } from "~/modules/settings/runtime-config.server";
 import type { DocType } from "~/modules/documents/policy";
 import { getFormDefinition, isDocxForm } from "~/modules/forms/registry";
 import type { Answers, FormCode, SectionDef } from "~/modules/forms/types";
@@ -76,7 +76,7 @@ export async function loader({ request, params, context }: Route.LoaderArgs) {
       scan: d.scanStatus,
     })),
     clarification,
-    maxMb: env().MAX_UPLOAD_MB,
+    maxMb: runtimeEnvSync().MAX_UPLOAD_MB,
   };
 }
 

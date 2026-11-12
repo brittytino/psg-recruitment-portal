@@ -6,9 +6,9 @@ import { hasPermission } from "~/modules/auth/permissions";
 import { staffApplicationScope } from "~/modules/auth/policy.server";
 import type { SessionUser } from "~/modules/auth/session.server";
 import { prisma } from "~/modules/core/db.server";
-import { env } from "~/modules/core/env.server";
 import { ConflictError, ForbiddenError, NotFoundError, ValidationError } from "~/modules/core/errors";
 import { enqueueOutbox } from "~/modules/notifications/outbox.server";
+import { runtimeEnvSync } from "~/modules/settings/runtime-config.server";
 import { imageInfo } from "./docx/ooxml";
 import {
   allowedMime,
@@ -80,8 +80,9 @@ export async function uploadDocument(
   const type = DOCUMENT_TYPES.find((t) => t === typeRaw);
   if (!type) throw new ValidationError("Choose a document type");
   if (!file || file.size === 0) throw new ValidationError("Choose a file to upload");
-  const max = env().MAX_UPLOAD_MB * 1024 * 1024;
-  if (file.size > max) throw new ValidationError(`Files must be ${env().MAX_UPLOAD_MB} MB or smaller`);
+  const maxMb = runtimeEnvSync().MAX_UPLOAD_MB;
+  const max = maxMb * 1024 * 1024;
+  if (file.size > max) throw new ValidationError(`Files must be ${maxMb} MB or smaller`);
   const app = await getOwnApplication(user, applicationId);
   if (!EDITABLE.includes(app.status as AppStatus))
     throw new ConflictError("Documents can only be changed while the application is editable");

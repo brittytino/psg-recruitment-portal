@@ -7,6 +7,7 @@ import { ConflictError } from "~/modules/core/errors";
 import { logger } from "~/modules/core/logger.server";
 import { redis } from "~/modules/core/redis.server";
 import { sendOtpEmail } from "~/modules/notifications/mailer.server";
+import { loadRuntimeConfig, runtimeEnvSync } from "~/modules/settings/runtime-config.server";
 import { perIp, rateLimit, refundRateLimit } from "./rate-limit.server";
 
 export const OTP_TTL_MINUTES = 5;
@@ -14,7 +15,7 @@ export const OTP_MAX_ATTEMPTS = 5;
 export const OTP_RESEND_SECONDS = 60;
 
 export function getOtpConfig() {
-  const e = env();
+  const e = runtimeEnvSync();
   return {
     length: e.OTP_LENGTH ?? 6,
     expiryMinutes: e.OTP_EXPIRY_MINUTES ?? 5,
@@ -46,6 +47,7 @@ export function codeHash(challengeId: string, code: string): string {
  * closed. Sends are limited per user and per IP with a resend cooldown.
  */
 export async function issueOtp(userId: string, purpose: OtpPurpose, ip: string): Promise<string> {
+  await loadRuntimeConfig();
   const cfg = getOtpConfig();
   const r = redis();
   const cooldownKey = `otp:cooldown:${purpose}:${userId}`;
@@ -78,8 +80,15 @@ export async function issueOtp(userId: string, purpose: OtpPurpose, ip: string):
   try {
     await sendOtpEmail(user.email, code, PURPOSE_TEXT[purpose] ?? "authentication", cfg.expiryMinutes);
   } catch (err) {
+    const causeMsg = (err as { cause?: Error })?.cause?.message;
     logger.error(
-      { event: "otp_send_failed", purpose, userId, err: (err as Error).message },
+      {
+        event: "otp_send_failed",
+        purpose,
+        userId,
+        err: (err as Error).message,
+        ...(causeMsg ? { cause: causeMsg } : {}),
+      },
       "sign-in code e-mail failed",
     );
     // Clean up immediately so user is not locked out with an undelivered challenge
@@ -119,6 +128,7 @@ export async function verifyOtp(
   purpose: OtpPurpose,
   ip: string,
 ): Promise<OtpCheck> {
+  await loadRuntimeConfig();
   const cfg = getOtpConfig();
   const code = codeRaw.replace(/\s/g, "");
   const invalid: OtpCheck = {

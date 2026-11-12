@@ -82,6 +82,8 @@ const LABELS: Record<string, string> = {
   "user.viewer_added": "Read-only viewer added",
   "user.viewer_removed": "Read-only viewer removed",
   "settings.changed": "Setting changed",
+  "settings.mail_channels_changed": "Mail delivery settings changed",
+  "settings.runtime_env_changed": "Runtime environment settings changed",
   "helpdesk.ticket_created": "Support ticket created",
   "helpdesk.candidate_replied": "Candidate replied on a ticket",
   "helpdesk.ticket_reopened": "Ticket reopened by the candidate",

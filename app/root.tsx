@@ -54,6 +54,7 @@ import {
 } from "./modules/auth/permissions";
 import { csrfToken, getSessionUser } from "./modules/auth/session.server";
 import { unreadCount } from "./modules/notifications/inbox.server";
+import { loadRuntimeConfig } from "./modules/settings/runtime-config.server";
 import { isOriginAllowed } from "./lib/origin.server";
 import { AccountMenu, SignOutDialog } from "./components/account-menu";
 import { GlobalSearch } from "./components/global-search";
@@ -131,6 +132,7 @@ export const middleware: Route.MiddlewareFunction[] = [
         throw new Response("Cross-origin request blocked", { status: 403 });
       }
     }
+    await loadRuntimeConfig();
     context.set(userContext, await getSessionUser(request));
     return next();
   },

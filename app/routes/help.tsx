@@ -2,7 +2,7 @@ import { originFrom, seo } from "~/lib/seo";
 import { jsonLd } from "~/lib/json-ld";
 import { ChevronDown, Mail, MapPin } from "lucide-react";
 import type { Route } from "./+types/help";
-import { env } from "~/modules/core/env.server";
+import { activeSenderEmail, loadRuntimeConfig } from "~/modules/settings/runtime-config.server";
 
 export const meta: Route.MetaFunction = ({ matches }) =>
   seo({
@@ -13,8 +13,9 @@ export const meta: Route.MetaFunction = ({ matches }) =>
     origin: originFrom(matches),
   });
 
-export function loader() {
-  return { email: env().SMTP_FROM_EMAIL };
+export async function loader() {
+  const { mail } = await loadRuntimeConfig();
+  return { email: activeSenderEmail(mail) };
 }
 
 const FAQ: [string, string][] = [

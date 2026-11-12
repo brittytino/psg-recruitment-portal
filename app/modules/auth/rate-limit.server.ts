@@ -1,7 +1,7 @@
 import { RateLimitedError } from "~/modules/core/errors";
-import { env } from "~/modules/core/env.server";
 import { logger } from "~/modules/core/logger.server";
 import { redis } from "~/modules/core/redis.server";
+import { runtimeEnvSync } from "~/modules/settings/runtime-config.server";
 
 /**
  * Fixed-window rate limiter in Redis. Keys must not contain raw personal data: callers pass a
@@ -28,7 +28,7 @@ export async function rateLimit(
 
 /** Per-IP limit scaled by IP_RATE_LIMIT_MULTIPLIER (shared campus/office networks). */
 export function perIp(base: number): number {
-  return base * env().IP_RATE_LIMIT_MULTIPLIER;
+  return base * runtimeEnvSync().IP_RATE_LIMIT_MULTIPLIER;
 }
 
 /** Gives back one unit of a bucket, e.g. when the action failed for reasons outside the user's control. */

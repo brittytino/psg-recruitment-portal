@@ -1,6 +1,7 @@
 import { createHash, createHmac, randomBytes, timingSafeEqual } from "node:crypto";
 import { prisma } from "~/modules/core/db.server";
 import { env } from "~/modules/core/env.server";
+import { runtimeEnvSync } from "~/modules/settings/runtime-config.server";
 import type { RoleGrant, RoleName } from "./permissions";
 
 export interface SessionUser {
@@ -60,7 +61,9 @@ export async function createSession(
   opts: { remember?: boolean } = {},
 ): Promise<string> {
   const token = randomBytes(32).toString("base64url");
-  const ttlMs = opts.remember ? REMEMBER_IDLE_DAYS * DAY_MS : env().SESSION_TTL_HOURS * 3600 * 1000;
+  const ttlMs = opts.remember
+    ? REMEMBER_IDLE_DAYS * DAY_MS
+    : runtimeEnvSync().SESSION_TTL_HOURS * 3600 * 1000;
   await prisma.session.create({
     data: {
       id: hashToken(token),
@@ -76,7 +79,8 @@ export async function createSession(
 /** A session longer than the ordinary lifetime was created with "keep me signed in". */
 function isRemembered(s: { lastSeenAt: Date; expiresAt: Date }): boolean {
   return (
-    s.expiresAt.getTime() - s.lastSeenAt.getTime() > env().SESSION_TTL_HOURS * 3600 * 1000 + TOUCH_INTERVAL_MS
+    s.expiresAt.getTime() - s.lastSeenAt.getTime() >
+    runtimeEnvSync().SESSION_TTL_HOURS * 3600 * 1000 + TOUCH_INTERVAL_MS
   );
 }
 

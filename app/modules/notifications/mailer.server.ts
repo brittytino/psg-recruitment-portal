@@ -1,9 +1,27 @@
 import nodemailer, { type SendMailOptions, type Transporter } from "nodemailer";
-import { env } from "~/modules/core/env.server";
+import { env, type Env } from "~/modules/core/env.server";
 import { logger } from "~/modules/core/logger.server";
-import { countEmail, hasRoom, type MailPriority } from "./budget.server";
+import {
+  getMailConfigSignature,
+  loadRuntimeConfig,
+  type MailChannelConfig,
+  type MailChannelId,
+  type MailChannelsConfig,
+  type MailTransport,
+  runtimeEnvSync,
+} from "~/modules/settings/runtime-config.server";
+import {
+  type ChannelCooldownKind,
+  channelSentToday,
+  clearChannelCooldown,
+  countChannelEmail,
+  getChannelCooldown,
+  hasChannelRoom,
+  type MailPriority,
+  setChannelCooldown,
+} from "./budget.server";
 
-/** Today's e-mail budget is used up. The caller keeps the message in the app. */
+/** Today's e-mail budget is used up across all active routes. The caller keeps the message in the app. */
 export class MailBudgetExceededError extends Error {
   constructor() {
     super("Daily e-mail budget reached");
@@ -12,6 +30,15 @@ export class MailBudgetExceededError extends Error {
 }
 
 let transport: Transporter | undefined;
+let fallback: Transporter | undefined;
+
+interface CachedChannelTransport {
+  signature: string;
+  main: Transporter;
+  alt?: Transporter;
+}
+
+const channelTransporters = new Map<MailChannelId, CachedChannelTransport>();
 
 export interface SmtpDiagnosticResult {
   ok: boolean;
@@ -23,26 +50,51 @@ export interface SmtpDiagnosticResult {
     | "AUTH_FAILED"
     | "TLS_ERROR"
     | "CONNECTION_REFUSED"
+    | "QUOTA_EXCEEDED"
+    | "BLOCKED"
     | "UNKNOWN_ERROR";
   message: string;
   provider: string;
   details?: string;
 }
 
-/** Resets the cached transporter (for test isolation). */
-export function resetTransporterForTesting(): void {
-  if (transport) {
-    try {
-      transport.close();
-    } catch {
-      // ignore
-    }
-  }
-  transport = undefined;
-  fallback = undefined;
+export interface MailDeliveryOutcome {
+  channelId: MailChannelId;
+  transport: MailTransport;
+  host: string;
+  failoverUsed: boolean;
 }
 
-/** Centralized transporter getter with connection pooling and timeouts. */
+function sanitizeSecretText(msg: string): string {
+  return msg
+    .replace(/pass(?:word)?(?:\s+is|\s*[:=])\s*\S+/gi, "password: ***")
+    .replace(/(?:xkeysib|xsmtpsib)-[A-Za-z0-9._-]+/gi, "brevo-key:***")
+    .replace(/api[-_ ]?key\s*[:=]\s*\S+/gi, "api-key: ***");
+}
+
+function closeSafe(t: Transporter | undefined): void {
+  if (!t) return;
+  try {
+    t.close();
+  } catch {
+    // ignore
+  }
+}
+
+/** Resets cached transporters (for test isolation or after config change). */
+export function resetTransporterForTesting(): void {
+  closeSafe(transport);
+  closeSafe(fallback);
+  transport = undefined;
+  fallback = undefined;
+  for (const entry of channelTransporters.values()) {
+    closeSafe(entry.main);
+    closeSafe(entry.alt);
+  }
+  channelTransporters.clear();
+}
+
+/** Centralized default transporter getter with connection pooling and timeouts. */
 export function getTransporter(): Transporter {
   if (!transport) {
     const e = env();
@@ -63,7 +115,7 @@ export function getTransporter(): Transporter {
         socketTimeout: e.SMTP_SOCKET_TIMEOUT_MS,
       });
     } else {
-      // Institutional SMTP provider (production)
+      // Institutional / configured SMTP provider
       transport = nodemailer.createTransport({
         pool: true,
         maxConnections: 5,
@@ -84,7 +136,48 @@ export function getTransporter(): Transporter {
   return transport;
 }
 
-let fallback: Transporter | undefined;
+function createChannelSmtpTransport(ch: MailChannelConfig, e: Env, portOverride?: number): Transporter {
+  const rt = runtimeEnvSync();
+  const port = portOverride ?? ch.port;
+  const secure = portOverride !== undefined ? portOverride === 465 : ch.secure;
+  return nodemailer.createTransport({
+    pool: portOverride === undefined,
+    maxConnections: 5,
+    maxMessages: 100,
+    host: ch.host,
+    port,
+    secure,
+    auth: ch.user ? { user: ch.user, pass: ch.password ?? "" } : undefined,
+    connectionTimeout: rt.SMTP_CONNECTION_TIMEOUT_MS,
+    greetingTimeout: rt.SMTP_GREETING_TIMEOUT_MS,
+    socketTimeout: rt.SMTP_SOCKET_TIMEOUT_MS,
+    tls: {
+      rejectUnauthorized: e.NODE_ENV === "production",
+    },
+  });
+}
+
+function getChannelSmtpTransport(
+  ch: MailChannelConfig,
+  mailCfg: MailChannelsConfig,
+  signature: string,
+  e: Env,
+): Transporter {
+  if (!mailCfg.fromDb && ch.id === "primary") {
+    return getTransporter();
+  }
+  const existing = channelTransporters.get(ch.id);
+  if (existing && existing.signature === signature) {
+    return existing.main;
+  }
+  if (existing) {
+    closeSafe(existing.main);
+    closeSafe(existing.alt);
+  }
+  const main = createChannelSmtpTransport(ch, e);
+  channelTransporters.set(ch.id, { signature, main });
+  return main;
+}
 
 /** Network-level failures (blocked port, timeout), as opposed to a rejected login or address. */
 function isConnectionError(err: unknown): boolean {
@@ -98,75 +191,430 @@ function isConnectionError(err: unknown): boolean {
       "ECONNECTION",
       "EHOSTUNREACH",
       "ENETUNREACH",
-    ].includes(e.code ?? "") || /timed? ?out|ECONNREFUSED|ECONNRESET/i.test(e.message ?? "")
+    ].includes(e.code ?? "") || /timed? ?out|ECONNREFUSED|ECONNRESET|fetch failed/i.test(e.message ?? "")
   );
 }
 
-/** Explains a send failure in the server log so the IT team can act on it. */
-export function smtpFailureHint(err: unknown): string {
-  const e = err as { code?: string; responseCode?: number };
-  if (e.code === "EAUTH" || e.responseCode === 535 || e.responseCode === 534)
-    return "Gmail rejected the login: the app password is wrong or revoked. Run: sudo ./prod.sh smtp-password";
-  if (isConnectionError(err))
-    return "Cannot connect to the mail server: outbound TCP 587/465 is blocked by the firewall. Run: ./prod.sh mailtest";
-  if (e.code === "EDNS") return "DNS lookup of the mail server failed on this server.";
-  return "Run ./prod.sh mailtest for a diagnosis.";
+interface MailErrorClassification {
+  diagnosticCode: SmtpDiagnosticResult["code"];
+  cooldownKind?: ChannelCooldownKind;
+  ttlSeconds?: number;
+  safeMessage: string;
+  recipientError?: boolean;
 }
 
-/**
- * Sends through the configured SMTP port; if the network blocks it (common on campus firewalls for
- * 587), retries once over the other port (465 implicit TLS, or 587).
- */
-async function deliverSmtp(mail: SendMailOptions): Promise<void> {
-  const e = env();
-  try {
-    await getTransporter().sendMail(mail);
-    return;
-  } catch (err) {
-    if (e.EMAIL_PROVIDER !== "smtp" || !isConnectionError(err)) throw err;
-    logger.warn(
-      { event: "mail_port_fallback", port: e.SMTP_PORT, err: (err as Error).message },
-      "mail server port unreachable, trying the other port",
-    );
-  }
-  if (!fallback) {
-    const port = e.SMTP_PORT === 465 ? 587 : 465;
-    fallback = nodemailer.createTransport({
-      host: e.SMTP_HOST,
-      port,
-      secure: port === 465,
-      auth: e.SMTP_USER ? { user: e.SMTP_USER, pass: e.SMTP_PASSWORD ?? "" } : undefined,
-      connectionTimeout: e.SMTP_CONNECTION_TIMEOUT_MS,
-      greetingTimeout: e.SMTP_GREETING_TIMEOUT_MS,
-      socketTimeout: e.SMTP_SOCKET_TIMEOUT_MS,
-      tls: { rejectUnauthorized: e.NODE_ENV === "production" },
-    });
-  }
-  await fallback.sendMail(mail);
-}
+export function classifyMailError(err: unknown): MailErrorClassification {
+  const error = err as {
+    code?: string;
+    message?: string;
+    response?: string;
+    responseCode?: number;
+    httpStatus?: number;
+    brevoCode?: string;
+  };
+  const errCode = error.code ?? "";
+  const errMsg = sanitizeSecretText(`${error.message ?? ""} ${error.response ?? ""}`.trim());
+  const status = error.httpStatus;
+  const smtpCode = error.responseCode;
 
-/** Diagnostic check for SMTP connectivity without sending actual emails. */
-export async function verifySmtpConnection(timeoutMs = 5000): Promise<SmtpDiagnosticResult> {
-  const e = env();
-  const provider = e.EMAIL_PROVIDER;
-
-  if (provider === "test") {
+  // Single-recipient bounces should not pause the entire sending channel.
+  if (
+    smtpCode === 550 &&
+    /5\.1\.1|user unknown|no such user|does not exist|recipient address rejected|mailbox unavailable/i.test(errMsg) &&
+    !/limit exceeded|daily.*limit|quota|blocked|unauthorized ip/i.test(errMsg)
+  ) {
     return {
-      ok: true,
-      code: "OK",
-      provider: "test",
-      message: "Test email provider active.",
+      diagnosticCode: "UNKNOWN_ERROR",
+      recipientError: true,
+      safeMessage: "The recipient mailbox rejected the address.",
     };
   }
 
-  const t = getTransporter();
+  if (
+    status === 402 ||
+    status === 429 ||
+    error.brevoCode === "not_enough_credits" ||
+    error.brevoCode === "too_many_requests" ||
+    /5\.4\.5|daily.*sending limit|daily.*limit exceeded|quota exceeded|too many messages|credits exhausted/i.test(
+      errMsg,
+    )
+  ) {
+    return {
+      diagnosticCode: "QUOTA_EXCEEDED",
+      cooldownKind: "quota",
+      ttlSeconds: 2 * 3600,
+      safeMessage: "Daily sending quota exceeded on this mail channel.",
+    };
+  }
+
+  if (
+    /unauthorized ip|unrecognized ip|ip.*not authorized|account.*suspended|account.*deactivated|sender.*blocked|blacklisted/i.test(
+      errMsg,
+    ) ||
+    status === 403
+  ) {
+    return {
+      diagnosticCode: "BLOCKED",
+      cooldownKind: "blocked",
+      ttlSeconds: 3600,
+      safeMessage: "Mail provider blocked sending from this account or server IP.",
+    };
+  }
+
+  if (
+    errCode === "EAUTH" ||
+    smtpCode === 535 ||
+    smtpCode === 534 ||
+    status === 401 ||
+    /authentication failed|invalid login|username and password not accepted|invalid api key|key not found/i.test(
+      errMsg,
+    )
+  ) {
+    return {
+      diagnosticCode: "AUTH_FAILED",
+      cooldownKind: "auth",
+      ttlSeconds: 15 * 60,
+      safeMessage: "Authentication failed with the mail server.",
+    };
+  }
+
+  if (errCode === "EDNS" || /ENOTFOUND|getaddrinfo/i.test(errMsg)) {
+    return {
+      diagnosticCode: "DNS_LOOKUP",
+      cooldownKind: "error",
+      ttlSeconds: 120,
+      safeMessage: "DNS resolution failed for the configured mail server.",
+    };
+  }
+
+  if (errCode === "ETIMEDOUT" || /timed? ?out|timeout|AbortError/i.test(errMsg)) {
+    return {
+      diagnosticCode: "TIMEOUT",
+      cooldownKind: "error",
+      ttlSeconds: 120,
+      safeMessage: "Connection to the mail server timed out.",
+    };
+  }
+
+  if (errCode === "ESOCKET" || /self-signed|TLS|certificate/i.test(errMsg)) {
+    return {
+      diagnosticCode: "TLS_ERROR",
+      cooldownKind: "error",
+      ttlSeconds: 120,
+      safeMessage: "TLS negotiation or certificate validation failed.",
+    };
+  }
+
+  if (errCode === "ECONNREFUSED" || /ECONNREFUSED/i.test(errMsg)) {
+    return {
+      diagnosticCode: "CONNECTION_REFUSED",
+      cooldownKind: "error",
+      ttlSeconds: 120,
+      safeMessage: "Connection refused by the mail server.",
+    };
+  }
+
+  if (isConnectionError(err)) {
+    return {
+      diagnosticCode: "CONNECTION_REFUSED",
+      cooldownKind: "error",
+      ttlSeconds: 120,
+      safeMessage: "Network connection to the mail provider failed.",
+    };
+  }
+
+  return {
+    diagnosticCode: "UNKNOWN_ERROR",
+    cooldownKind: "error",
+    ttlSeconds: 90,
+    safeMessage: errMsg || "Mail delivery check failed.",
+  };
+}
+
+/** Explains a send failure in the server log so operations can act on it. */
+export function smtpFailureHint(err: unknown): string {
+  const c = classifyMailError(err);
+  if (c.diagnosticCode === "QUOTA_EXCEEDED") {
+    return "Channel hit its daily sending limit (e.g., Gmail 550-5.4.5 or Brevo credits). Failover channel handles traffic automatically, or configure Brevo in Super Admin Settings.";
+  }
+  if (c.diagnosticCode === "BLOCKED") {
+    return "Provider blocked sending IP or account. If using Brevo, verify authorized IPs in Brevo -> Security -> Authorized IPs is off or includes this server.";
+  }
+  if (c.diagnosticCode === "AUTH_FAILED") {
+    return "Mail provider rejected the login or API key. Update the credentials in Super Admin -> System Settings.";
+  }
+  if (c.diagnosticCode === "TIMEOUT" || c.diagnosticCode === "CONNECTION_REFUSED") {
+    return "Cannot connect to the mail server port (outbound 587/465 may be firewalled). Switch channel transport to Brevo HTTPS API (port 443) or check firewall.";
+  }
+  if (c.diagnosticCode === "DNS_LOOKUP") return "DNS lookup of the mail server failed on this server.";
+  return "Check Super Admin -> System Settings -> Mail Delivery or run ./prod.sh mailtest for diagnostics.";
+}
+
+function isChannelConfigured(ch: MailChannelConfig, e: Env): boolean {
+  if (!ch.enabled) return false;
+  if (ch.transport === "brevo-api") {
+    return Boolean(ch.password && (ch.fromEmail || ch.user || e.SMTP_FROM_EMAIL));
+  }
+  if (e.EMAIL_PROVIDER === "test" || e.EMAIL_PROVIDER === "mailpit") return true;
+  return Boolean(ch.host);
+}
+
+function buildChannelEnvelope(ch: MailChannelConfig, mail: SendMailOptions, e: Env): SendMailOptions {
+  const fromEmail = ch.fromEmail || e.SMTP_FROM_EMAIL || ch.user || e.SMTP_USER;
+  const cleanName = (ch.fromName || e.SMTP_FROM_NAME).replace(/["\r\n]/g, "").trim();
+  const computedFrom = fromEmail ? (cleanName ? `"${cleanName}" <${fromEmail}>` : fromEmail) : mail.from ?? e.MAIL_FROM;
+  const replyTo = ch.replyTo || mail.replyTo;
+  return {
+    ...mail,
+    from: computedFrom,
+    ...(replyTo ? { replyTo } : {}),
+  };
+}
+
+function parseAddressList(value: SendMailOptions["to"]): { email: string; name?: string }[] {
+  const list = Array.isArray(value) ? value : value ? [value] : [];
+  const out: { email: string; name?: string }[] = [];
+  for (const item of list) {
+    if (typeof item === "string") {
+      const m = item.match(/^(.*?)\s*<([^>]+)>$/);
+      if (m?.[2]) {
+        out.push({ email: m[2].trim(), name: (m[1] ?? "").replace(/^"|"$/g, "").trim() || undefined });
+      } else if (item.trim()) {
+        out.push({ email: item.trim() });
+      }
+    } else if (item && typeof item === "object" && "address" in item && item.address) {
+      out.push({ email: item.address, name: item.name || undefined });
+    }
+  }
+  return out;
+}
+
+async function deliverBrevoApi(ch: MailChannelConfig, mail: SendMailOptions, e: Env): Promise<void> {
+  if (!ch.password) {
+    const err = new Error("Brevo API key is missing") as Error & { httpStatus?: number };
+    err.httpStatus = 401;
+    throw err;
+  }
+  const fromEmail = ch.fromEmail || e.SMTP_FROM_EMAIL || ch.user;
+  if (!fromEmail) {
+    throw new Error("Sender e-mail address is required for Brevo HTTP API");
+  }
+  const to = parseAddressList(mail.to);
+  if (to.length === 0) {
+    throw new Error("No valid recipient e-mail address provided");
+  }
+
+  const headers: Record<string, string> = {};
+  if (mail.headers && typeof mail.headers === "object" && !Array.isArray(mail.headers)) {
+    for (const [k, v] of Object.entries(mail.headers)) {
+      if (typeof v === "string") headers[k] = v;
+    }
+  }
+
+  const payload = {
+    sender: {
+      name: (ch.fromName || e.SMTP_FROM_NAME).trim(),
+      email: fromEmail,
+    },
+    to,
+    ...(ch.replyTo ? { replyTo: { email: ch.replyTo } } : {}),
+    subject: mail.subject ?? "",
+    ...(mail.html ? { htmlContent: String(mail.html) } : {}),
+    ...(mail.text ? { textContent: String(mail.text) } : {}),
+    ...(Object.keys(headers).length > 0 ? { headers } : {}),
+  };
+
+  const res = await fetch("https://api.brevo.com/v3/smtp/email", {
+    method: "POST",
+    headers: {
+      "api-key": ch.password,
+      accept: "application/json",
+      "content-type": "application/json",
+    },
+    body: JSON.stringify(payload),
+    signal: AbortSignal.timeout(15_000),
+  });
+
+  if (!res.ok) {
+    let bodyText = "";
+    let brevoCode: string | undefined;
+    try {
+      const json = (await res.json()) as { code?: string; message?: string };
+      brevoCode = json.code;
+      bodyText = json.message ?? JSON.stringify(json);
+    } catch {
+      bodyText = await res.text().catch(() => res.statusText);
+    }
+    const err = new Error(`Brevo API error (${res.status}): ${bodyText || res.statusText}`) as Error & {
+      httpStatus?: number;
+      brevoCode?: string;
+    };
+    err.httpStatus = res.status;
+    err.brevoCode = brevoCode;
+    throw err;
+  }
+}
+
+async function deliverSmtpOnChannel(
+  ch: MailChannelConfig,
+  mail: SendMailOptions,
+  mailCfg: MailChannelsConfig,
+  signature: string,
+  e: Env,
+): Promise<void> {
+  const main = getChannelSmtpTransport(ch, mailCfg, signature, e);
+  try {
+    await main.sendMail(mail);
+    return;
+  } catch (err) {
+    const canTryAltPort =
+      e.EMAIL_PROVIDER === "smtp" &&
+      (ch.port === 587 || ch.port === 465) &&
+      isConnectionError(err);
+    if (!canTryAltPort) throw err;
+    logger.warn(
+      { event: "mail_port_fallback", channelId: ch.id, host: ch.host, port: ch.port, err: (err as Error).message },
+      "mail server port unreachable, trying the alternate port",
+    );
+  }
+
+  const altPort = ch.port === 465 ? 587 : 465;
+  if (!mailCfg.fromDb && ch.id === "primary") {
+    if (!fallback) {
+      const rt = runtimeEnvSync();
+      fallback = nodemailer.createTransport({
+        host: ch.host,
+        port: altPort,
+        secure: altPort === 465,
+        auth: ch.user ? { user: ch.user, pass: ch.password ?? "" } : undefined,
+        connectionTimeout: rt.SMTP_CONNECTION_TIMEOUT_MS,
+        greetingTimeout: rt.SMTP_GREETING_TIMEOUT_MS,
+        socketTimeout: rt.SMTP_SOCKET_TIMEOUT_MS,
+        tls: { rejectUnauthorized: e.NODE_ENV === "production" },
+      });
+    }
+    await fallback.sendMail(mail);
+    return;
+  }
+
+  const entry = channelTransporters.get(ch.id);
+  const alt = entry?.alt ?? createChannelSmtpTransport(ch, e, altPort);
+  if (entry) entry.alt = alt;
+  await alt.sendMail(mail);
+}
+
+async function sendViaChannel(
+  ch: MailChannelConfig,
+  baseMail: SendMailOptions,
+  mailCfg: MailChannelsConfig,
+  signature: string,
+  e: Env,
+): Promise<void> {
+  const envelope = buildChannelEnvelope(ch, baseMail, e);
+  if (ch.transport === "brevo-api") {
+    await deliverBrevoApi(ch, envelope, e);
+  } else {
+    await deliverSmtpOnChannel(ch, envelope, mailCfg, signature, e);
+  }
+}
+
+async function verifyBrevoApi(ch: MailChannelConfig, timeoutMs: number): Promise<SmtpDiagnosticResult> {
+  if (!ch.password) {
+    return {
+      ok: false,
+      code: "CONFIG_ERROR",
+      provider: "brevo-api",
+      message: "Brevo API key is not configured.",
+    };
+  }
+  try {
+    const res = await fetch("https://api.brevo.com/v3/account", {
+      method: "GET",
+      headers: {
+        "api-key": ch.password,
+        accept: "application/json",
+      },
+      signal: AbortSignal.timeout(timeoutMs),
+    });
+    if (!res.ok) {
+      const bodyText = await res.text().catch(() => res.statusText);
+      const err = new Error(`Brevo API returned HTTP ${res.status}: ${bodyText}`) as Error & {
+        httpStatus?: number;
+      };
+      err.httpStatus = res.status;
+      const c = classifyMailError(err);
+      return {
+        ok: false,
+        code: c.diagnosticCode,
+        provider: "brevo-api",
+        message: c.safeMessage,
+        details: sanitizeSecretText(err.message),
+      };
+    }
+    return {
+      ok: true,
+      code: "OK",
+      provider: "brevo-api",
+      message: "Brevo HTTPS API verified and ready.",
+    };
+  } catch (err) {
+    const c = classifyMailError(err);
+    return {
+      ok: false,
+      code: c.diagnosticCode,
+      provider: "brevo-api",
+      message: c.safeMessage,
+      details: sanitizeSecretText((err as Error).message || String(err)),
+    };
+  }
+}
+
+/** Diagnostic check for a specific channel (primary or fallback) without sending mail. */
+export async function verifyChannelConnection(
+  channelId: MailChannelId,
+  timeoutMs = 5000,
+): Promise<SmtpDiagnosticResult> {
+  const e = env();
+  const { mail: mailCfg } = await loadRuntimeConfig();
+  const ch = mailCfg[channelId];
+
+  if ((e.EMAIL_PROVIDER === "test" || e.EMAIL_PROVIDER === "mailpit") && !mailCfg.fromDb && channelId === "primary") {
+    if (e.EMAIL_PROVIDER === "test") {
+      return { ok: true, code: "OK", provider: "test", message: "Test email provider active." };
+    }
+  }
+
+  if (!ch.enabled) {
+    return {
+      ok: false,
+      code: "CONFIG_ERROR",
+      provider: ch.transport === "brevo-api" ? "brevo-api" : e.EMAIL_PROVIDER,
+      message: "Channel is disabled.",
+    };
+  }
+
+  if (ch.transport === "brevo-api") {
+    return verifyBrevoApi(ch, timeoutMs);
+  }
+
+  if (!ch.host && e.EMAIL_PROVIDER === "smtp") {
+    return {
+      ok: false,
+      code: "CONFIG_ERROR",
+      provider: "smtp",
+      message: "SMTP host is not configured.",
+    };
+  }
+
+  const signature = getMailConfigSignature();
+  const t = getChannelSmtpTransport(ch, mailCfg, signature, e);
+  const provider = mailCfg.fromDb ? "smtp" : e.EMAIL_PROVIDER;
 
   try {
     const verifyPromise = t.verify();
     const timeoutPromise = new Promise<never>((_, reject) =>
       setTimeout(() => reject(new Error("Connection timed out")), timeoutMs),
     );
-
     await Promise.race([verifyPromise, timeoutPromise]);
     return {
       ok: true,
@@ -175,74 +623,296 @@ export async function verifySmtpConnection(timeoutMs = 5000): Promise<SmtpDiagno
       message: "SMTP transporter verified and ready.",
     };
   } catch (err: unknown) {
-    const error = err as { code?: string; message?: string; responseCode?: number };
-    const errMsg = error.message || String(err);
-    const errCode = error.code || "";
-
-    let code: SmtpDiagnosticResult["code"] = "UNKNOWN_ERROR";
-    let safeMessage = "SMTP connection check failed.";
-
-    if (errCode === "EDNS" || errMsg.includes("ENOTFOUND") || errMsg.includes("getaddrinfo")) {
-      code = "DNS_LOOKUP";
-      safeMessage = "DNS resolution failed for the configured mail server.";
-    } else if (errCode === "ETIMEDOUT" || errMsg.includes("timed out") || errMsg.includes("timeout")) {
-      code = "TIMEOUT";
-      safeMessage = "Connection to the mail server timed out.";
-    } else if (errCode === "EAUTH" || error.responseCode === 535 || errMsg.includes("authentication")) {
-      code = "AUTH_FAILED";
-      safeMessage = "Authentication failed with the mail server.";
-    } else if (
-      errCode === "ESOCKET" ||
-      errMsg.includes("self-signed") ||
-      errMsg.includes("TLS") ||
-      errMsg.includes("certificate")
-    ) {
-      code = "TLS_ERROR";
-      safeMessage = "TLS negotiation or certificate validation failed.";
-    } else if (errCode === "ECONNREFUSED" || errMsg.includes("ECONNREFUSED")) {
-      code = "CONNECTION_REFUSED";
-      safeMessage = "Connection refused by the mail server.";
-    }
+    const c = classifyMailError(err);
+    const errMsg = sanitizeSecretText((err as Error).message || String(err));
 
     logger.error(
       {
         event: "mail_check_failed",
+        channelId,
         provider,
-        code,
-        diagnostic: safeMessage,
-        rawMessage: errMsg.replace(/pass(?:word)?\s*[:=]\s*\S+/gi, "password: ***"),
+        code: c.diagnosticCode,
+        diagnostic: c.safeMessage,
+        rawMessage: errMsg,
       },
       "SMTP verification error",
     );
 
     return {
       ok: false,
-      code,
+      code: c.diagnosticCode,
       provider,
-      message: safeMessage,
+      message: c.safeMessage,
       details: errMsg,
     };
   }
 }
 
-/**
- * Sends one e-mail through the SMTP mailbox while today's budget has room for this priority (sign-in
- * codes always go out). Mailpit / test providers have no budget.
- */
-async function deliver(mail: SendMailOptions, priority: MailPriority): Promise<void> {
+/** Diagnostic check for active mail connectivity without sending actual emails. */
+export async function verifySmtpConnection(timeoutMs = 5000): Promise<SmtpDiagnosticResult> {
   const e = env();
+  const { mail: mailCfg } = await loadRuntimeConfig();
+
+  if (e.EMAIL_PROVIDER === "test" && !mailCfg.fromDb) {
+    return {
+      ok: true,
+      code: "OK",
+      provider: "test",
+      message: "Test email provider active.",
+    };
+  }
+
+  const order: MailChannelId[] =
+    mailCfg.strategy === "fallback-only"
+      ? ["fallback"]
+      : mailCfg.fallback.enabled
+        ? ["primary", "fallback"]
+        : ["primary"];
+
+  let firstResult: SmtpDiagnosticResult | undefined;
+  for (const id of order) {
+    const ch = mailCfg[id];
+    if (!ch.enabled && id !== order[0]) continue;
+    const res = await verifyChannelConnection(id, timeoutMs);
+    if (!firstResult) firstResult = res;
+    if (res.ok) {
+      return id === order[0]
+        ? res
+        : {
+            ...res,
+            message: `Fallback channel verified and ready (${ch.label || ch.host}).`,
+          };
+    }
+  }
+
+  return (
+    firstResult ?? {
+      ok: false,
+      code: "CONFIG_ERROR",
+      provider: e.EMAIL_PROVIDER,
+      message: "No active mail channel configured.",
+    }
+  );
+}
+
+/**
+ * Sends one e-mail with automatic failover across configured channels:
+ *  - skips channels currently on cooldown or over their priority budget when a healthy route exists,
+ *  - retries across remaining channels immediately if SMTP returns 550 quota/block or times out,
+ *  - keeps OTP delivery resilient even if soft daily budgets are exceeded.
+ */
+async function deliverWithOutcome(mail: SendMailOptions, priority: MailPriority): Promise<MailDeliveryOutcome> {
+  const e = env();
+  const { mail: mailCfg } = await loadRuntimeConfig();
+  const signature = getMailConfigSignature();
+
   const message: SendMailOptions = {
     ...mail,
     // Ask mail servers not to send out-of-office or other automatic replies to this mailbox.
     headers: { "Auto-Submitted": "auto-generated", "X-Auto-Response-Suppress": "All", ...mail.headers },
   };
-  if (e.EMAIL_PROVIDER !== "smtp") {
+
+  if ((e.EMAIL_PROVIDER === "test" || e.EMAIL_PROVIDER === "mailpit") && !mailCfg.fromDb) {
     await getTransporter().sendMail(message);
-    return;
+    return {
+      channelId: "primary",
+      transport: "smtp",
+      host: e.SMTP_HOST,
+      failoverUsed: false,
+    };
   }
-  if (!(await hasRoom(priority))) throw new MailBudgetExceededError();
-  await deliverSmtp(message);
-  void countEmail();
+
+  const orderedRaw =
+    mailCfg.strategy === "fallback-only" ? [mailCfg.fallback] : [mailCfg.primary, mailCfg.fallback];
+  const configured = orderedRaw.filter((ch) => isChannelConfigured(ch, e));
+
+  if (configured.length === 0) {
+    throw new Error("No mail delivery channel is enabled and configured.");
+  }
+
+  // When only a single un-overridden channel handles an OTP in test mode, skip Redis cooldown
+  // round-trips since there is no alternate route to fail over to.
+  const singleOtpEnvOnly = configured.length === 1 && priority === "otp" && !mailCfg.fromDb && e.NODE_ENV === "test";
+  const states = await Promise.all(
+    configured.map(async (ch, index) => {
+      if (singleOtpEnvOnly) {
+        return {
+          ch,
+          index,
+          cooldown: { active: false as const },
+          sent: 0,
+          inBudget: true,
+        };
+      }
+      const [cooldown, sent] = await Promise.all([getChannelCooldown(ch), channelSentToday(ch)]);
+      return {
+        ch,
+        index,
+        cooldown,
+        sent,
+        inBudget: hasChannelRoom(sent, ch.dailyBudget, priority),
+      };
+    }),
+  );
+
+  const healthy = states.filter((s) => !s.cooldown.active && s.inBudget);
+  let candidates = healthy;
+
+  if (priority === "otp") {
+    // For sign-in codes: try healthy channels first; if none remain, fall back to over-budget
+    // channels or ones whose cooldown is shortest rather than silently locking users out.
+    const backup = states
+      .filter((s) => !healthy.includes(s))
+      .sort((a, b) => {
+        const score = (s: (typeof states)[number]) => {
+          if (!s.cooldown.active) return 0;
+          if (s.cooldown.kind === "error" || s.cooldown.kind === "auth") return 1;
+          return 2;
+        };
+        const diff = score(a) - score(b);
+        if (diff !== 0) return diff;
+        return (a.cooldown.ttlSeconds ?? 0) - (b.cooldown.ttlSeconds ?? 0);
+      });
+    candidates = [...healthy, ...backup];
+  } else if (healthy.length === 0) {
+    const allQuotaOrBlocked = states.every(
+      (s) => !s.inBudget || s.cooldown.kind === "quota" || s.cooldown.kind === "blocked",
+    );
+    if (allQuotaOrBlocked) {
+      throw new MailBudgetExceededError();
+    }
+    // Transient cooldown on a channel while budget remains: try the one with shortest cooldown once.
+    candidates = [...states].sort((a, b) => (a.cooldown.ttlSeconds ?? 0) - (b.cooldown.ttlSeconds ?? 0));
+  }
+
+  let lastErr: unknown;
+  let allAttemptedQuota = true;
+
+  for (let i = 0; i < candidates.length; i++) {
+    const candidate = candidates[i];
+    if (!candidate) continue;
+    const ch = candidate.ch;
+    const isFailover = candidate.index > 0 || i > 0;
+    try {
+      await sendViaChannel(ch, message, mailCfg, signature, e);
+      if (!singleOtpEnvOnly) {
+        void countChannelEmail(ch, ch.dailyBudget);
+      }
+      if (candidate.cooldown.active) {
+        void clearChannelCooldown(ch);
+      }
+      if (isFailover) {
+        logger.info(
+          {
+            event: "mail_failover_succeeded",
+            channelId: ch.id,
+            transport: ch.transport,
+            host: ch.host,
+            priority,
+          },
+          `Delivered ${priority} e-mail via failover channel (${ch.label || ch.host})`,
+        );
+      }
+      return {
+        channelId: ch.id,
+        transport: ch.transport,
+        host: ch.host,
+        failoverUsed: isFailover,
+      };
+    } catch (err) {
+      lastErr = err;
+      const classification = classifyMailError(err);
+      if (classification.diagnosticCode !== "QUOTA_EXCEEDED") {
+        allAttemptedQuota = false;
+      }
+      if (!singleOtpEnvOnly && !classification.recipientError && classification.cooldownKind && classification.ttlSeconds) {
+        await setChannelCooldown(
+          ch,
+          classification.cooldownKind,
+          classification.safeMessage,
+          classification.ttlSeconds,
+        );
+      }
+      logger.warn(
+        {
+          event: "mail_channel_attempt_failed",
+          channelId: ch.id,
+          transport: ch.transport,
+          host: ch.host,
+          code: classification.diagnosticCode,
+          willFailover: i + 1 < candidates.length && !classification.recipientError,
+          err: sanitizeSecretText((err as Error).message || String(err)),
+        },
+        `Mail delivery attempt failed on ${ch.id} (${ch.host})`,
+      );
+      if (classification.recipientError) {
+        throw err;
+      }
+    }
+  }
+
+  if (priority !== "otp" && allAttemptedQuota) {
+    throw new MailBudgetExceededError();
+  }
+  throw lastErr instanceof Error ? lastErr : new Error(String(lastErr ?? "Mail delivery failed"));
+}
+
+async function deliver(mail: SendMailOptions, priority: MailPriority): Promise<void> {
+  await deliverWithOutcome(mail, priority);
+}
+
+/** Sends a live test e-mail targeting either a specific channel or full auto-failover routing. */
+export async function sendChannelTestEmail(
+  target: MailChannelId | "auto",
+  to: string,
+): Promise<MailDeliveryOutcome> {
+  const e = env();
+  const { mail: mailCfg } = await loadRuntimeConfig(true);
+  const signature = getMailConfigSignature();
+  const subject = "PSG Tech Recruitment Portal — mail test";
+  const body = `This is a live test message from ${mailCfg.primary.fromName || "PSG Tech Recruitment Portal"}.
+
+Delivery target: ${target === "auto" ? "Automatic Primary/Fallback failover" : `Direct channel test (${target})`}
+Server origin: ${e.APP_ORIGIN}
+Timestamp: ${new Date().toISOString()}`;
+
+  const { text, html } = renderNotificationEmail(subject, body);
+  const mail: SendMailOptions = { from: e.MAIL_FROM, to, subject, text, html };
+
+  if (target === "auto") {
+    return deliverWithOutcome(mail, "otp");
+  }
+
+  const ch = mailCfg[target];
+  if (ch.transport === "brevo-api" && !ch.password) {
+    throw new Error("Configure a Brevo API key on this channel before testing.");
+  }
+  if (ch.transport === "smtp" && !ch.host && e.EMAIL_PROVIDER === "smtp") {
+    throw new Error("Configure an SMTP host on this channel before testing.");
+  }
+
+  try {
+    await sendViaChannel(ch, mail, mailCfg, signature, e);
+    void countChannelEmail(ch, ch.dailyBudget);
+    await clearChannelCooldown(ch);
+    return {
+      channelId: ch.id,
+      transport: ch.transport,
+      host: ch.host,
+      failoverUsed: ch.id === "fallback",
+    };
+  } catch (err) {
+    const classification = classifyMailError(err);
+    if (!classification.recipientError && classification.cooldownKind && classification.ttlSeconds) {
+      await setChannelCooldown(
+        ch,
+        classification.cooldownKind,
+        classification.safeMessage,
+        classification.ttlSeconds,
+      );
+    }
+    throw err;
+  }
 }
 
 // ---------------------------------------------------------------------------------------------------
@@ -396,14 +1066,14 @@ export async function sendOtpEmail(
   try {
     await deliver({ from: e.MAIL_FROM, to, subject, text, html }, "otp");
   } catch (err) {
-    const msg = (err as Error).message || String(err);
+    const msg = sanitizeSecretText((err as Error).message || String(err));
     logger.error(
       {
         event: "mail_send_failed",
         toDomain: to.split("@")[1] ?? "unknown",
         purpose,
         hint: smtpFailureHint(err),
-        err: msg.replace(/pass(?:word)?(?:\s+is|\s*[:=])\s*\S+/gi, "password: ***"),
+        err: msg,
       },
       "Failed to deliver OTP email",
     );

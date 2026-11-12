@@ -5,8 +5,8 @@ import { Alert, Badge, ConfirmDialog, CsrfInput, formatDateTime, statusTone } fr
 import { handleAction, readForm, requireUser } from "~/lib/http.server";
 import { getOwnApplication } from "~/modules/applications/service.server";
 import { EDITABLE, type AppStatus } from "~/modules/applications/workflow";
-import { env } from "~/modules/core/env.server";
 import { ValidationError } from "~/modules/core/errors";
+import { runtimeEnvSync } from "~/modules/settings/runtime-config.server";
 import {
   DOCUMENT_TYPE_LABELS,
   INLINE_ENTRY_DOC_TYPES,
@@ -49,7 +49,7 @@ export async function loader({ request, params, context }: Route.LoaderArgs) {
       scan: d.scanStatus,
       uploadedAt: d.uploadedAt,
     })),
-    maxMb: env().MAX_UPLOAD_MB,
+    maxMb: runtimeEnvSync().MAX_UPLOAD_MB,
   };
 }
 
