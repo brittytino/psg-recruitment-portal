@@ -6,11 +6,8 @@ import { StarRatingInput } from "~/components/star-rating";
 import { clientIp, handleAction, readForm, requireStaff } from "~/lib/http.server";
 import { POSITION_LABELS } from "~/lib/labels";
 import { STATUS_LABELS, type AppStatus } from "~/modules/applications/workflow";
-import {
-  ADVISORY_LABELS,
-  advisoryApplicationDetail,
-  recordAdvisoryReview,
-} from "~/modules/reviews/advisory.server";
+import { advisoryApplicationDetail, recordAdvisoryReview } from "~/modules/reviews/advisory.server";
+import { ADVISORY_LABELS } from "~/modules/reviews/advisory-labels";
 
 export const meta: Route.MetaFunction = () => [
   { title: "Advisory review — PSG Tech Recruitment" },

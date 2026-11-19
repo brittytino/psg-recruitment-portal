@@ -11,12 +11,7 @@ import { NotFoundError, ValidationError } from "~/modules/core/errors";
  * application status, which stays with the Dean / Principal.
  */
 
-const ADVISORY_RECOMMENDATIONS = ["SHORTLIST", "HOLD", "REJECT"] as const;
-export const ADVISORY_LABELS: Record<(typeof ADVISORY_RECOMMENDATIONS)[number], string> = {
-  SHORTLIST: "Recommend shortlisting",
-  HOLD: "Hold for further consideration",
-  REJECT: "Recommend not shortlisting",
-};
+import { ADVISORY_RECOMMENDATIONS } from "./advisory-labels";
 
 const advisorySchema = z.object({
   /** Optional 1–5 star rating, as for the HOD ("" = not rated). */

@@ -7,7 +7,8 @@ import { Alert, Badge, ConfirmDialog, CsrfInput, formatDateTime, statusTone } fr
 import { clientIp, handleAction, readForm, requireStaff } from "~/lib/http.server";
 import { FORM_LABELS, POSITION_LABELS } from "~/lib/labels";
 import { getStaffApplication, transition, updateInternalNote } from "~/modules/applications/service.server";
-import { ADVISORY_LABELS, advisoryOpinionsFor } from "~/modules/reviews/advisory.server";
+import { advisoryOpinionsFor } from "~/modules/reviews/advisory.server";
+import { ADVISORY_LABELS } from "~/modules/reviews/advisory-labels";
 import { INTERVIEW_FROM, inviteForInterview } from "~/modules/applications/interview.server";
 import { CalendarCheck, Download, Eye, Gavel } from "lucide-react";
 import { StarRatingInput, StarRatingView } from "~/components/star-rating";

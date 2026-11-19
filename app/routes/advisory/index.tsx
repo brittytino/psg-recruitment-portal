@@ -5,7 +5,8 @@ import { EmptyState, PageHeader } from "~/components/staff";
 import { requireStaff } from "~/lib/http.server";
 import { POSITION_LABELS } from "~/lib/labels";
 import { STATUS_LABELS, type AppStatus } from "~/modules/applications/workflow";
-import { ADVISORY_LABELS, advisoryApplicationList } from "~/modules/reviews/advisory.server";
+import { advisoryApplicationList } from "~/modules/reviews/advisory.server";
+import { ADVISORY_LABELS } from "~/modules/reviews/advisory-labels";
 
 export const meta: Route.MetaFunction = () => [
   { title: "Advisory reviews — PSG Tech Recruitment" },
