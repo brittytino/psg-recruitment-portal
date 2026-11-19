@@ -22,6 +22,7 @@ RUN set -eux; \
       -e 's|deb.debian.org/debian-security|security.debian.org/debian-security|g' \
       -e 's|deb.debian.org/debian|ftp.debian.org/debian|g' {} +; \
     apt-get update \
+ && apt-get upgrade -y \
  && apt-get install -y --no-install-recommends ca-certificates openssl tini qpdf \
  && rm -rf /var/lib/apt/lists/*
 WORKDIR /app
@@ -51,6 +52,9 @@ COPY --chown=node:node prisma ./prisma
 COPY --chown=node:node templates ./templates
 COPY --chown=node:node public ./public
 COPY --chown=node:node server.mjs ./server.mjs
+# The image's bundled npm (10.x) ships tar 6.x/7.4.x, with known critical advisories; use a release
+# that bundles a fixed tar. The worker and migrations still run npm.
+RUN npm install -g npm@11.10.0 && npm cache clean --force
 RUN mkdir -p /var/lib/srportal/storage && chown -R node:node /var/lib/srportal
 USER node
 EXPOSE 3000
