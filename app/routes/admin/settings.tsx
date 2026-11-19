@@ -171,8 +171,7 @@ export async function action({ request, context }: Route.ActionArgs) {
       case "test-email":
       case "test-channel": {
         const targetRaw = String(form.get("target") ?? "auto");
-        const target =
-          targetRaw === "primary" || targetRaw === "fallback" ? targetRaw : ("auto" as const);
+        const target = targetRaw === "primary" || targetRaw === "fallback" ? targetRaw : ("auto" as const);
         const recipient = String(form.get("recipient") ?? user.email).trim() || user.email;
         try {
           const outcome = await sendChannelTest(user, target, recipient, ip);
@@ -297,7 +296,10 @@ function ChannelEditor({
   const isBrevoApi = transport === "brevo-api";
 
   const pwBadge = clearPassword
-    ? { cls: "bg-warning-50 text-warning-700 border-warning/30", text: "Stored password will be cleared on save" }
+    ? {
+        cls: "bg-warning-50 text-warning-700 border-warning/30",
+        text: "Stored password will be cleared on save",
+      }
     : passwordDraft.trim()
       ? { cls: "bg-brand-50 text-brand-700 border-brand-200", text: "New key/password ready to save" }
       : initial.passwordSource === "db"
@@ -491,7 +493,9 @@ function ChannelEditor({
             </button>
           </div>
           <div className="mt-1.5 flex flex-wrap items-center justify-between gap-2">
-            <span className={`inline-flex items-center gap-1 rounded border px-2 py-0.5 text-[11px] font-medium ${pwBadge.cls}`}>
+            <span
+              className={`inline-flex items-center gap-1 rounded border px-2 py-0.5 text-[11px] font-medium ${pwBadge.cls}`}
+            >
               <KeyRound className="h-3 w-3" aria-hidden="true" />
               {pwBadge.text}
             </span>
@@ -521,8 +525,8 @@ function ChannelEditor({
                 onChange={(e) => setUseEnvPassword(e.target.checked)}
                 className="h-4 w-4"
               />
-              Fall back to server <code className="rounded bg-soft px-1">.env SMTP_PASSWORD</code> if no DB password
-              is stored above (recommended for Gmail)
+              Fall back to server <code className="rounded bg-soft px-1">.env SMTP_PASSWORD</code> if no DB
+              password is stored above (recommended for Gmail)
             </label>
           </div>
         )}
@@ -762,8 +766,9 @@ export default function Settings({ loaderData, actionData }: Route.ComponentProp
                     <div className="mt-2 flex flex-wrap items-center justify-between gap-2 rounded-lg border border-warning/40 bg-paper px-2.5 py-1.5 text-xs">
                       <span className="text-warning-800">
                         Paused ({ch.cooldown.kind}
-                        {ch.cooldown.ttlSeconds ? `, ${formatCooldownTtl(ch.cooldown.ttlSeconds)}` : ""}):{" "}
-                        {ch.cooldown.reason}
+                        {ch.cooldown.ttlSeconds
+                          ? `, ${formatCooldownTtl(ch.cooldown.ttlSeconds)}`
+                          : ""}): {ch.cooldown.reason}
                       </span>
                       <Form method="post">
                         <CsrfInput />
@@ -802,11 +807,11 @@ export default function Settings({ loaderData, actionData }: Route.ComponentProp
               Mail delivery &amp; auto-failover (Brevo + Gmail)
             </h2>
             <p className="mt-1 text-sm text-muted">
-              Configure both a Primary channel (recommended: Brevo) and a Fallback channel (recommended:
-              Gmail Workspace). When one reaches its daily quota or returns an error (such as Gmail 550 daily
-              limit), traffic fails over automatically to the other. Credentials are encrypted with AES-256-GCM
-              using <code className="rounded bg-soft px-1">SESSION_SECRET</code> and require no server{" "}
-              <code className="rounded bg-soft px-1">.env</code> edits.
+              Configure both a Primary channel (recommended: Brevo) and a Fallback channel (recommended: Gmail
+              Workspace). When one reaches its daily quota or returns an error (such as Gmail 550 daily
+              limit), traffic fails over automatically to the other. Credentials are encrypted with
+              AES-256-GCM using <code className="rounded bg-soft px-1">SESSION_SECRET</code> and require no
+              server <code className="rounded bg-soft px-1">.env</code> edits.
             </p>
           </div>
           <div className="flex flex-wrap items-center gap-2">
@@ -819,9 +824,7 @@ export default function Settings({ loaderData, actionData }: Route.ComponentProp
             </Form>
             <span
               className={`rounded-full px-3 py-1 text-xs font-semibold ${
-                mailConfig.fromDb
-                  ? "bg-success-50 text-success-700"
-                  : "bg-soft text-muted"
+                mailConfig.fromDb ? "bg-success-50 text-success-700" : "bg-soft text-muted"
               }`}
             >
               {mailConfig.fromDb ? "Saved in database" : "Using .env defaults"}
@@ -847,9 +850,7 @@ export default function Settings({ loaderData, actionData }: Route.ComponentProp
               <option value="primary-first">
                 Primary first, automatic failover to Fallback (recommended)
               </option>
-              <option value="fallback-only">
-                Fallback only (bypass Primary completely until restored)
-              </option>
+              <option value="fallback-only">Fallback only (bypass Primary completely until restored)</option>
             </select>
           </div>
 
@@ -889,8 +890,8 @@ export default function Settings({ loaderData, actionData }: Route.ComponentProp
             <Send className="h-4 w-4 text-brand-600" aria-hidden="true" /> Test mail delivery right now
           </p>
           <p className="mt-0.5 text-xs text-muted">
-            Sends a live verification e-mail directly without waiting for the background queue. Use after saving
-            above to verify Brevo and Gmail.
+            Sends a live verification e-mail directly without waiting for the background queue. Use after
+            saving above to verify Brevo and Gmail.
           </p>
           <Form method="post" className="mt-3 flex flex-wrap items-end gap-2">
             <CsrfInput />
@@ -909,31 +910,13 @@ export default function Settings({ loaderData, actionData }: Route.ComponentProp
                 className="input mt-1"
               />
             </div>
-            <button
-              type="submit"
-              name="target"
-              value="auto"
-              className="btn-primary"
-              disabled={busy}
-            >
+            <button type="submit" name="target" value="auto" className="btn-primary" disabled={busy}>
               Test Auto-Failover
             </button>
-            <button
-              type="submit"
-              name="target"
-              value="primary"
-              className="btn-secondary"
-              disabled={busy}
-            >
+            <button type="submit" name="target" value="primary" className="btn-secondary" disabled={busy}>
               Test Primary only
             </button>
-            <button
-              type="submit"
-              name="target"
-              value="fallback"
-              className="btn-secondary"
-              disabled={busy}
-            >
+            <button type="submit" name="target" value="fallback" className="btn-secondary" disabled={busy}>
               Test Fallback only
             </button>
           </Form>

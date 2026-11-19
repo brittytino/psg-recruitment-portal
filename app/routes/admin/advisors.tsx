@@ -69,7 +69,9 @@ export default function Advisors({ loaderData, actionData }: Route.ComponentProp
           </h2>
           {loaderData.advisors.length === 0 ? (
             <div className="p-5">
-              <EmptyState title="No external advisors yet">Add an external advisor to review applicants.</EmptyState>
+              <EmptyState title="No external advisors yet">
+                Add an external advisor to review applicants.
+              </EmptyState>
             </div>
           ) : (
             <ul className="divide-y divide-line">
@@ -82,7 +84,9 @@ export default function Advisors({ loaderData, actionData }: Route.ComponentProp
                     <span className="block font-semibold text-ink">{v.name}</span>
                     <span className="block truncate text-sm text-muted">{v.email}</span>
                     <span className="block text-xs text-muted">
-                      {v.lastLoginAt ? `Last signed in ${formatDateTime(v.lastLoginAt)}` : "Not signed in yet"}
+                      {v.lastLoginAt
+                        ? `Last signed in ${formatDateTime(v.lastLoginAt)}`
+                        : "Not signed in yet"}
                       {v.grantedBy ? ` · added by ${v.grantedBy}` : ""}
                     </span>
                   </span>
@@ -114,7 +118,13 @@ export default function Advisors({ loaderData, actionData }: Route.ComponentProp
           <h2 id="add" className="flex items-center gap-2 text-lg">
             <UserPlus className="h-5 w-5 text-brand-600" aria-hidden="true" /> Add an external advisor
           </h2>
-          <TextInput label="Full name" name="fullName" required error={fe.fullName?.[0]} autoComplete="name" />
+          <TextInput
+            label="Full name"
+            name="fullName"
+            required
+            error={fe.fullName?.[0]}
+            autoComplete="name"
+          />
           <TextInput
             label="E-mail address"
             name="email"

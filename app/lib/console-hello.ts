@@ -33,13 +33,22 @@ export function consoleHello() {
       "letter-spacing: 0.5px",
     ].join(";");
   const body = (bg: string, color: string) =>
-    [`background: ${bg}`, `color: ${color}`, font, "font-size: 11px", "padding: 4px 10px", "border-radius: 0 4px 4px 0"].join(
-      ";",
-    );
+    [
+      `background: ${bg}`,
+      `color: ${color}`,
+      font,
+      "font-size: 11px",
+      "padding: 4px 10px",
+      "border-radius: 0 4px 4px 0",
+    ].join(";");
 
   console.log("\n%cSELECTION DESK  •  Recruitment platform for colleges and universities", header);
   console.log("");
-  console.log("%c PRODUCT %c Selection Desk · https://selectiondesk.in ", tag("#1e3a8a"), body("#1e293b", "#f8fafc"));
+  console.log(
+    "%c PRODUCT %c Selection Desk · https://selectiondesk.in ",
+    tag("#1e3a8a"),
+    body("#1e293b", "#f8fafc"),
+  );
   console.log(
     "%c NOTICE %c Proprietary software. © 2026 Selection Desk. All rights reserved. ",
     tag("#334155"),

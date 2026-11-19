@@ -8,9 +8,7 @@ labels: bug
 
 **What you expected**
 
-**Steps to reproduce**
-1.
-2.
+**Steps to reproduce** 1. 2.
 
 **Screenshots** (remove any personal data first)
 

@@ -44,8 +44,8 @@ export default function AdvisoryIndex({ loaderData }: Route.ComponentProps) {
                   </Link>
                 </p>
                 <p className="text-sm text-muted">
-                  {a.appliedPosition ? (POSITION_LABELS[a.appliedPosition] ?? a.appliedPosition) : "Research"} ·{" "}
-                  {a.department} · {a.vacancyTitle}
+                  {a.appliedPosition ? (POSITION_LABELS[a.appliedPosition] ?? a.appliedPosition) : "Research"}{" "}
+                  · {a.department} · {a.vacancyTitle}
                 </p>
                 <p className="text-sm text-muted">
                   Submitted {a.submittedAt ? formatDate(a.submittedAt) : "—"}

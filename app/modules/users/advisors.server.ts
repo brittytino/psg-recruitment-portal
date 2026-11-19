@@ -68,11 +68,15 @@ export async function addAdvisor(actor: SessionUser | null, input: unknown) {
   const { email, fullName } = p.data;
   const existing = await prisma.user.findUnique({ where: { email }, include: { roles: true } });
   if (existing?.roles.some((r) => r.role === "CANDIDATE"))
-    throw new ConflictError("This e-mail address belongs to a candidate. Use a different (official) address.");
+    throw new ConflictError(
+      "This e-mail address belongs to a candidate. Use a different (official) address.",
+    );
   if (existing?.roles.some((r) => r.role === "ADVISOR"))
     throw new ConflictError("This person is already an external advisor.");
   if (existing && existing.roles.length)
-    throw new ConflictError("This person already has a staff role. Advisor access is granted to external people only.");
+    throw new ConflictError(
+      "This person already has a staff role. Advisor access is granted to external people only.",
+    );
 
   await prisma.$transaction(async (tx) => {
     const u =
@@ -97,7 +101,13 @@ export async function addAdvisor(actor: SessionUser | null, input: unknown) {
       { dedupeKey: `advisor:${u.id}:${Date.now()}` },
     );
     await audit(
-      { actorId: a.id, action: "user.advisor_added", entityType: "user", entityId: u.id, metadata: { role: "ADVISOR" } },
+      {
+        actorId: a.id,
+        action: "user.advisor_added",
+        entityType: "user",
+        entityId: u.id,
+        metadata: { role: "ADVISOR" },
+      },
       tx,
     );
   });
@@ -115,7 +125,13 @@ export async function removeAdvisor(actor: SessionUser | null, userId: string) {
     if (u.roles.length === 1) await tx.user.update({ where: { id: userId }, data: { status: "DISABLED" } });
     await tx.session.deleteMany({ where: { userId } });
     await audit(
-      { actorId: a.id, action: "user.advisor_removed", entityType: "user", entityId: userId, metadata: { role: "ADVISOR" } },
+      {
+        actorId: a.id,
+        action: "user.advisor_removed",
+        entityType: "user",
+        entityId: userId,
+        metadata: { role: "ADVISOR" },
+      },
       tx,
     );
   });

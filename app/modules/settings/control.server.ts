@@ -41,7 +41,10 @@ async function check(fn: () => Promise<string>, ms = 4000): Promise<CheckState> 
   } catch (e) {
     return {
       ok: false,
-      detail: (e as Error).message === "timeout" ? "No answer (timed out)" : (e as Error).message || "Not reachable",
+      detail:
+        (e as Error).message === "timeout"
+          ? "No answer (timed out)"
+          : (e as Error).message || "Not reachable",
     };
   }
 }
@@ -320,8 +323,5 @@ export async function clearMailCooldown(
 export async function refreshMailDeliveryState(): Promise<void> {
   const { mail } = await loadRuntimeConfig(true);
   resetTransporterForTesting();
-  await Promise.all([
-    clearChannelCooldown(mail.primary),
-    clearChannelCooldown(mail.fallback),
-  ]);
+  await Promise.all([clearChannelCooldown(mail.primary), clearChannelCooldown(mail.fallback)]);
 }

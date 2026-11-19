@@ -150,10 +150,7 @@ export async function getChannelCooldown(target: ChannelBucketTarget): Promise<C
   try {
     const k = channelCooldownKey(target);
     const r = redis();
-    const [raw, ttl] = await Promise.all([
-      quick(r.get(k), null),
-      quick(r.ttl(k), -1),
-    ]);
+    const [raw, ttl] = await Promise.all([quick(r.get(k), null), quick(r.ttl(k), -1)]);
     if (!raw) return { active: false };
     try {
       const parsed = JSON.parse(raw) as { kind?: ChannelCooldownKind; reason?: string };

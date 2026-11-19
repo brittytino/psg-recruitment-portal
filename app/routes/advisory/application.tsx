@@ -110,9 +110,7 @@ export default function AdvisoryApplication({ loaderData, actionData }: Route.Co
           <h2 id="opinion" className="text-xl">
             Your advisory opinion
           </h2>
-          {opinion && (
-            <Badge tone="success">Recorded {formatDateTime(opinion.recordedAt)}</Badge>
-          )}
+          {opinion && <Badge tone="success">Recorded {formatDateTime(opinion.recordedAt)}</Badge>}
         </div>
         <ErrorSummary
           messages={

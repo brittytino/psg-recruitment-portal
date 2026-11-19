@@ -156,7 +156,11 @@ export async function recordAdvisoryReview(
     if (existing) {
       await tx.review.update({
         where: { id: existing.id },
-        data: { recommendation: p.data.recommendation, comments: p.data.comments, score: p.data.rating ?? null },
+        data: {
+          recommendation: p.data.recommendation,
+          comments: p.data.comments,
+          score: p.data.rating ?? null,
+        },
       });
     } else {
       await tx.review.create({

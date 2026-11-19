@@ -3,9 +3,9 @@
 This is the supported way to run the portal in production: Docker Compose (`./prod.sh`) behind the
 host's Nginx. HTTPS uses **PSG Tech's own SSL certificate** (no Let's Encrypt / certbot).
 
-| Address                                 | Serves                  | Notes                                                     |
-| --------------------------------------- | ----------------------- | --------------------------------------------------------- |
-| `https://recruitments.psgtech.ac.in`    | Recruitment portal      | App listens on `127.0.0.1:6969` only                      |
+| Address                                | Serves                  | Notes                                                     |
+| -------------------------------------- | ----------------------- | --------------------------------------------------------- |
+| `https://recruitments.psgtech.ac.in`   | Recruitment portal      | App listens on `127.0.0.1:6969` only                      |
 | `https://recruitmentsdb.psgtech.ac.in` | Database viewer (pgweb) | Read-only, password protected, optional; `127.0.0.1:6981` |
 
 ## 1. DNS and HTTPS (college IT team)
@@ -13,10 +13,10 @@ host's Nginx. HTTPS uses **PSG Tech's own SSL certificate** (no Let's Encrypt / 
 Both names must reach this server: `recruitments.psgtech.ac.in` and `recruitmentsdb.psgtech.ac.in`.
 HTTPS is provided with the college certificate in one of two ways:
 
-| Setup | What to do |
-| --- | --- |
+| Setup                                                                                                              | What to do                                                                                                                                                                                                                                                                        |
+| ------------------------------------------------------------------------------------------------------------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | **College HTTPS gateway** (default) — the gateway holds the certificate and forwards HTTP to this server's port 80 | Nothing on this server. Set the gateway's IP in `TRUSTED_PROXY_IPS` (`.env.production`, currently `10.1.10.162`) so the real visitor IP is used. The gateway must send `X-Forwarded-For` and `X-Forwarded-Proto: https`, and allow uploads of 25 MB (`client_max_body_size 25m`). |
-| **Certificate installed on this server** | Copy the certificate chain and key to the server, then add to `secrets/override.env`:<br>`SSL_CERTIFICATE=/etc/ssl/psgtech/fullchain.pem`<br>`SSL_CERTIFICATE_KEY=/etc/ssl/psgtech/private.key`<br>and run `sudo ./prod.sh`. Nginx then serves HTTPS on 443 and redirects HTTP. |
+| **Certificate installed on this server**                                                                           | Copy the certificate chain and key to the server, then add to `secrets/override.env`:<br>`SSL_CERTIFICATE=/etc/ssl/psgtech/fullchain.pem`<br>`SSL_CERTIFICATE_KEY=/etc/ssl/psgtech/private.key`<br>and run `sudo ./prod.sh`. Nginx then serves HTTPS on 443 and redirects HTTP.   |
 
 When the certificate is renewed, replace the files and run `sudo systemctl reload nginx`.
 
@@ -81,12 +81,12 @@ Backups go to `backups/<timestamp>/` (database dump + uploaded files). Copy them
 
 ## Where files are stored
 
-| What | Where |
-| --- | --- |
-| Uploaded documents (photos, signatures, certificates, PDFs) | Docker volume `psg-srportal_storage`, folder `uploads/<2 chars>/<random id>.<pdf, jpg or png>` |
-| Generated application PDFs and consolidated bundles | Same volume, folder `generated/<application id>/` |
-| Open-positions PDFs (Faculty: `/open-positions.pdf`, Research: `/research-positions.pdf`) | Same volume, folder `generated/notices/` |
-| Which file belongs to whom | Database tables `application_documents` and `generated_documents`; readable views `reports.documents` and `reports.generated_pdfs` |
+| What                                                                                      | Where                                                                                                                              |
+| ----------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------- |
+| Uploaded documents (photos, signatures, certificates, PDFs)                               | Docker volume `psg-srportal_storage`, folder `uploads/<2 chars>/<random id>.<pdf, jpg or png>`                                     |
+| Generated application PDFs and consolidated bundles                                       | Same volume, folder `generated/<application id>/`                                                                                  |
+| Open-positions PDFs (Faculty: `/open-positions.pdf`, Research: `/research-positions.pdf`) | Same volume, folder `generated/notices/`                                                                                           |
+| Which file belongs to whom                                                                | Database tables `application_documents` and `generated_documents`; readable views `reports.documents` and `reports.generated_pdfs` |
 
 On the server the volume is at `/var/lib/docker/volumes/psg-srportal_storage/_data/` (inside the app
 container: `/var/lib/srportal/storage/`). Files get random names, are never served directly by Nginx
@@ -121,11 +121,11 @@ sudo ./prod.sh mailtest someone@your-college.edu # also sends a test e-mail
 
 It prints the cause and the fix:
 
-| Result | Fix |
-| --- | --- |
+| Result                              | Fix                                                                                                                                                                   |
+| ----------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | Ports 587 and 465 **not reachable** | The firewall blocks outgoing mail. Network team: allow outbound TCP 587 and 465 from this server to `smtp.gmail.com`. (The portal uses whichever of the two is open.) |
-| Gmail **rejected the login** (535) | App password wrong or revoked. Create a new one for recruitment@your-college.edu (2-Step Verification must be on) and run `sudo ./prod.sh smtp-password`. |
-| Password **empty** | `sudo ./prod.sh smtp-password` |
+| Gmail **rejected the login** (535)  | App password wrong or revoked. Create a new one for recruitment@your-college.edu (2-Step Verification must be on) and run `sudo ./prod.sh smtp-password`.             |
+| Password **empty**                  | `sudo ./prod.sh smtp-password`                                                                                                                                        |
 
 ## E-mail
 

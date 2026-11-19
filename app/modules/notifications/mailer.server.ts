@@ -220,7 +220,9 @@ export function classifyMailError(err: unknown): MailErrorClassification {
   // Single-recipient bounces should not pause the entire sending channel.
   if (
     smtpCode === 550 &&
-    /5\.1\.1|user unknown|no such user|does not exist|recipient address rejected|mailbox unavailable/i.test(errMsg) &&
+    /5\.1\.1|user unknown|no such user|does not exist|recipient address rejected|mailbox unavailable/i.test(
+      errMsg,
+    ) &&
     !/limit exceeded|daily.*limit|quota|blocked|unauthorized ip/i.test(errMsg)
   ) {
     return {
@@ -362,7 +364,11 @@ function isChannelConfigured(ch: MailChannelConfig, e: Env): boolean {
 function buildChannelEnvelope(ch: MailChannelConfig, mail: SendMailOptions, e: Env): SendMailOptions {
   const fromEmail = ch.fromEmail || e.SMTP_FROM_EMAIL || ch.user || e.SMTP_USER;
   const cleanName = (ch.fromName || e.SMTP_FROM_NAME).replace(/["\r\n]/g, "").trim();
-  const computedFrom = fromEmail ? (cleanName ? `"${cleanName}" <${fromEmail}>` : fromEmail) : mail.from ?? e.MAIL_FROM;
+  const computedFrom = fromEmail
+    ? cleanName
+      ? `"${cleanName}" <${fromEmail}>`
+      : fromEmail
+    : (mail.from ?? e.MAIL_FROM);
   const replyTo = ch.replyTo || mail.replyTo;
   return {
     ...mail,
@@ -472,12 +478,16 @@ async function deliverSmtpOnChannel(
     return;
   } catch (err) {
     const canTryAltPort =
-      e.EMAIL_PROVIDER === "smtp" &&
-      (ch.port === 587 || ch.port === 465) &&
-      isConnectionError(err);
+      e.EMAIL_PROVIDER === "smtp" && (ch.port === 587 || ch.port === 465) && isConnectionError(err);
     if (!canTryAltPort) throw err;
     logger.warn(
-      { event: "mail_port_fallback", channelId: ch.id, host: ch.host, port: ch.port, err: (err as Error).message },
+      {
+        event: "mail_port_fallback",
+        channelId: ch.id,
+        host: ch.host,
+        port: ch.port,
+        err: (err as Error).message,
+      },
       "mail server port unreachable, trying the alternate port",
     );
   }
@@ -582,7 +592,11 @@ export async function verifyChannelConnection(
   const { mail: mailCfg } = await loadRuntimeConfig();
   const ch = mailCfg[channelId];
 
-  if ((e.EMAIL_PROVIDER === "test" || e.EMAIL_PROVIDER === "mailpit") && !mailCfg.fromDb && channelId === "primary") {
+  if (
+    (e.EMAIL_PROVIDER === "test" || e.EMAIL_PROVIDER === "mailpit") &&
+    !mailCfg.fromDb &&
+    channelId === "primary"
+  ) {
     if (e.EMAIL_PROVIDER === "test") {
       return { ok: true, code: "OK", provider: "test", message: "Test email provider active." };
     }
@@ -705,7 +719,10 @@ export async function verifySmtpConnection(timeoutMs = 5000): Promise<SmtpDiagno
  *  - retries across remaining channels immediately if SMTP returns 550 quota/block or times out,
  *  - keeps OTP delivery resilient even if soft daily budgets are exceeded.
  */
-async function deliverWithOutcome(mail: SendMailOptions, priority: MailPriority): Promise<MailDeliveryOutcome> {
+async function deliverWithOutcome(
+  mail: SendMailOptions,
+  priority: MailPriority,
+): Promise<MailDeliveryOutcome> {
   const e = env();
   const { mail: mailCfg } = await loadRuntimeConfig();
   const signature = getMailConfigSignature();
@@ -736,7 +753,8 @@ async function deliverWithOutcome(mail: SendMailOptions, priority: MailPriority)
 
   // When only a single un-overridden channel handles an OTP in test mode, skip Redis cooldown
   // round-trips since there is no alternate route to fail over to.
-  const singleOtpEnvOnly = configured.length === 1 && priority === "otp" && !mailCfg.fromDb && e.NODE_ENV === "test";
+  const singleOtpEnvOnly =
+    configured.length === 1 && priority === "otp" && !mailCfg.fromDb && e.NODE_ENV === "test";
   const states = await Promise.all(
     configured.map(async (ch, index) => {
       if (singleOtpEnvOnly) {
@@ -829,7 +847,12 @@ async function deliverWithOutcome(mail: SendMailOptions, priority: MailPriority)
       if (classification.diagnosticCode !== "QUOTA_EXCEEDED") {
         allAttemptedQuota = false;
       }
-      if (!singleOtpEnvOnly && !classification.recipientError && classification.cooldownKind && classification.ttlSeconds) {
+      if (
+        !singleOtpEnvOnly &&
+        !classification.recipientError &&
+        classification.cooldownKind &&
+        classification.ttlSeconds
+      ) {
         await setChannelCooldown(
           ch,
           classification.cooldownKind,

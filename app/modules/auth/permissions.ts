@@ -15,7 +15,16 @@
  *    Super Admin or HR – N4 Section.
  *  - CANDIDATE: their own applications only.
  */
-export const ROLES = ["CANDIDATE", "HR", "HOD", "ADMIN", "SUPER_ADMIN", "VIEWER", "MANAGER", "ADVISOR"] as const;
+export const ROLES = [
+  "CANDIDATE",
+  "HR",
+  "HOD",
+  "ADMIN",
+  "SUPER_ADMIN",
+  "VIEWER",
+  "MANAGER",
+  "ADVISOR",
+] as const;
 export type RoleName = (typeof ROLES)[number];
 
 /** Staff roles that Super Admin can grant (candidates register themselves). */

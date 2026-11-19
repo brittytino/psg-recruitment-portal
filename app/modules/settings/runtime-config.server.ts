@@ -348,10 +348,7 @@ export function defaultMailChannelsFromEnv(): MailChannelsConfig {
   };
 }
 
-function hydrateChannel(
-  stored: z.infer<typeof storedChannelSchema>,
-  e: Env,
-): MailChannelConfig {
+function hydrateChannel(stored: z.infer<typeof storedChannelSchema>, e: Env): MailChannelConfig {
   const dbSecret = decryptSecret(stored.passwordEnc);
   const password = dbSecret || (stored.useEnvPassword ? e.SMTP_PASSWORD : "");
   const isBrevoApi = stored.transport === "brevo-api";
@@ -480,11 +477,7 @@ export function getMailConfigSync(): MailChannelsConfig {
 // Super Admin UI loaders & mutators (never return raw secrets)
 // -------------------------------------------------------------------------------------------------
 
-function redactChannel(
-  ch: MailChannelConfig,
-  hasDbPassword: boolean,
-  e: Env,
-): RedactedMailChannel {
+function redactChannel(ch: MailChannelConfig, hasDbPassword: boolean, e: Env): RedactedMailChannel {
   const hasEnv = ch.useEnvPassword && Boolean(e.SMTP_PASSWORD);
   return {
     id: ch.id,
@@ -559,7 +552,9 @@ export async function saveMailChannelsConfig(
 
     if (ch.enabled) {
       if (!isBrevoApi && !host) {
-        throw new ValidationError(`${id === "primary" ? "Primary" : "Fallback"} channel requires an SMTP host.`);
+        throw new ValidationError(
+          `${id === "primary" ? "Primary" : "Fallback"} channel requires an SMTP host.`,
+        );
       }
       if (!ch.fromEmail) {
         throw new ValidationError(
@@ -607,14 +602,26 @@ export async function saveMailChannelsConfig(
 
   const toStore: z.infer<typeof storedMailConfigSchema> = {
     strategy: input.strategy,
-    primary: validateAndBuild("primary", input.primary, existingParsed.success ? existingParsed.data.primary : undefined),
-    fallback: validateAndBuild("fallback", input.fallback, existingParsed.success ? existingParsed.data.fallback : undefined),
+    primary: validateAndBuild(
+      "primary",
+      input.primary,
+      existingParsed.success ? existingParsed.data.primary : undefined,
+    ),
+    fallback: validateAndBuild(
+      "fallback",
+      input.fallback,
+      existingParsed.success ? existingParsed.data.fallback : undefined,
+    ),
   };
 
   await prisma.$transaction(async (tx) => {
     await tx.systemSetting.upsert({
       where: { key: MAIL_CHANNELS_KEY },
-      create: { key: MAIL_CHANNELS_KEY, value: toStore as unknown as Prisma.InputJsonValue, updatedById: u.id },
+      create: {
+        key: MAIL_CHANNELS_KEY,
+        value: toStore as unknown as Prisma.InputJsonValue,
+        updatedById: u.id,
+      },
       update: { value: toStore as unknown as Prisma.InputJsonValue, updatedById: u.id },
     });
     await audit(
@@ -709,7 +716,11 @@ export async function swapMailChannelsConfig(
   await prisma.$transaction(async (tx) => {
     await tx.systemSetting.upsert({
       where: { key: MAIL_CHANNELS_KEY },
-      create: { key: MAIL_CHANNELS_KEY, value: toStore as unknown as Prisma.InputJsonValue, updatedById: u.id },
+      create: {
+        key: MAIL_CHANNELS_KEY,
+        value: toStore as unknown as Prisma.InputJsonValue,
+        updatedById: u.id,
+      },
       update: { value: toStore as unknown as Prisma.InputJsonValue, updatedById: u.id },
     });
     await audit(

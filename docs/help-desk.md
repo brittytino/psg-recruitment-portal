@@ -7,27 +7,27 @@ same application (same sign-in, database, storage and e-mail), not a separate sy
 
 ### Routes
 
-| Route | Who | Purpose |
-| --- | --- | --- |
-| `/help-desk` | Everyone | Overview. Signed-in candidates see their ticket counts and list; visitors see how to get help. |
-| `/help-desk/tickets` | Candidate | Own tickets: search, status / category filter, sort, pages. |
-| `/help-desk/new` | Candidate | Create a ticket (subject, category, sub-category, description, optional application, urgency, attachments). |
-| `/help-desk/tickets/:id` | Candidate (owner) | Conversation and reply. |
-| `/help-desk/articles`, `/help-desk/articles/:slug` | Everyone | Published help articles (none ship with the system). |
-| `/help-desk/files/:id` | Owner or support staff | Attachment download (authorised every time). |
-| `/staff/help-desk` | HR – N4, Admin, owner | Ticket queue: views, counts, filters, bulk assign / status. |
-| `/staff/help-desk/:id` | HR – N4, Admin, owner | Conversation, reply / request information / internal note, status, assignment, priority, escalation, history. |
-| `/staff/help-desk/settings` | Owner | Default assignment, staff e-mail on new tickets, help articles. |
+| Route                                              | Who                    | Purpose                                                                                                       |
+| -------------------------------------------------- | ---------------------- | ------------------------------------------------------------------------------------------------------------- |
+| `/help-desk`                                       | Everyone               | Overview. Signed-in candidates see their ticket counts and list; visitors see how to get help.                |
+| `/help-desk/tickets`                               | Candidate              | Own tickets: search, status / category filter, sort, pages.                                                   |
+| `/help-desk/new`                                   | Candidate              | Create a ticket (subject, category, sub-category, description, optional application, urgency, attachments).   |
+| `/help-desk/tickets/:id`                           | Candidate (owner)      | Conversation and reply.                                                                                       |
+| `/help-desk/articles`, `/help-desk/articles/:slug` | Everyone               | Published help articles (none ship with the system).                                                          |
+| `/help-desk/files/:id`                             | Owner or support staff | Attachment download (authorised every time).                                                                  |
+| `/staff/help-desk`                                 | HR – N4, Admin, owner  | Ticket queue: views, counts, filters, bulk assign / status.                                                   |
+| `/staff/help-desk/:id`                             | HR – N4, Admin, owner  | Conversation, reply / request information / internal note, status, assignment, priority, escalation, history. |
+| `/staff/help-desk/settings`                        | Owner                  | Default assignment, staff e-mail on new tickets, help articles.                                               |
 
 Signed-out visitors who open a ticket page are sent through the normal e-mail-code sign-in and returned
 to the page afterwards.
 
 ### Permissions
 
-| Permission | Roles | Allows |
-| --- | --- | --- |
-| `helpdesk:handle` | HR, Admin, owner | Read and work on every ticket. |
-| `helpdesk:admin` | Admin, owner | Help desk settings, help articles, reopening closed tickets. |
+| Permission        | Roles            | Allows                                                       |
+| ----------------- | ---------------- | ------------------------------------------------------------ |
+| `helpdesk:handle` | HR, Admin, owner | Read and work on every ticket.                               |
+| `helpdesk:admin`  | Admin, owner     | Help desk settings, help articles, reopening closed tickets. |
 
 Admin (Dean / Principal) and HODs have no help desk access. Candidates only ever see their own tickets,
 public messages and attachments of public messages. Every rule is checked on the server.
@@ -36,10 +36,10 @@ public messages and attachments of public messages. Every rule is checked on the
 
 `Open → In progress → Awaiting candidate → Resolved → Closed`
 
-| Who | Change |
-| --- | --- |
-| Candidate | Creates (Open). Replying to *Awaiting candidate* returns it to the team (Open / In progress). Replying to *Resolved* within 14 days reopens it. Cannot reply to *Closed*. |
-| Staff | Any change allowed by `STAFF_TRANSITIONS` in `app/modules/helpdesk/definitions.ts`. *Resolved* and *Closed* need a resolution summary. Only a senior administrator reopens a *Closed* ticket. Replying to an unassigned ticket assigns it to the replier. |
+| Who       | Change                                                                                                                                                                                                                                                    |
+| --------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Candidate | Creates (Open). Replying to _Awaiting candidate_ returns it to the team (Open / In progress). Replying to _Resolved_ within 14 days reopens it. Cannot reply to _Closed_.                                                                                 |
+| Staff     | Any change allowed by `STAFF_TRANSITIONS` in `app/modules/helpdesk/definitions.ts`. _Resolved_ and _Closed_ need a resolution summary. Only a senior administrator reopens a _Closed_ ticket. Replying to an unassigned ticket assigns it to the replier. |
 
 Priority (Low / Normal / High / Urgent) is set by staff only; candidates describe the urgency in their
 own words. Escalation flags the ticket for senior administrators (priority at least High) and keeps its history.
@@ -70,10 +70,10 @@ The mail account has a daily sending limit. The application keeps well inside it
    nothing. The worker never re-sends a notification already marked sent.
 3. **Daily budget** (`MAIL_DAILY_BUDGET`, default 450, shared Redis counter per IST day):
    - sign-in codes are always sent;
-   - *critical* mail (submission receipt, interview call, invitations, account e-mails) is sent up to the
+   - _critical_ mail (submission receipt, interview call, invitations, account e-mails) is sent up to the
      budget;
-   - *routine* mail (help desk updates, assignment notices) stops at 80 % and is then shown in the app only.
-   Usage is logged at 70 / 85 / 95 % and shown in the Control centre.
+   - _routine_ mail (help desk updates, assignment notices) stops at 80 % and is then shown in the app only.
+     Usage is logged at 70 / 85 / 95 % and shown in the Control centre.
 4. **In-app notifications** — the bell icon lists every notification, e-mailed or not. Staff are told
    about new tickets in the app; e-mailing them is optional (help desk settings).
 

@@ -19,7 +19,6 @@ console.log(`\nE-mail check: ${host}, account ${user || "(none)"}\n`);
 const devMail = process.env.EMAIL_PROVIDER === "mailpit";
 if (devMail) ok("Development mode: e-mails go to Mailpit, not Gmail.");
 
-
 try {
   const addrs = await dns.lookup(host, { all: true });
   ok(

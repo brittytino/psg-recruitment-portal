@@ -318,7 +318,9 @@ export async function inviteHod(actor: SessionUser | null, input: unknown) {
     throw new ConflictError("This person is already a HOD of the department");
   // One HOD per department: bulk assignment sends a department's applications to exactly one HOD.
   if ((await prisma.userRole.count({ where: { role: "HOD", departmentId: v.departmentId } })) > 0)
-    throw new ConflictError("This department already has a HOD. Remove the current HOD before adding another.");
+    throw new ConflictError(
+      "This department already has a HOD. Remove the current HOD before adding another.",
+    );
   await prisma.$transaction(async (tx) => {
     const user =
       existing ??
@@ -441,7 +443,13 @@ export async function signOutEverywhere(actor: SessionUser | null, userId: strin
 export async function changeUserEmail(actor: SessionUser | null, userId: string, emailRaw: unknown) {
   const a = requireUserAdmin(actor);
   await assertCanManage(a, userId);
-  const parsed = z.string().trim().toLowerCase().email("Enter a valid e-mail address").max(200).safeParse(emailRaw);
+  const parsed = z
+    .string()
+    .trim()
+    .toLowerCase()
+    .email("Enter a valid e-mail address")
+    .max(200)
+    .safeParse(emailRaw);
   if (!parsed.success)
     throw new ValidationError("Enter a valid e-mail address", { email: ["Enter a valid e-mail address"] });
   const email = parsed.data;
@@ -518,7 +526,8 @@ export async function renameUser(actor: SessionUser | null, userId: string, name
  * should be disabled instead.
  */
 export async function deleteUser(actor: SessionUser | null, userId: string) {
-  if (!actor || !isSuperAdmin(actor.grants)) throw new ForbiddenError("Only the Super Admin can delete accounts");
+  if (!actor || !isSuperAdmin(actor.grants))
+    throw new ForbiddenError("Only the Super Admin can delete accounts");
   if (userId === actor.id) throw new ConflictError("You cannot delete your own account");
   try {
     await prisma.$transaction(async (tx) => {

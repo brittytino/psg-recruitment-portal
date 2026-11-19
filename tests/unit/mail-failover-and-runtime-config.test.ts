@@ -1,22 +1,24 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-const { mockRedisStore, mockPrismaSystemSetting, mockTransportSendMail, mockTransportVerify } = vi.hoisted(() => {
-  const store = new Map<string, { val: string; ttl?: number }>();
-  const systemSetting = {
-    findMany: vi.fn(),
-    findUnique: vi.fn(),
-    upsert: vi.fn(),
-    deleteMany: vi.fn(),
-  };
-  const sendMail = vi.fn();
-  const verify = vi.fn();
-  return {
-    mockRedisStore: store,
-    mockPrismaSystemSetting: systemSetting,
-    mockTransportSendMail: sendMail,
-    mockTransportVerify: verify,
-  };
-});
+const { mockRedisStore, mockPrismaSystemSetting, mockTransportSendMail, mockTransportVerify } = vi.hoisted(
+  () => {
+    const store = new Map<string, { val: string; ttl?: number }>();
+    const systemSetting = {
+      findMany: vi.fn(),
+      findUnique: vi.fn(),
+      upsert: vi.fn(),
+      deleteMany: vi.fn(),
+    };
+    const sendMail = vi.fn();
+    const verify = vi.fn();
+    return {
+      mockRedisStore: store,
+      mockPrismaSystemSetting: systemSetting,
+      mockTransportSendMail: sendMail,
+      mockTransportVerify: verify,
+    };
+  },
+);
 
 vi.mock("~/modules/core/db.server", () => ({
   prisma: {
@@ -502,4 +504,3 @@ describe("Runtime Config Encryption, Validation & Mail Failover", () => {
     expect(switchedToBrevoSmtp.fallback.password).toBe("primary-db-app-password");
   });
 });
-

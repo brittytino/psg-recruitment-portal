@@ -118,14 +118,14 @@ No real account or e-mail address is stored in this repository. A new installati
 `secrets/override.env`; everyone else is added in the application (**Users & roles**). There are no
 demo candidates, vacancies or applications.
 
-| Role | Who | Can do |
-| :--- | :--- | :--- |
-| `MANAGER` — **Admin** | Recruitment and support lead | Everything HR and Dean / Principal can do, the help desk (including settings), and adding HR, HOD and Viewer accounts. No system settings, logs or audit log. |
-| `ADMIN` — **Dean / Principal** | Recruitment oversight | All applications, HOD assignment, position-change approval, summaries. |
-| `HR` — **HR – N4 Section** | Recruitment office | Job profiles, screening, departments and HOD invitations, exports, help desk, viewers. |
-| `HOD` | Head of a department | Reviews the applications assigned to them; approves the department summary sheet. |
-| `VIEWER` | Read-only | Lists and opens applications and their documents; nothing else. |
-| `CANDIDATE` | Applicants | Their own applications and help desk tickets. |
+| Role                           | Who                          | Can do                                                                                                                                                        |
+| :----------------------------- | :--------------------------- | :------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `MANAGER` — **Admin**          | Recruitment and support lead | Everything HR and Dean / Principal can do, the help desk (including settings), and adding HR, HOD and Viewer accounts. No system settings, logs or audit log. |
+| `ADMIN` — **Dean / Principal** | Recruitment oversight        | All applications, HOD assignment, position-change approval, summaries.                                                                                        |
+| `HR` — **HR – N4 Section**     | Recruitment office           | Job profiles, screening, departments and HOD invitations, exports, help desk, viewers.                                                                        |
+| `HOD`                          | Head of a department         | Reviews the applications assigned to them; approves the department summary sheet.                                                                             |
+| `VIEWER`                       | Read-only                    | Lists and opens applications and their documents; nothing else.                                                                                               |
+| `CANDIDATE`                    | Applicants                   | Their own applications and help desk tickets.                                                                                                                 |
 
 ## 6. Strict 100% Passwordless Authentication & Email Infrastructure
 
@@ -336,10 +336,10 @@ All quality gates pass cleanly:
 
 The repository has three long-lived branches. **Production servers only ever pull `main`.**
 
-| Branch | Purpose | Who merges into it |
-| :--- | :--- | :--- |
-| `dev` | Integration branch. Every feature and fix lands here first. | Maintainers, after review of a pull request |
-| `qa` | Testing / staging. What QA checks before a release. | Maintainers, by merging `dev` when it is ready to test |
+| Branch | Purpose                                                                          | Who merges into it                                        |
+| :----- | :------------------------------------------------------------------------------- | :-------------------------------------------------------- |
+| `dev`  | Integration branch. Every feature and fix lands here first.                      | Maintainers, after review of a pull request               |
+| `qa`   | Testing / staging. What QA checks before a release.                              | Maintainers, by merging `dev` when it is ready to test    |
 | `main` | Production. The college server runs `git pull origin main && sudo ./prod.sh up`. | Maintainers only, by merging `qa` after it passes testing |
 
 ```

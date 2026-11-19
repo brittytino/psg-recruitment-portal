@@ -230,45 +230,45 @@ export default function Departments({ loaderData, actionData }: Route.ComponentP
                       <div className="flex items-center justify-between gap-2">
                         <p className="label-caps">Head of Department</p>
                         {d.roles.length === 0 && (
-                        <Modal
-                          size="md"
-                          triggerClassName="btn-ghost btn-sm"
-                          trigger={
-                            <>
-                              <Plus className="h-4 w-4" aria-hidden="true" /> Add HOD
-                            </>
-                          }
-                          icon={<UserPlus className="h-5 w-5" aria-hidden="true" />}
-                          title={`Add a HOD — ${d.code}`}
-                          description={`${d.name}. They receive an e-mail invitation and sign in with a one-time code.`}
-                        >
-                          <Form method="post" className="space-y-4">
-                            <CsrfInput />
-                            <input type="hidden" name="intent" value="hod" />
-                            <input type="hidden" name="departmentId" value={d.id} />
-                            <TextInput
-                              label="Full name"
-                              name="fullName"
-                              required
-                              placeholder="Dr. R. Kumar"
-                              error={fe?.fullName?.[0]}
-                            />
-                            <TextInput
-                              label="Official e-mail"
-                              name="email"
-                              type="email"
-                              required
-                              placeholder={`hod.${d.code.toLowerCase()}@your-college.edu`}
-                              error={fe?.email?.[0]}
-                            />
-                            <ModalActions>
-                              <ModalClose className="btn-secondary">Cancel</ModalClose>
-                              <button type="submit" className="btn-primary" disabled={busy}>
-                                <Mail className="h-4 w-4" aria-hidden="true" /> Add & send invitation
-                              </button>
-                            </ModalActions>
-                          </Form>
-                        </Modal>
+                          <Modal
+                            size="md"
+                            triggerClassName="btn-ghost btn-sm"
+                            trigger={
+                              <>
+                                <Plus className="h-4 w-4" aria-hidden="true" /> Add HOD
+                              </>
+                            }
+                            icon={<UserPlus className="h-5 w-5" aria-hidden="true" />}
+                            title={`Add a HOD — ${d.code}`}
+                            description={`${d.name}. They receive an e-mail invitation and sign in with a one-time code.`}
+                          >
+                            <Form method="post" className="space-y-4">
+                              <CsrfInput />
+                              <input type="hidden" name="intent" value="hod" />
+                              <input type="hidden" name="departmentId" value={d.id} />
+                              <TextInput
+                                label="Full name"
+                                name="fullName"
+                                required
+                                placeholder="Dr. R. Kumar"
+                                error={fe?.fullName?.[0]}
+                              />
+                              <TextInput
+                                label="Official e-mail"
+                                name="email"
+                                type="email"
+                                required
+                                placeholder={`hod.${d.code.toLowerCase()}@your-college.edu`}
+                                error={fe?.email?.[0]}
+                              />
+                              <ModalActions>
+                                <ModalClose className="btn-secondary">Cancel</ModalClose>
+                                <button type="submit" className="btn-primary" disabled={busy}>
+                                  <Mail className="h-4 w-4" aria-hidden="true" /> Add & send invitation
+                                </button>
+                              </ModalActions>
+                            </Form>
+                          </Modal>
                         )}
                       </div>
                       {d.roles.length === 0 ? (

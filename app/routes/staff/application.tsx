@@ -437,8 +437,8 @@ export default function StaffApplication({ loaderData, actionData }: Route.Compo
                       {o.rating != null ? ` · ${o.rating} / 5` : ""}
                     </p>
                     <p className="text-muted">
-                      {ADVISORY_LABELS[o.recommendation as keyof typeof ADVISORY_LABELS] ?? o.recommendation} ·{" "}
-                      {formatDateTime(o.recordedAt)}
+                      {ADVISORY_LABELS[o.recommendation as keyof typeof ADVISORY_LABELS] ?? o.recommendation}{" "}
+                      · {formatDateTime(o.recordedAt)}
                     </p>
                     <p className="mt-1 whitespace-pre-line">{o.comments}</p>
                   </li>

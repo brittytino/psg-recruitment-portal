@@ -55,15 +55,15 @@ All of them must pass. Add or update tests for the behaviour you change.
 
 ## Project layout
 
-| Path | What |
-| --- | --- |
-| `app/routes/` | Pages and resource routes (React Router) |
-| `app/modules/` | Business logic, one folder per domain (applications, auth, documents, helpdesk …) |
-| `app/components/` | Shared UI; `components/ui/` holds the shadcn-style primitives |
-| `prisma/` | Schema, migrations and the seed |
-| `worker/` | Background jobs (PDF generation, virus scans, e-mail) |
-| `scripts/`, `infrastructure/` | Launchers, Nginx and deployment |
-| `docs/` | Architecture, deployment and runbooks |
+| Path                          | What                                                                              |
+| ----------------------------- | --------------------------------------------------------------------------------- |
+| `app/routes/`                 | Pages and resource routes (React Router)                                          |
+| `app/modules/`                | Business logic, one folder per domain (applications, auth, documents, helpdesk …) |
+| `app/components/`             | Shared UI; `components/ui/` holds the shadcn-style primitives                     |
+| `prisma/`                     | Schema, migrations and the seed                                                   |
+| `worker/`                     | Background jobs (PDF generation, virus scans, e-mail)                             |
+| `scripts/`, `infrastructure/` | Launchers, Nginx and deployment                                                   |
+| `docs/`                       | Architecture, deployment and runbooks                                             |
 
 ## Reporting security problems
 

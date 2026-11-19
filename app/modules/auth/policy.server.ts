@@ -36,7 +36,14 @@ export function staffApplicationScope(user: SessionUser): Prisma.ApplicationWher
     return { status: { not: "DRAFT" } };
   const depts = hodDepartments(user.grants);
   const hod: Prisma.ApplicationWhereInput[] = depts.length
-    ? [{ AND: [{ status: { not: "DRAFT" } }, { OR: [{ assignedHodId: user.id, vacancy: { departmentId: { in: depts } } }] }] }]
+    ? [
+        {
+          AND: [
+            { status: { not: "DRAFT" } },
+            { OR: [{ assignedHodId: user.id, vacancy: { departmentId: { in: depts } } }] },
+          ],
+        },
+      ]
     : [];
   const advisor = isAdvisor(user.grants) ? [advisoryApplicationScope()] : [];
   if (!hod.length && !advisor.length) return null;
