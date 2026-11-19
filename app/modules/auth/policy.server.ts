@@ -4,6 +4,7 @@ import {
   hasPermission,
   hodDepartments,
   isAdmin,
+  isAdvisor,
   isHrOfficer,
   isViewer,
   type Permission,
@@ -34,13 +35,27 @@ export function staffApplicationScope(user: SessionUser): Prisma.ApplicationWher
   if (isAdmin(user.grants) || isHrOfficer(user.grants) || isViewer(user.grants))
     return { status: { not: "DRAFT" } };
   const depts = hodDepartments(user.grants);
-  if (!depts.length) return null;
-  return {
-    AND: [
-      { status: { not: "DRAFT" } },
-      { OR: [{ assignedHodId: user.id, vacancy: { departmentId: { in: depts } } }] },
-    ],
-  };
+  const hod: Prisma.ApplicationWhereInput[] = depts.length
+    ? [{ AND: [{ status: { not: "DRAFT" } }, { OR: [{ assignedHodId: user.id, vacancy: { departmentId: { in: depts } } }] }] }]
+    : [];
+  const advisor = isAdvisor(user.grants) ? [advisoryApplicationScope()] : [];
+  if (!hod.length && !advisor.length) return null;
+  return hod.length && advisor.length ? { OR: [...hod, ...advisor] } : (hod[0] ?? advisor[0])!;
+}
+
+/** Statuses at which the HOD review is complete; the external advisor reviews applications from here on. */
+export const ADVISORY_STATUSES = [
+  "HOD_ACCEPTED",
+  "HOD_RECOMMENDED_CHANGE",
+  "HOD_REJECTED",
+  "SHORTLISTED",
+  "REJECTED",
+  "APPROVED",
+] as const;
+
+/** External advisor scope: every applicant whose HOD review is complete (all departments). */
+export function advisoryApplicationScope(): Prisma.ApplicationWhereInput {
+  return { status: { in: [...ADVISORY_STATUSES] } };
 }
 
 /** True for Super Admin, Admin and HR (institution-wide recruitment office access). */

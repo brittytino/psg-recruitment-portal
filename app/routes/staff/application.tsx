@@ -7,6 +7,7 @@ import { Alert, Badge, ConfirmDialog, CsrfInput, formatDateTime, statusTone } fr
 import { clientIp, handleAction, readForm, requireStaff } from "~/lib/http.server";
 import { FORM_LABELS, POSITION_LABELS } from "~/lib/labels";
 import { getStaffApplication, transition, updateInternalNote } from "~/modules/applications/service.server";
+import { ADVISORY_LABELS, advisoryOpinionsFor } from "~/modules/reviews/advisory.server";
 import { INTERVIEW_FROM, inviteForInterview } from "~/modules/applications/interview.server";
 import { CalendarCheck, Download, Eye, Gavel } from "lucide-react";
 import { StarRatingInput, StarRatingView } from "~/components/star-rating";
@@ -154,6 +155,8 @@ export async function loader({ request, params, context }: Route.LoaderArgs) {
       (app.status !== "UNDER_HR_REVIEW" || app.recruitmentCategory === "RESEARCH") &&
       !app.positionChanges.some((c) => c.status === "PENDING"),
     hods: isOffice && app.vacancy.departmentId ? await hodsForDepartment(app.vacancy.departmentId) : [],
+    // Flow: HOD review, then the external advisor, then Dean / Principal. Read only, for the office.
+    advisory: isOffice ? await advisoryOpinionsFor(app.id) : [],
     changeOptions: allowedChanges(applied),
   };
 }
@@ -213,6 +216,7 @@ export async function action({ request, params, context }: Route.ActionArgs) {
 export default function StaffApplication({ loaderData, actionData }: Route.ComponentProps) {
   const {
     app,
+    advisory,
     isOffice,
     isAssignedHod,
     canDownload,
@@ -420,6 +424,28 @@ export default function StaffApplication({ loaderData, actionData }: Route.Compo
         </div>
 
         <aside className="space-y-6">
+          {advisory.length > 0 && (
+            <section className="card space-y-3" aria-labelledby="advisory-out">
+              <h2 id="advisory-out" className="text-lg">
+                Advisory opinion
+              </h2>
+              <ul className="space-y-3">
+                {advisory.map((o, i) => (
+                  <li key={i} className="rounded-lg border border-line bg-soft p-3 text-sm">
+                    <p className="font-semibold">
+                      {o.advisor}
+                      {o.rating != null ? ` · ${o.rating} / 5` : ""}
+                    </p>
+                    <p className="text-muted">
+                      {ADVISORY_LABELS[o.recommendation as keyof typeof ADVISORY_LABELS] ?? o.recommendation} ·{" "}
+                      {formatDateTime(o.recordedAt)}
+                    </p>
+                    <p className="mt-1 whitespace-pre-line">{o.comments}</p>
+                  </li>
+                ))}
+              </ul>
+            </section>
+          )}
           {(canFinal || app.final) && (
             <section className="card space-y-4 border-brand-600/30" aria-labelledby="final">
               <div className="flex items-start gap-3">

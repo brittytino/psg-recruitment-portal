@@ -31,6 +31,8 @@ import {
   resendInvite,
   revokeRole,
   setUserStatus,
+  changeUserEmail,
+  deleteUser,
   signOutEverywhere,
 } from "~/modules/users/service.server";
 
@@ -68,7 +70,9 @@ export async function loader({ request, context }: Route.LoaderArgs) {
     selfId: user.id,
     role: role ?? null,
     visibleRoles: [...visibleRoles],
-    grantable: [...grantableRoles(user.grants)],
+    // HODs are added per department on Departments & HODs (one per department), never here.
+    grantable: [...grantableRoles(user.grants)].filter((r) => r !== "HOD"),
+    isSuper: isSuperAdmin(user.grants),
     counts: Object.fromEntries(counts.map((c) => [c.role, c._count._all])),
   };
 }
@@ -105,6 +109,12 @@ export async function action({ request, context }: Route.ActionArgs) {
       case "rename":
         await renameUser(user, String(form.get("userId")), form.get("fullName"));
         return { message: "Name updated." };
+      case "delete":
+        await deleteUser(user, String(form.get("userId")));
+        return { message: "Account deleted." };
+      case "email":
+        await changeUserEmail(user, String(form.get("userId")), form.get("email"));
+        return { message: "E-mail address changed. The account's sessions were ended." };
       case "invite":
         await resendInvite(user, String(form.get("userId")));
         return { message: "Sign-in instructions e-mailed again." };
@@ -115,9 +125,9 @@ export async function action({ request, context }: Route.ActionArgs) {
 }
 
 export default function Users({ loaderData, actionData }: Route.ComponentProps) {
-  const { users, departments, selfId, role, counts, visibleRoles, grantable } = loaderData;
+  const { users, departments, selfId, role, counts, visibleRoles, grantable, isSuper } = loaderData;
   const [params] = useSearchParams();
-  const [newRole, setNewRole] = useState<StaffRole>("HOD");
+  const [newRole, setNewRole] = useState<StaffRole>("HR");
   const a = actionData as
     { message?: string; formError?: string; fieldErrors?: Record<string, string[]> } | undefined;
   const fe = a?.fieldErrors;
@@ -301,6 +311,25 @@ export default function Users({ loaderData, actionData }: Route.ComponentProps) 
                         </button>
                       </Form>
                     )}
+                    {isSuper && u.id !== selfId && (
+                      <Form method="post">
+                        <CsrfInput />
+                        <input type="hidden" name="intent" value="delete" />
+                        <input type="hidden" name="userId" value={u.id} />
+                        <ConfirmDialog
+                          trigger="Delete account"
+                          triggerClassName="btn-secondary px-3 py-1.5 text-sm text-danger"
+                          tone="danger"
+                          title={`Permanently delete ${u.profile?.fullName ?? u.email}?`}
+                          confirmLabel="Delete account"
+                        >
+                          <p>
+                            The account and its sign-in are removed for good. Accounts with applications,
+                            reviews or audit history cannot be deleted; disable those instead.
+                          </p>
+                        </ConfirmDialog>
+                      </Form>
+                    )}
                     {u.id !== selfId && (
                       <Form method="post">
                         <CsrfInput />
@@ -349,6 +378,34 @@ export default function Users({ loaderData, actionData }: Route.ComponentProps) 
                       Save name
                     </button>
                   </Form>
+                </details>
+                <details>
+                  <summary className="cursor-pointer text-sm font-semibold text-brand-700">
+                    Change e-mail address
+                  </summary>
+                  <Form method="post" className="mt-3 flex flex-col gap-2 sm:flex-row sm:items-end">
+                    <CsrfInput />
+                    <input type="hidden" name="intent" value="email" />
+                    <input type="hidden" name="userId" value={u.id} />
+                    <label htmlFor={`email-${u.id}`} className="sr-only">
+                      New e-mail address
+                    </label>
+                    <input
+                      id={`email-${u.id}`}
+                      name="email"
+                      type="email"
+                      required
+                      maxLength={200}
+                      placeholder="New e-mail address"
+                      className="field-input sm:max-w-sm"
+                    />
+                    <button type="submit" className="btn-secondary btn-sm">
+                      Save e-mail
+                    </button>
+                  </Form>
+                  <p className="mt-2 text-sm text-muted">
+                    Current: {u.email}. The account is signed out, and sign-in codes go to the new address.
+                  </p>
                 </details>
                 {!isCandidate && (
                   <ul className="flex flex-wrap gap-2" aria-label="Roles">

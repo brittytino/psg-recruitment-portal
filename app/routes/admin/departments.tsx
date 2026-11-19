@@ -229,6 +229,7 @@ export default function Departments({ loaderData, actionData }: Route.ComponentP
                     <div>
                       <div className="flex items-center justify-between gap-2">
                         <p className="label-caps">Head of Department</p>
+                        {d.roles.length === 0 && (
                         <Modal
                           size="md"
                           triggerClassName="btn-ghost btn-sm"
@@ -268,6 +269,7 @@ export default function Departments({ loaderData, actionData }: Route.ComponentP
                             </ModalActions>
                           </Form>
                         </Modal>
+                        )}
                       </div>
                       {d.roles.length === 0 ? (
                         <p className="mt-1 text-sm text-muted">Not added yet.</p>

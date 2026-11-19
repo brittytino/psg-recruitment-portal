@@ -24,6 +24,7 @@ import {
   ClipboardCheck,
   ExternalLink,
   Eye,
+  UserPlus,
   FileSpreadsheet,
   FileText,
   LayoutDashboard,
@@ -71,6 +72,8 @@ function staffNav(grants: RoleGrant[]): { title: string; items: NavItem[] }[] {
   if (office || isViewer(grants))
     work.push({ to: "/staff", label: "Applications", icon: LayoutDashboard, end: true });
   if (isHodReviewer(grants)) work.push({ to: "/staff/review", label: "My reviews", icon: ClipboardCheck });
+  if (hasPermission(grants, "advisory:review"))
+    work.push({ to: "/advisory", label: "Advisory reviews", icon: ClipboardCheck });
   // Viewers only read applications: no summary sheets or exports.
   if (office || isHodReviewer(grants))
     work.push({
@@ -86,6 +89,8 @@ function staffNav(grants: RoleGrant[]): { title: string; items: NavItem[] }[] {
     setup.push({ to: "/admin/departments", label: "Departments & HODs", icon: Building2 });
   if (hasPermission(grants, "viewer:manage"))
     setup.push({ to: "/admin/viewers", label: "Viewers (read only)", icon: Eye });
+  if (hasPermission(grants, "advisor:manage"))
+    setup.push({ to: "/admin/advisors", label: "External advisors", icon: UserPlus });
   if (hasPermission(grants, "notice:manage"))
     setup.push({ to: "/admin/notices", label: "Open positions PDFs", icon: FileText });
 

@@ -29,6 +29,8 @@ enum Role {
   VIEWER
   /// "Admin": recruitment and support management below the Super Admin.
   MANAGER
+  /// External advisor: reads applications after the HOD review and records an advisory opinion. Nothing else.
+  ADVISOR
 }
 
 enum UserStatus {
@@ -156,6 +158,8 @@ enum GeneratedKind {
 enum ReviewStage {
   HR
   DEPARTMENT
+  /// External advisor opinion, recorded after the HOD review. Does not change the application status.
+  ADVISORY
 }
 
 enum Recommendation {

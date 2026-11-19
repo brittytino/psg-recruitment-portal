@@ -97,13 +97,10 @@ export async function createStaffUser(actor: SessionUser | null, input: unknown)
   if (!p.success)
     throw new ValidationError("Please correct the highlighted fields", z.flattenError(p.error).fieldErrors);
   const v = p.data;
+  if (v.role === "HOD") throw new ConflictError("Add HODs from Departments & HODs, one per department");
   assertCanGrant(a, v.role);
   if (await prisma.user.findUnique({ where: { email: v.email } }))
     throw new ConflictError("An account with this e-mail address already exists");
-  if (v.role === "HOD") {
-    const n = await prisma.department.count({ where: { id: { in: v.departmentIds }, active: true } });
-    if (n !== v.departmentIds.length) throw new ValidationError("Choose active departments only");
-  }
   const token = randomBytes(32).toString("base64url");
   const passwordHash = await hashPassword(randomBytes(32).toString("base64url"));
   await prisma.$transaction(async (tx) => {
@@ -164,16 +161,16 @@ export async function grantRole(actor: SessionUser | null, input: unknown) {
   const p = grantSchema.safeParse(input);
   if (!p.success) throw new ValidationError("Invalid role assignment");
   const g = p.data;
+  if (g.role === "HOD") throw new ConflictError("Add HODs from Departments & HODs, one per department");
   assertCanGrant(a, g.role);
   await assertCanManage(a, g.userId);
-  if (g.role === "HOD" && !g.departmentId) throw new ValidationError("Choose the HOD's department");
   const target = await prisma.user.findUnique({ where: { id: g.userId }, include: { roles: true } });
   if (!target) throw new NotFoundError("User");
   if (target.roles.some((r) => r.role === "CANDIDATE"))
     throw new ConflictError(
       "Candidate accounts cannot be given staff roles; create a separate staff account",
     );
-  const departmentId = g.role === "HOD" ? g.departmentId! : null;
+  const departmentId = null;
   if (target.roles.some((r) => r.role === g.role && r.departmentId === departmentId))
     throw new ConflictError("This role is already assigned");
   await prisma.$transaction(async (tx) => {
@@ -319,6 +316,9 @@ export async function inviteHod(actor: SessionUser | null, input: unknown) {
     );
   if (existing?.roles.some((r) => r.role === "HOD" && r.departmentId === v.departmentId))
     throw new ConflictError("This person is already a HOD of the department");
+  // One HOD per department: bulk assignment sends a department's applications to exactly one HOD.
+  if ((await prisma.userRole.count({ where: { role: "HOD", departmentId: v.departmentId } })) > 0)
+    throw new ConflictError("This department already has a HOD. Remove the current HOD before adding another.");
   await prisma.$transaction(async (tx) => {
     const user =
       existing ??
@@ -434,6 +434,66 @@ export async function signOutEverywhere(actor: SessionUser | null, userId: strin
   });
 }
 
+/**
+ * Changes the sign-in e-mail address of an account. The new address must be unused; every session
+ * of the account is ended so the next sign-in uses a one-time code sent to the new address.
+ */
+export async function changeUserEmail(actor: SessionUser | null, userId: string, emailRaw: unknown) {
+  const a = requireUserAdmin(actor);
+  await assertCanManage(a, userId);
+  const parsed = z.string().trim().toLowerCase().email("Enter a valid e-mail address").max(200).safeParse(emailRaw);
+  if (!parsed.success)
+    throw new ValidationError("Enter a valid e-mail address", { email: ["Enter a valid e-mail address"] });
+  const email = parsed.data;
+  await prisma.$transaction(async (tx) => {
+    const target = await tx.user.findUnique({
+      where: { id: userId },
+      select: {
+        id: true,
+        email: true,
+        profile: { select: { fullName: true } },
+        roles: { where: { role: "HOD" }, select: { department: { select: { name: true } } } },
+      },
+    });
+    if (!target) throw new NotFoundError("User");
+    if (target.email === email) throw new ConflictError("That is already this account's e-mail address");
+    if (await tx.user.findUnique({ where: { email }, select: { id: true } }))
+      throw new ConflictError("An account with this e-mail address already exists");
+    await tx.user.update({ where: { id: userId }, data: { email } });
+    await tx.session.deleteMany({ where: { userId } });
+    const hodDept = target.roles[0]?.department;
+    if (hodDept) {
+      // A HOD gets the full invitation again at the new address, so the department can sign in and receive bulk assignments.
+      await notify(
+        tx,
+        userId,
+        "account.hod_invite",
+        `HOD access – ${hodDept.name} | PSG Tech Recruitment`,
+        hodInviteBody(target.profile?.fullName ?? email, hodDept.name, email),
+        { dedupeKey: `hod-email:${email}` },
+      );
+    } else {
+      await notify(
+        tx,
+        userId,
+        "account.email_changed",
+        "Your sign-in e-mail address has been changed | PSG Tech Recruitment",
+        `The sign-in e-mail address for your PSG College of Technology recruitment office account has been changed to ${email}.\n\nAll active sessions were ended. Sign in at ${env().APP_ORIGIN}/login; the one-time code will be sent to this address.\n\nIf you did not expect this change, contact the recruitment office.`,
+      );
+    }
+    await audit(
+      {
+        actorId: a.id,
+        action: "user.email_changed",
+        entityType: "user",
+        entityId: userId,
+        metadata: { previousEmail: target.email, newEmail: email },
+      },
+      tx,
+    );
+  });
+}
+
 /** Corrects the display name of any account. Submitted applications keep their own snapshot. */
 export async function renameUser(actor: SessionUser | null, userId: string, nameRaw: unknown) {
   const a = requireUserAdmin(actor);
@@ -450,4 +510,42 @@ export async function renameUser(actor: SessionUser | null, userId: string, name
     });
     await audit({ actorId: a.id, action: "user.renamed", entityType: "user", entityId: userId }, tx);
   });
+}
+
+/**
+ * Permanently deletes an account of any role. Super Admin only. Refused when the account is still
+ * referenced by records that must be kept (applications, reviews, audit history); such accounts
+ * should be disabled instead.
+ */
+export async function deleteUser(actor: SessionUser | null, userId: string) {
+  if (!actor || !isSuperAdmin(actor.grants)) throw new ForbiddenError("Only the Super Admin can delete accounts");
+  if (userId === actor.id) throw new ConflictError("You cannot delete your own account");
+  try {
+    await prisma.$transaction(async (tx) => {
+      const target = await tx.user.findUnique({
+        where: { id: userId },
+        select: { id: true, email: true, roles: { select: { role: true } } },
+      });
+      if (!target) throw new NotFoundError("User");
+      if (target.roles.some((r) => r.role === "SUPER_ADMIN") && (await activeAdminCount(tx, userId)) === 0)
+        throw new ConflictError("At least one active Super Admin must remain");
+      await audit(
+        {
+          actorId: actor.id,
+          action: "user.deleted",
+          entityType: "user",
+          entityId: userId,
+          metadata: { email: target.email, roles: target.roles.map((r) => r.role) },
+        },
+        tx,
+      );
+      await tx.user.delete({ where: { id: userId } });
+    });
+  } catch (err) {
+    if ((err as { code?: string }).code === "P2003")
+      throw new ConflictError(
+        "This account has applications, reviews or audit history and cannot be deleted. Disable it instead.",
+      );
+    throw err;
+  }
 }
