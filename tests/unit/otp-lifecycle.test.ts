@@ -14,6 +14,15 @@ describe("OTP Lifecycle & Security Unit Tests", () => {
   beforeEach(() => {
     resetEnvCacheForTesting();
     process.env = { ...originalEnv };
+    // Set the required configuration explicitly: CI has no .env file, so env() would otherwise throw.
+    process.env.APP_ORIGIN = "https://recruitments.psgtech.ac.in";
+    process.env.DATABASE_URL = "postgresql://srp_app:pass@db:5432/srportal";
+    process.env.REDIS_URL = "redis://redis:6379";
+    process.env.STORAGE_DIR = "/var/lib/srportal/storage";
+    process.env.CONVERTER_URL = "http://converter:3100";
+    process.env.EMAIL_PROVIDER = "test";
+    process.env.SMTP_HOST = "smtp.psgtech.ac.in";
+    process.env.SMTP_PORT = "587";
     process.env.SESSION_SECRET = "test-secret-at-least-32-characters-long-123456";
     process.env.OTP_LENGTH = "6";
     process.env.OTP_EXPIRY_MINUTES = "5";
