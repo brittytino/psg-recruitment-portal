@@ -1,3 +1,4 @@
+import type { Position, Prisma } from "@prisma/client";
 import { z } from "zod";
 import { audit } from "~/modules/audit/audit.server";
 import { advisoryApplicationScope, requirePermission } from "~/modules/auth/policy.server";
@@ -27,12 +28,101 @@ const advisorySchema = z.object({
     .max(3000, "Keep the comments under 3000 characters"),
 });
 
-/** Applications in the advisor's scope, with the advisor's own opinion if already recorded. */
-export async function advisoryApplicationList(user: SessionUser) {
-  requirePermission(user, "advisory:review");
+export type AdvisoryTab = "awaiting" | "reviewed" | "all";
+const TABS: readonly AdvisoryTab[] = ["awaiting", "reviewed", "all"];
+
+export interface AdvisoryListFilters {
+  tab?: AdvisoryTab;
+  departmentId?: string;
+  position?: string;
+  search?: string;
+}
+
+/** Reads the list/detail filter query params the same way everywhere (list page, detail page, export). */
+export function parseAdvisoryFilters(params: URLSearchParams): Required<AdvisoryListFilters> {
+  const rawTab = params.get("tab")?.trim() ?? "";
+  return {
+    tab: (TABS as readonly string[]).includes(rawTab) ? (rawTab as AdvisoryTab) : "awaiting",
+    departmentId: params.get("department")?.trim() ?? "",
+    position: params.get("position")?.trim() ?? "",
+    search: params.get("q")?.trim() ?? "",
+  };
+}
+
+const notYetReviewed = (reviewerId: string): Prisma.ApplicationWhereInput => ({
+  reviews: { none: { stage: "ADVISORY", reviewerId } },
+});
+const alreadyReviewed = (reviewerId: string): Prisma.ApplicationWhereInput => ({
+  reviews: { some: { stage: "ADVISORY", reviewerId } },
+});
+
+/** The filtered `where` clause shared by the list, the queue (prev/next) and the counts. */
+function advisoryWhere(reviewerId: string, filters: AdvisoryListFilters): Prisma.ApplicationWhereInput {
+  const andClauses: Prisma.ApplicationWhereInput[] = [advisoryApplicationScope()];
+  const tab = filters.tab ?? "awaiting";
+  if (tab === "awaiting") andClauses.push(notYetReviewed(reviewerId));
+  else if (tab === "reviewed") andClauses.push(alreadyReviewed(reviewerId));
+
+  if (filters.departmentId) andClauses.push({ departmentId: filters.departmentId });
+
+  if (
+    filters.position &&
+    (filters.position === "ASSISTANT_PROFESSOR" ||
+      filters.position === "ASSOCIATE_PROFESSOR" ||
+      filters.position === "PROFESSOR")
+  ) {
+    const positionEnum = filters.position as Position;
+    andClauses.push({
+      OR: [{ appliedPosition: positionEnum }, { appliedPosition: null, vacancy: { position: positionEnum } }],
+    });
+  }
+
+  if (filters.search) {
+    const search = filters.search;
+    andClauses.push({
+      OR: [
+        { referenceNo: { contains: search, mode: "insensitive" } },
+        { currentRevision: { candidateName: { contains: search, mode: "insensitive" } } },
+        {
+          currentRevision: {
+            qualifications: { some: { degree: { contains: search, mode: "insensitive" } } },
+          },
+        },
+      ],
+    });
+  }
+
+  return { AND: andClauses };
+}
+
+/** Oldest-first while clearing the queue (nothing goes stale); newest-first once it's a record. */
+function advisoryOrderBy(tab: AdvisoryTab | undefined): Prisma.ApplicationOrderByWithRelationInput[] {
+  return tab === "awaiting" ? [{ submittedAt: "asc" }] : [{ submittedAt: "desc" }];
+}
+
+/**
+ * Applications in the advisor's scope (every HOD-reviewed applicant, every department), filtered
+ * and searched like the HOD's own review list, with summary counts and the department list for the
+ * filter form.
+ */
+export async function advisoryApplicationList(user: SessionUser, filters: AdvisoryListFilters = {}) {
+  const u = requirePermission(user, "advisory:review");
+  const baseScope = advisoryApplicationScope();
+
+  const [total, awaiting, reviewed, departmentRecords] = await Promise.all([
+    prisma.application.count({ where: baseScope }),
+    prisma.application.count({ where: { AND: [baseScope, notYetReviewed(u.id)] } }),
+    prisma.application.count({ where: { AND: [baseScope, alreadyReviewed(u.id)] } }),
+    prisma.department.findMany({
+      where: { applications: { some: baseScope } },
+      select: { id: true, name: true, code: true },
+      orderBy: { name: "asc" },
+    }),
+  ]);
+
   const apps = await prisma.application.findMany({
-    where: advisoryApplicationScope(),
-    orderBy: [{ submittedAt: "desc" }],
+    where: advisoryWhere(u.id, filters),
+    orderBy: advisoryOrderBy(filters.tab),
     take: 500,
     select: {
       id: true,
@@ -40,34 +130,89 @@ export async function advisoryApplicationList(user: SessionUser) {
       status: true,
       appliedPosition: true,
       submittedAt: true,
+      hodDecision: true,
+      hodRating: true,
       vacancy: {
         select: {
-          title: true,
           position: true,
           researchPositionTitle: true,
-          department: { select: { name: true, code: true } },
+          department: { select: { id: true, name: true } },
           researchSpecialisation: { select: { name: true } },
         },
       },
+      currentRevision: {
+        select: {
+          candidateName: true,
+          phdStatus: true,
+          totalExperienceMonths: true,
+          journalCount: true,
+          hIndex: true,
+          qualifications: {
+            where: { category: "COLLEGE" },
+            orderBy: { sortOrder: "desc" },
+            take: 1,
+            select: { degree: true },
+          },
+        },
+      },
       reviews: {
-        where: { stage: "ADVISORY", reviewerId: user.id },
-        select: { recommendation: true, createdAt: true },
+        where: { stage: "ADVISORY", reviewerId: u.id },
+        select: { recommendation: true, score: true, createdAt: true },
         take: 1,
       },
     },
   });
-  return apps.map((a) => ({
-    id: a.id,
-    referenceNo: a.referenceNo,
-    status: a.status,
-    submittedAt: a.submittedAt,
-    appliedPosition: a.appliedPosition ?? a.vacancy.position ?? null,
-    vacancyTitle: a.vacancy.title,
-    department: a.vacancy.department?.name ?? a.vacancy.researchSpecialisation?.name ?? "Research",
-    myOpinion: a.reviews[0]
-      ? { recommendation: a.reviews[0].recommendation, recordedAt: a.reviews[0].createdAt }
-      : null,
-  }));
+
+  return {
+    apps: apps.map((a) => {
+      const r = a.currentRevision;
+      return {
+        id: a.id,
+        referenceNo: a.referenceNo,
+        status: a.status,
+        submittedAt: a.submittedAt,
+        appliedPosition: a.appliedPosition ?? a.vacancy.position ?? null,
+        departmentId: a.vacancy.department?.id ?? null,
+        department: a.vacancy.department?.name ?? a.vacancy.researchSpecialisation?.name ?? "Research",
+        hodDecision: a.hodDecision,
+        hodRating: a.hodRating,
+        candidateName: r?.candidateName ?? null,
+        phdStatus: r?.phdStatus ?? null,
+        degree: r?.qualifications[0]?.degree ?? null,
+        experienceMonths: r?.totalExperienceMonths ?? null,
+        journalCount: r?.journalCount ?? null,
+        hIndex: r?.hIndex ?? null,
+        myOpinion: a.reviews[0]
+          ? {
+              recommendation: a.reviews[0].recommendation,
+              rating: a.reviews[0].score,
+              recordedAt: a.reviews[0].createdAt,
+            }
+          : null,
+      };
+    }),
+    departments: departmentRecords,
+    counts: { total, awaiting, reviewed },
+  };
+}
+
+/**
+ * The same filtered, ordered id list as the list page, for "N of M in this queue" and the
+ * previous / next buttons on the detail page. Kept in exact sync with advisoryApplicationList's
+ * where clause and ordering.
+ */
+export async function advisoryQueueIds(
+  user: SessionUser,
+  filters: AdvisoryListFilters = {},
+): Promise<string[]> {
+  const u = requirePermission(user, "advisory:review");
+  const rows = await prisma.application.findMany({
+    where: advisoryWhere(u.id, filters),
+    orderBy: advisoryOrderBy(filters.tab),
+    take: 500,
+    select: { id: true },
+  });
+  return rows.map((r) => r.id);
 }
 
 /** One application for the advisor: its HOD decision and the advisor's own opinion. */
@@ -198,6 +343,54 @@ export async function advisoryOpinionsFor(applicationId: string) {
   });
   return rows.map((r) => ({
     advisor: r.reviewer.profile?.fullName ?? r.reviewer.email,
+    recommendation: r.recommendation,
+    rating: r.score,
+    comments: r.comments,
+    recordedAt: r.createdAt,
+  }));
+}
+
+/** Every opinion this advisor has recorded, for her own CSV export (a report she can submit). */
+export async function advisoryMyReviews(user: SessionUser) {
+  const u = requirePermission(user, "advisory:review");
+  const rows = await prisma.review.findMany({
+    where: { stage: "ADVISORY", reviewerId: u.id },
+    orderBy: { createdAt: "desc" },
+    select: {
+      recommendation: true,
+      score: true,
+      comments: true,
+      createdAt: true,
+      application: {
+        select: {
+          referenceNo: true,
+          appliedPosition: true,
+          status: true,
+          hodDecision: true,
+          hodRating: true,
+          vacancy: {
+            select: {
+              position: true,
+              department: { select: { name: true } },
+              researchSpecialisation: { select: { name: true } },
+            },
+          },
+          currentRevision: { select: { candidateName: true } },
+        },
+      },
+    },
+  });
+  return rows.map((r) => ({
+    referenceNo: r.application.referenceNo,
+    candidateName: r.application.currentRevision?.candidateName ?? "",
+    department:
+      r.application.vacancy.department?.name ??
+      r.application.vacancy.researchSpecialisation?.name ??
+      "Research",
+    appliedPosition: r.application.appliedPosition ?? r.application.vacancy.position ?? null,
+    status: r.application.status,
+    hodDecision: r.application.hodDecision,
+    hodRating: r.application.hodRating,
     recommendation: r.recommendation,
     rating: r.score,
     comments: r.comments,

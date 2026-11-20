@@ -34,6 +34,7 @@ import {
   UserRound,
   Settings,
   LifeBuoy,
+  Scale,
   ScrollText,
   ShieldCheck,
   Users,
@@ -73,7 +74,7 @@ function staffNav(grants: RoleGrant[]): { title: string; items: NavItem[] }[] {
     work.push({ to: "/staff", label: "Applications", icon: LayoutDashboard, end: true });
   if (isHodReviewer(grants)) work.push({ to: "/staff/review", label: "My reviews", icon: ClipboardCheck });
   if (hasPermission(grants, "advisory:review"))
-    work.push({ to: "/advisory", label: "Advisory reviews", icon: ClipboardCheck });
+    work.push({ to: "/staff/advisory", label: "Advisory review", icon: Scale });
   // Viewers only read applications: no summary sheets or exports.
   if (office || isHodReviewer(grants))
     work.push({

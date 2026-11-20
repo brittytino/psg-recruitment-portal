@@ -277,6 +277,6 @@ export function homePath(grants: readonly RoleGrant[]): string {
   if (isSuperAdmin(grants) || isAdmin(grants) || isHrOfficer(grants)) return "/staff";
   if (isHodReviewer(grants)) return "/staff/review";
   if (isViewer(grants)) return "/staff";
-  if (isAdvisor(grants)) return "/advisory";
+  if (isAdvisor(grants)) return "/staff/advisory";
   return "/account";
 }

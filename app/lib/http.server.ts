@@ -1,7 +1,7 @@
 import { data, redirect, type RouterContextProvider } from "react-router";
 import { userContext } from "~/context";
 import { requireAuth, requirePermission } from "~/modules/auth/policy.server";
-import type { Permission } from "~/modules/auth/permissions";
+import { hasPermission, type Permission } from "~/modules/auth/permissions";
 import type { SessionUser } from "~/modules/auth/session.server";
 import { verifyCsrf } from "~/modules/auth/session.server";
 import { clientIp } from "~/modules/auth/rate-limit.server";
@@ -29,6 +29,13 @@ export function requireStaff(context: Ctx, request: Request, p: Permission): Ses
   } catch {
     throw data("You do not have access to this page.", { status: 403 });
   }
+}
+
+/** Like requireStaff, but for a feature several roles reach through different permissions. */
+export function requireStaffAny(context: Ctx, request: Request, perms: readonly Permission[]): SessionUser {
+  const u = requireUser(context, request);
+  if (perms.some((p) => hasPermission(u.grants, p))) return u;
+  throw data("You do not have access to this page.", { status: 403 });
 }
 
 /** Only allow relative, same-site redirect targets (prevents open redirects). */

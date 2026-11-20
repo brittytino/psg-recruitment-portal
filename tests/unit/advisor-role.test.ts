@@ -36,7 +36,7 @@ describe("External advisor role", () => {
 
   it("lands on the advisory page and is a staff role", () => {
     expect(isAdvisor(advisor)).toBe(true);
-    expect(homePath(advisor)).toBe("/advisory");
+    expect(homePath(advisor)).toBe("/staff/advisory");
     expect(STAFF_ROLES).toContain("ADVISOR");
   });
 

@@ -79,6 +79,7 @@ const LABELS: Record<string, string> = {
   "user.advisor_added": "External advisor added",
   "user.advisor_removed": "External advisor removed",
   "application.advisory_review_recorded": "Advisory review recorded",
+  "application.advisory_export": "Advisory opinions exported",
   "user.role_granted": "Role granted",
   "user.role_revoked": "Role removed",
   "user.status_changed": "Account enabled / disabled",
