@@ -271,7 +271,11 @@ export default function Users({ loaderData, actionData }: Route.ComponentProps) 
         <ul className="space-y-3">
           {users.map((u) => {
             const staffRoles = u.roles.filter((r) => r.role !== "CANDIDATE");
-            const isCandidate = staffRoles.length === 0;
+            // A candidate account actually holds the CANDIDATE role; an account whose last staff
+            // role was removed holds no role at all and still needs role management, not the
+            // "Candidate" label and hidden controls.
+            const isCandidate = u.roles.some((r) => r.role === "CANDIDATE");
+            const isRoleless = !isCandidate && staffRoles.length === 0;
             return (
               <li key={u.id} className="card space-y-4 p-5">
                 <div className="flex flex-wrap items-start justify-between gap-3">
@@ -286,6 +290,7 @@ export default function Users({ loaderData, actionData }: Route.ComponentProps) 
                       {u.status === "ACTIVE" ? "Active" : "Disabled"}
                     </Badge>
                     {isCandidate && <Badge tone="info">Candidate</Badge>}
+                    {isRoleless && <Badge tone="warning">No role — add one below</Badge>}
                     {u.id !== selfId && (
                       <Form method="post">
                         <CsrfInput />
@@ -407,7 +412,12 @@ export default function Users({ loaderData, actionData }: Route.ComponentProps) 
                     Current: {u.email}. The account is signed out, and sign-in codes go to the new address.
                   </p>
                 </details>
-                {!isCandidate && (
+                {isRoleless && (
+                  <p className="text-sm text-muted">
+                    No role is assigned — this account cannot sign in until you add one below.
+                  </p>
+                )}
+                {!isCandidate && staffRoles.length > 0 && (
                   <ul className="flex flex-wrap gap-2" aria-label="Roles">
                     {staffRoles.map((r) => (
                       <li

@@ -1,4 +1,5 @@
 import { randomBytes } from "node:crypto";
+import type { Prisma } from "@prisma/client";
 import { z } from "zod";
 import { audit } from "~/modules/audit/audit.server";
 import { hashPassword } from "~/modules/auth/password.server";
@@ -40,24 +41,31 @@ function assertCanGrant(actor: SessionUser, role: string) {
     throw new ForbiddenError("You cannot give this role");
 }
 
-/** Lists staff accounts, or candidate accounts when role = "CANDIDATE" (Super Admin manages every user). */
+/**
+ * Lists staff accounts, or candidate accounts when role = "CANDIDATE" (Super Admin manages every
+ * user). "All staff" (role not given) also surfaces accounts with no role at all: an account whose
+ * last role was removed (e.g. a viewer taken off) still needs to be findable so a new role can be
+ * granted to it, instead of being invisible and blocking that e-mail address forever.
+ */
 export async function listStaff(actor: SessionUser | null, q?: string, role?: StaffRole | "CANDIDATE") {
   const a = requireUserAdmin(actor);
   const hideSuper = !isSuperAdmin(a.grants);
   if (hideSuper && role === "SUPER_ADMIN") return [];
+  const clauses: Prisma.UserWhereInput[] = [
+    role
+      ? { roles: { some: { role } } }
+      : { OR: [{ roles: { some: { role: { not: "CANDIDATE" } } } }, { roles: { none: {} } }] },
+  ];
+  if (hideSuper) clauses.push({ NOT: { roles: { some: { role: "SUPER_ADMIN" } } } });
+  if (q)
+    clauses.push({
+      OR: [
+        { email: { contains: q.toLowerCase() } },
+        { profile: { fullName: { contains: q, mode: "insensitive" } } },
+      ],
+    });
   return prisma.user.findMany({
-    where: {
-      roles: { some: role ? { role } : { role: { not: "CANDIDATE" } } },
-      ...(hideSuper ? { NOT: { roles: { some: { role: "SUPER_ADMIN" } } } } : {}),
-      ...(q
-        ? {
-            OR: [
-              { email: { contains: q.toLowerCase() } },
-              { profile: { fullName: { contains: q, mode: "insensitive" } } },
-            ],
-          }
-        : {}),
-    },
+    where: { AND: clauses },
     orderBy: { email: "asc" },
     take: 300,
     include: { roles: { include: { department: true } }, profile: true },
