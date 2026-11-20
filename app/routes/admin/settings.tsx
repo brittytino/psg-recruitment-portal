@@ -25,7 +25,7 @@ import {
   XCircle,
 } from "lucide-react";
 import type { Route } from "./+types/settings";
-import { Alert, ConfirmDialog, CsrfInput } from "~/components/forms";
+import { Alert, ConfirmDialog, CsrfInput, formatDateTime } from "~/components/forms";
 import { PageHeader } from "~/components/staff";
 import { handleAction, readForm, requireStaff } from "~/lib/http.server";
 import { ROLE_LABELS, type RoleName } from "~/modules/auth/permissions";
@@ -631,7 +631,8 @@ export default function Settings({ loaderData, actionData }: Route.ComponentProp
             </h2>
             <p className="mt-1 text-sm text-white/70">
               {status.checks.filter((c) => c.ok).length} of {status.checks.length} services healthy · version{" "}
-              <span className="font-mono">{status.version.slice(0, 7)}</span>
+              <span className="font-mono">{status.version.slice(0, 7)}</span> · last deployed{" "}
+              <span className="font-semibold">{formatDateTime(status.deployedAt)}</span>
             </p>
           </div>
           <span

@@ -215,6 +215,8 @@ export async function systemStatus(user: SessionUser | null) {
       failed: mailFailed,
     },
     version: process.env.GIT_SHA ?? "dev",
+    // A deploy starts a new container, so the time this process started is when the current release went live.
+    deployedAt: new Date(Date.now() - process.uptime() * 1000).toISOString(),
     mailFrom: activeSenderEmail(mailCfg),
   };
 }
