@@ -4,7 +4,7 @@ import { EmptyState, StatTile } from "~/components/staff";
 import type { Route } from "./+types/account";
 import { Alert, Badge, CsrfInput, formatDateTime, statusTone } from "~/components/forms";
 import { handleAction, readForm, requireUser } from "~/lib/http.server";
-import { STATUS_LABELS, type AppStatus } from "~/modules/applications/workflow";
+import { candidateStatusLabel, type AppStatus } from "~/modules/applications/workflow";
 import { listOwnApplications } from "~/modules/applications/service.server";
 import { resendEmailOtp, sendVerification } from "~/modules/auth/account.server";
 import { pendingCookie } from "~/modules/auth/otp.server";
@@ -125,7 +125,7 @@ export default function Account({ loaderData, actionData }: Route.ComponentProps
                         </p>
                       </div>
                     </div>
-                    <Badge tone={statusTone(a.status)}>{STATUS_LABELS[a.status as AppStatus]}</Badge>
+                    <Badge tone={statusTone(a.status)}>{candidateStatusLabel(a.status as AppStatus)}</Badge>
                   </div>
                   {a.status === "SHORTLISTED" && a.interviewAt && (
                     <p className="rounded-lg border border-success/25 bg-success-50 px-3 py-2 text-sm">

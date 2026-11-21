@@ -1,6 +1,6 @@
 import type { Route } from "./+types/logs-download";
 import { requireStaff } from "~/lib/http.server";
-import { audit } from "~/modules/audit/audit.server";
+import { auditBestEffort } from "~/modules/audit/audit.server";
 import { clientIp } from "~/modules/auth/rate-limit.server";
 import { formatLogText, LOG_CATEGORIES, readLogs, type LogCategory } from "~/modules/settings/logs.server";
 
@@ -14,7 +14,7 @@ export async function loader({ request, context }: Route.LoaderArgs) {
   const category: LogCategory = cat && cat in LOG_CATEGORIES ? (cat as LogCategory) : "all";
   const search = sp.get("q")?.slice(0, 100) || undefined;
   const { entries } = await readLogs(user, { date, category, search }, 200_000);
-  await audit({
+  await auditBestEffort({
     actorId: user.id,
     action: "system.logs_downloaded",
     entityType: "system",

@@ -1,5 +1,6 @@
 import type { Prisma } from "@prisma/client";
 import { prisma, type Tx } from "~/modules/core/db.server";
+import { logger } from "~/modules/core/logger.server";
 
 export interface AuditInput {
   actorId: string | null;
@@ -35,4 +36,24 @@ export async function audit(e: AuditInput, tx: Tx = prisma): Promise<void> {
       ip: e.ip ?? null,
     },
   });
+}
+
+/**
+ * Same as `audit`, for the end of a file download: the audit row is a side effect of the request,
+ * never something the person's download should be blocked or 500'd by. A failure here is logged
+ * and swallowed, never rethrown. Never pass `tx` — a transaction failure must still fail loudly.
+ */
+export async function auditBestEffort(e: AuditInput): Promise<void> {
+  try {
+    await audit(e);
+  } catch (err) {
+    logger.error(
+      {
+        event: "audit_write_failed",
+        action: e.action,
+        err: err instanceof Error ? err.message : String(err),
+      },
+      "audit write failed (non-fatal)",
+    );
+  }
 }

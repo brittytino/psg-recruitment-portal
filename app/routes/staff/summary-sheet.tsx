@@ -4,8 +4,9 @@ import { Alert, Badge, ConfirmDialog, CsrfInput, formatDateTime } from "~/compon
 import { PageHeader } from "~/components/staff";
 import { clientIp, handleAction, readForm, requireStaff } from "~/lib/http.server";
 import { hasPermission } from "~/modules/auth/permissions";
-import { audit } from "~/modules/audit/audit.server";
+import { auditBestEffort } from "~/modules/audit/audit.server";
 import { prisma } from "~/modules/core/db.server";
+import { ValidationError } from "~/modules/core/errors";
 import { csvCell } from "~/modules/reporting/applications.server";
 import { listSummarySheets, reopenSummarySheet, type SummaryRow } from "~/modules/reviews/service.server";
 import { SummaryTable } from "~/components/summary-table";
@@ -25,8 +26,9 @@ async function loadSheet(user: Parameters<typeof listSummarySheets>[0], id: stri
 export async function loader({ request, params, context }: Route.LoaderArgs) {
   const user = requireStaff(context, request, "application:list");
   const sheet = await loadSheet(user, params.id);
-  const rows = sheet.rows as unknown as SummaryRow[];
+  const rows = Array.isArray(sheet.rows) ? (sheet.rows as unknown as SummaryRow[]) : [];
   if (new URL(request.url).searchParams.get("format") === "csv") {
+    if (!rows.length) throw new ValidationError("This summary sheet has no rows to export");
     const header = [
       "S. No.",
       "Reference No.",
@@ -56,7 +58,7 @@ export async function loader({ request, params, context }: Route.LoaderArgs) {
           .join(","),
       ),
     ];
-    await audit({
+    await auditBestEffort({
       actorId: user.id,
       action: "summary.exported",
       entityType: "summary_sheet",

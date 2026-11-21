@@ -1,7 +1,7 @@
 import type { Route } from "./+types/export";
 import { clientIp, requireStaff } from "~/lib/http.server";
 import { referenceDeptCode } from "~/modules/applications/reference";
-import { audit } from "~/modules/audit/audit.server";
+import { auditBestEffort } from "~/modules/audit/audit.server";
 import { prisma } from "~/modules/core/db.server";
 import { exportCsv, parseColumns, parseListQuery } from "~/modules/reporting/applications.server";
 import { academicYearOf } from "~/modules/applications/reference";
@@ -19,7 +19,7 @@ export async function loader({ request, context }: Route.LoaderArgs) {
   const selectedIds = url.searchParams.getAll("ids").filter(Boolean);
   const { csv, rows } = await exportCsv(user, q, columns, selectedIds.length > 0 ? selectedIds : undefined);
   await prisma.user.update({ where: { id: user.id }, data: { exportColumns: columns } });
-  await audit({
+  await auditBestEffort({
     actorId: user.id,
     action: "applications.exported",
     entityType: "application",

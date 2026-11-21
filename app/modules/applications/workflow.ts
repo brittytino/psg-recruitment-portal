@@ -233,6 +233,20 @@ export function availableTransitions(
 /** Statuses in which the candidate may edit answers and documents. */
 export const EDITABLE: readonly AppStatus[] = ["DRAFT", "NEEDS_CLARIFICATION"];
 
+/**
+ * The HOD's decision is provisional: the Dean / Principal can overrule it at any time via
+ * `review:final`, and recording that decision does not change `status` (see recordFinalDecision).
+ * So the candidate must never be shown "Accepted by HOD" / "Rejected by HOD" / the position-change
+ * recommendation — only staff should see those. The candidate sees a neutral "still being reviewed"
+ * label for all three, same as before the HOD acted.
+ */
+const HOD_DECIDED_STATUSES: readonly AppStatus[] = ["HOD_ACCEPTED", "HOD_RECOMMENDED_CHANGE", "HOD_REJECTED"];
+
+/** Status label for the candidate's own view: never reveals the HOD's (provisional) decision. */
+export function candidateStatusLabel(status: AppStatus): string {
+  return HOD_DECIDED_STATUSES.includes(status) ? "Under department review" : STATUS_LABELS[status];
+}
+
 export const STATUS_LABELS: Record<AppStatus, string> = {
   DRAFT: "Draft",
   SUBMITTED: "Submitted",

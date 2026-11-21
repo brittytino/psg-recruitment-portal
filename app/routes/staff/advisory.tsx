@@ -1,13 +1,14 @@
-import { Form, Link, useSearchParams } from "react-router";
-import { CheckCircle2, Clock, Download, FileText, Scale } from "lucide-react";
+import { Form, Link, useNavigation, useSearchParams } from "react-router";
+import { CheckCircle2, Clock, Download, FileText, Loader2, Scale } from "lucide-react";
 import type { Route } from "./+types/advisory";
 import { Badge, formatDate, statusTone } from "~/components/forms";
-import { EmptyState, FilterSelect, PageHeader, StatTile, Tabs } from "~/components/staff";
+import { EmptyState, FilterSelect, ListPagination, PageHeader, StatTile, Tabs } from "~/components/staff";
 import { requireStaff } from "~/lib/http.server";
 import { POSITION_LABELS } from "~/lib/labels";
 import { STATUS_LABELS, type AppStatus } from "~/modules/applications/workflow";
 import { ADVISORY_LABELS, type AdvisoryRecommendation } from "~/modules/reviews/advisory-labels";
 import { advisoryApplicationList, parseAdvisoryFilters } from "~/modules/reviews/advisory.server";
+import { PAGE_SIZES } from "~/modules/reporting/constants";
 import { formatYearsMonths, splitMonths } from "~/modules/forms/experience";
 
 export const meta: Route.MetaFunction = () => [
@@ -38,17 +39,23 @@ export async function loader({ request, context }: Route.LoaderArgs) {
   const url = new URL(request.url);
   const filters = parseAdvisoryFilters(url.searchParams);
 
-  const { apps, departments, counts } = await advisoryApplicationList(user, {
-    tab: filters.tab,
-    departmentId: filters.departmentId || undefined,
-    position: filters.position || undefined,
-    search: filters.search || undefined,
-  });
+  const { apps, departments, counts, pagination } = await advisoryApplicationList(
+    user,
+    {
+      tab: filters.tab,
+      departmentId: filters.departmentId || undefined,
+      position: filters.position || undefined,
+      search: filters.search || undefined,
+    },
+    filters.page,
+    filters.size,
+  );
 
   return {
     apps,
     departments,
     counts,
+    pagination,
     q: {
       search: filters.search,
       position: filters.position,
@@ -66,8 +73,11 @@ function daysWaiting(submittedAt: string | Date | null): number | null {
 }
 
 export default function AdvisoryIndex({ loaderData }: Route.ComponentProps) {
-  const { apps, departments, counts, q } = loaderData;
+  const { apps, departments, counts, pagination, q } = loaderData;
   const [params] = useSearchParams();
+  // Visibility of system status (Nielsen #1): a visible spinner while a filter/tab/page change is
+  // in flight, instead of the page silently freezing between click and response.
+  const loading = useNavigation().state === "loading";
 
   const withParams = (patch: Record<string, string | number | null>) => {
     const p = new URLSearchParams(params);
@@ -80,6 +90,9 @@ export default function AdvisoryIndex({ loaderData }: Route.ComponentProps) {
     }
     return `?${p.toString()}`;
   };
+  // Narrowing the result set (tab, filter removal, clear-all) always returns to page 1: user
+  // control & error prevention (Nielsen #3/#5) — never leave someone stranded on a now-empty page.
+  const withFilter = (patch: Record<string, string | number | null>) => withParams({ ...patch, page: null });
 
   const departmentOptions = departments.map((d) => [d.id, d.name] as const);
   const departmentName = departments.find((d) => d.id === q.department)?.name;
@@ -90,7 +103,7 @@ export default function AdvisoryIndex({ loaderData }: Route.ComponentProps) {
     chips.push(["position", POSITION_LABELS[q.position as keyof typeof POSITION_LABELS] ?? q.position]);
   if (q.department) chips.push(["department", departmentName ?? "Department"]);
 
-  const clearAll = withParams({ q: null, position: null, department: null });
+  const clearAll = withFilter({ q: null, position: null, department: null });
 
   return (
     <div className="page-stack">
@@ -166,8 +179,14 @@ export default function AdvisoryIndex({ loaderData }: Route.ComponentProps) {
         {/* Active filter badges & count */}
         <div className="flex flex-wrap items-center justify-between gap-2 border-t border-line/60 pt-3">
           <div className="flex flex-wrap items-center gap-2">
-            <span className="text-sm font-medium text-muted">
-              {apps.length} application{apps.length === 1 ? "" : "s"} found
+            <span className="text-sm font-medium text-muted" aria-live="polite">
+              {loading ? (
+                <span className="inline-flex items-center gap-1.5">
+                  <Loader2 className="h-3.5 w-3.5 animate-spin" aria-hidden="true" /> Updating…
+                </span>
+              ) : (
+                `${pagination.total} application${pagination.total === 1 ? "" : "s"} match`
+              )}
             </span>
             {chips.map(([k, label]) => (
               <span
@@ -176,7 +195,7 @@ export default function AdvisoryIndex({ loaderData }: Route.ComponentProps) {
               >
                 {label}
                 <Link
-                  to={withParams({ [k]: null })}
+                  to={withFilter({ [k]: null })}
                   className="ml-0.5 text-brand-600 hover:text-danger"
                   aria-label={`Remove filter ${label}`}
                 >
@@ -195,7 +214,7 @@ export default function AdvisoryIndex({ loaderData }: Route.ComponentProps) {
 
       <Tabs
         items={TABS.map(([k, l]) => ({
-          to: withParams({ tab: k }),
+          to: withFilter({ tab: k }),
           label: l,
           active: k === q.tab,
           count: k === "awaiting" ? counts.awaiting : k === "reviewed" ? counts.reviewed : counts.total,
@@ -224,96 +243,123 @@ export default function AdvisoryIndex({ loaderData }: Route.ComponentProps) {
           )}
         </EmptyState>
       ) : (
-        <div className="card overflow-x-auto p-0">
-          <table className="table">
-            <caption className="sr-only">Applications for advisory review</caption>
-            <thead>
-              <tr>
-                <th scope="col">Reference No.</th>
-                <th scope="col">Candidate</th>
-                <th scope="col">Department</th>
-                <th scope="col">Applied for</th>
-                <th scope="col">Highest degree</th>
-                <th scope="col" className="text-right">
-                  Experience
-                </th>
-                <th scope="col">HOD decision</th>
-                <th scope="col">Status</th>
-                <th scope="col">Your opinion</th>
-                <th scope="col">
-                  <span className="sr-only">Open</span>
-                </th>
-              </tr>
-            </thead>
-            <tbody>
-              {apps.map((a) => {
-                const applied = a.appliedPosition;
-                return (
-                  <tr key={a.id}>
-                    <td className="font-mono text-sm whitespace-nowrap">{a.referenceNo}</td>
-                    <td className="font-semibold">{a.candidateName}</td>
-                    <td className="whitespace-nowrap">{a.department}</td>
-                    <td className="whitespace-nowrap">
+        // A card list, not a wide table: every card reads top to bottom and the review button is
+        // always in view. A table this wide would only be fully reachable by scrolling sideways,
+        // which a touchpad does easily but a plain desktop mouse has no direct way to do.
+        <ul className="space-y-3">
+          {apps.map((a) => {
+            const applied = a.appliedPosition;
+            const days = !a.myOpinion ? daysWaiting(a.submittedAt) : null;
+            return (
+              <li key={a.id} className="card space-y-3 p-5">
+                <div className="flex flex-wrap items-start justify-between gap-3">
+                  <div className="min-w-0">
+                    <p className="font-mono text-xs text-muted">{a.referenceNo}</p>
+                    <Link
+                      to={`/staff/advisory/${a.id}${withParams({})}`}
+                      state={{ back: `/staff/advisory${withParams({})}` }}
+                      className="text-lg font-semibold text-ink hover:text-brand-700 hover:underline"
+                    >
+                      {a.candidateName}
+                    </Link>
+                  </div>
+                  <div className="flex flex-wrap items-center gap-2">
+                    <Badge tone={statusTone(a.status)}>{STATUS_LABELS[a.status as AppStatus]}</Badge>
+                    {a.myOpinion ? (
+                      <Badge tone="success">
+                        {ADVISORY_LABELS[a.myOpinion.recommendation as AdvisoryRecommendation] ??
+                          a.myOpinion.recommendation}
+                        {a.myOpinion.rating != null && <span className="ml-1">· {a.myOpinion.rating}/5</span>}
+                      </Badge>
+                    ) : (
+                      <Badge tone="warning">Awaiting your opinion</Badge>
+                    )}
+                    {days != null && days >= 7 && <Badge tone="warning">Waiting {days} days</Badge>}
+                  </div>
+                </div>
+
+                <dl className="grid grid-cols-2 gap-x-4 gap-y-2 text-sm sm:grid-cols-4">
+                  <div>
+                    <dt className="text-xs text-muted">Department</dt>
+                    <dd className="font-medium">{a.department}</dd>
+                  </div>
+                  <div>
+                    <dt className="text-xs text-muted">Applied for</dt>
+                    <dd className="font-medium">
                       {applied ? (POSITION_LABELS[applied] ?? applied) : "Research"}
-                    </td>
-                    <td>{a.degree ?? "—"}</td>
-                    <td className="text-right whitespace-nowrap">
+                    </dd>
+                  </div>
+                  <div>
+                    <dt className="text-xs text-muted">Highest degree</dt>
+                    <dd className="font-medium">{a.degree ?? "—"}</dd>
+                  </div>
+                  <div>
+                    <dt className="text-xs text-muted">Experience</dt>
+                    <dd className="font-medium">
                       {a.experienceMonths != null ? formatYearsMonths(splitMonths(a.experienceMonths)) : "—"}
-                    </td>
-                    <td className="whitespace-nowrap">
-                      {a.hodDecision ? (
-                        <>
-                          {HOD_LABELS[a.hodDecision] ?? a.hodDecision}
-                          {a.hodRating != null && (
-                            <span className="ml-1 text-xs text-muted">· {a.hodRating}/5</span>
-                          )}
-                        </>
-                      ) : (
-                        "—"
-                      )}
-                    </td>
-                    <td>
-                      <Badge tone={statusTone(a.status)}>{STATUS_LABELS[a.status as AppStatus]}</Badge>
-                      <span className="mt-1 block text-xs text-muted">
-                        Submitted {a.submittedAt ? formatDate(a.submittedAt) : "—"}
+                    </dd>
+                  </div>
+                </dl>
+
+                <div className="flex flex-wrap items-center justify-between gap-3 border-t border-line/60 pt-3">
+                  <p className="text-sm text-muted">
+                    HOD:{" "}
+                    {a.hodDecision ? (
+                      <span className="font-medium text-ink">
+                        {HOD_LABELS[a.hodDecision] ?? a.hodDecision}
+                        {a.hodRating != null && ` · ${a.hodRating}/5`}
                       </span>
-                      {!a.myOpinion &&
-                        (() => {
-                          const days = daysWaiting(a.submittedAt);
-                          return days != null && days >= 7 ? (
-                            <span className="mt-0.5 block text-xs font-semibold text-warning">
-                              Waiting {days} days
-                            </span>
-                          ) : null;
-                        })()}
-                    </td>
-                    <td className="whitespace-nowrap">
-                      {a.myOpinion ? (
-                        <Badge tone="success">
-                          {ADVISORY_LABELS[a.myOpinion.recommendation as AdvisoryRecommendation] ??
-                            a.myOpinion.recommendation}
-                          {a.myOpinion.rating != null && (
-                            <span className="ml-1">· {a.myOpinion.rating}/5</span>
-                          )}
-                        </Badge>
-                      ) : (
-                        <Badge tone="warning">Not yet</Badge>
-                      )}
-                    </td>
-                    <td>
-                      <Link
-                        to={`/staff/advisory/${a.id}${withParams({})}`}
-                        state={{ back: `/staff/advisory${withParams({})}` }}
-                        className="btn-secondary px-3 py-1.5 text-sm whitespace-nowrap"
-                      >
-                        {a.myOpinion ? "View" : "Review"}
-                      </Link>
-                    </td>
-                  </tr>
-                );
-              })}
-            </tbody>
-          </table>
+                    ) : (
+                      "—"
+                    )}
+                    {" · submitted "}
+                    {a.submittedAt ? formatDate(a.submittedAt) : "—"}
+                  </p>
+                  <Link
+                    to={`/staff/advisory/${a.id}${withParams({})}`}
+                    state={{ back: `/staff/advisory${withParams({})}` }}
+                    className="btn-primary px-4 py-2 text-sm whitespace-nowrap"
+                  >
+                    {a.myOpinion ? "View" : "Review"}
+                  </Link>
+                </div>
+              </li>
+            );
+          })}
+        </ul>
+      )}
+
+      {pagination.total > 0 && (
+        <div className="card p-0">
+          <ListPagination
+            page={pagination.page}
+            pages={pagination.pages}
+            total={pagination.total}
+            pageSize={pagination.size}
+            label="applications"
+            href={(n) => withParams({ page: n })}
+            sizeControl={
+              <Form method="get" className="flex items-center gap-2">
+                {[...params]
+                  .filter(([k]) => k !== "size" && k !== "page")
+                  .map(([k, v], i) => (
+                    <input key={`${k}-${i}`} type="hidden" name={k} value={v} />
+                  ))}
+                <label htmlFor="advisory-size">Rows per page</label>
+                <select
+                  id="advisory-size"
+                  name="size"
+                  defaultValue={pagination.size}
+                  className="field-input w-20 py-1"
+                  onChange={(e) => e.currentTarget.form?.requestSubmit()}
+                >
+                  {PAGE_SIZES.map((n) => (
+                    <option key={n}>{n}</option>
+                  ))}
+                </select>
+              </Form>
+            }
+          />
         </div>
       )}
     </div>

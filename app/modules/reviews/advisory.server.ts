@@ -5,6 +5,7 @@ import { advisoryApplicationScope, requirePermission } from "~/modules/auth/poli
 import type { SessionUser } from "~/modules/auth/session.server";
 import { prisma } from "~/modules/core/db.server";
 import { NotFoundError, ValidationError } from "~/modules/core/errors";
+import { DEFAULT_PAGE_SIZE, PAGE_SIZES } from "~/modules/reporting/constants";
 
 /**
  * External advisor opinion. Advisors read every applicant whose HOD review is complete and record
@@ -38,14 +39,24 @@ export interface AdvisoryListFilters {
   search?: string;
 }
 
+export interface AdvisoryListQuery extends Required<AdvisoryListFilters> {
+  page: number;
+  size: number;
+}
+
 /** Reads the list/detail filter query params the same way everywhere (list page, detail page, export). */
-export function parseAdvisoryFilters(params: URLSearchParams): Required<AdvisoryListFilters> {
+export function parseAdvisoryFilters(params: URLSearchParams): AdvisoryListQuery {
   const rawTab = params.get("tab")?.trim() ?? "";
+  const page = Math.max(1, Math.trunc(Number(params.get("page")) || 1));
+  const rawSize = Number(params.get("size"));
+  const size = (PAGE_SIZES as readonly number[]).includes(rawSize) ? rawSize : DEFAULT_PAGE_SIZE;
   return {
     tab: (TABS as readonly string[]).includes(rawTab) ? (rawTab as AdvisoryTab) : "awaiting",
     departmentId: params.get("department")?.trim() ?? "",
     position: params.get("position")?.trim() ?? "",
     search: params.get("q")?.trim() ?? "",
+    page,
+    size,
   };
 }
 
@@ -105,25 +116,36 @@ function advisoryOrderBy(tab: AdvisoryTab | undefined): Prisma.ApplicationOrderB
  * and searched like the HOD's own review list, with summary counts and the department list for the
  * filter form.
  */
-export async function advisoryApplicationList(user: SessionUser, filters: AdvisoryListFilters = {}) {
+export async function advisoryApplicationList(
+  user: SessionUser,
+  filters: AdvisoryListFilters = {},
+  page = 1,
+  size: number = DEFAULT_PAGE_SIZE,
+) {
   const u = requirePermission(user, "advisory:review");
   const baseScope = advisoryApplicationScope();
+  const where = advisoryWhere(u.id, filters);
 
-  const [total, awaiting, reviewed, departmentRecords] = await Promise.all([
+  const [total, awaiting, reviewed, filteredTotal, departmentRecords] = await Promise.all([
     prisma.application.count({ where: baseScope }),
     prisma.application.count({ where: { AND: [baseScope, notYetReviewed(u.id)] } }),
     prisma.application.count({ where: { AND: [baseScope, alreadyReviewed(u.id)] } }),
+    // Matches the department / position / search filters too, for correct pagination math.
+    prisma.application.count({ where }),
     prisma.department.findMany({
       where: { applications: { some: baseScope } },
       select: { id: true, name: true, code: true },
       orderBy: { name: "asc" },
     }),
   ]);
+  const pages = Math.max(1, Math.ceil(filteredTotal / size));
+  const safePage = Math.min(page, pages);
 
   const apps = await prisma.application.findMany({
-    where: advisoryWhere(u.id, filters),
+    where,
     orderBy: advisoryOrderBy(filters.tab),
-    take: 500,
+    skip: (safePage - 1) * size,
+    take: size,
     select: {
       id: true,
       referenceNo: true,
@@ -193,6 +215,7 @@ export async function advisoryApplicationList(user: SessionUser, filters: Adviso
     }),
     departments: departmentRecords,
     counts: { total, awaiting, reviewed },
+    pagination: { page: safePage, size, total: filteredTotal, pages },
   };
 }
 

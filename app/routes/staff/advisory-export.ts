@@ -1,7 +1,7 @@
 import type { Route } from "./+types/advisory-export";
 import { clientIp, requireStaff } from "~/lib/http.server";
 import { POSITION_LABELS } from "~/lib/labels";
-import { audit } from "~/modules/audit/audit.server";
+import { auditBestEffort } from "~/modules/audit/audit.server";
 import { ADVISORY_LABELS } from "~/modules/reviews/advisory-labels";
 import { advisoryMyReviews } from "~/modules/reviews/advisory.server";
 import { csvCell } from "~/modules/reporting/applications.server";
@@ -56,7 +56,7 @@ export async function loader({ request, context }: Route.LoaderArgs) {
   }
   const csv = lines.join("\r\n");
 
-  await audit({
+  await auditBestEffort({
     actorId: user.id,
     action: "application.advisory_export",
     entityType: "application",

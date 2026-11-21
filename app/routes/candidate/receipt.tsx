@@ -7,8 +7,8 @@ import { getOwnApplication, withdraw } from "~/modules/applications/service.serv
 import { POSITION_LABELS } from "~/lib/labels";
 import {
   availableTransitions,
+  candidateStatusLabel,
   PROCESSING_LABELS,
-  STATUS_LABELS,
   type AppStatus,
 } from "~/modules/applications/workflow";
 import { prisma } from "~/modules/core/db.server";
@@ -134,7 +134,7 @@ export default function Receipt({ loaderData: L, actionData }: Route.ComponentPr
           <div>
             <dt className="text-muted">Status</dt>
             <dd>
-              <Badge tone={statusTone(L.status)}>{STATUS_LABELS[L.status]}</Badge>
+              <Badge tone={statusTone(L.status)}>{candidateStatusLabel(L.status)}</Badge>
             </dd>
           </div>
           <div>
@@ -199,7 +199,7 @@ export default function Receipt({ loaderData: L, actionData }: Route.ComponentPr
         <ol className="mt-3 space-y-2 text-sm">
           {L.history.map((h, i) => (
             <li key={i}>
-              <span className="font-medium">{STATUS_LABELS[h.to]}</span> — {formatDateTime(h.at)}
+              <span className="font-medium">{candidateStatusLabel(h.to)}</span> — {formatDateTime(h.at)}
               {h.candidateVisibleReason && (
                 <span className="block whitespace-pre-line text-muted">
                   Message: {h.candidateVisibleReason}

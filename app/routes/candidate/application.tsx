@@ -18,7 +18,7 @@ import { readForm, requireUser } from "~/lib/http.server";
 import { logger } from "~/modules/core/logger.server";
 import { FORM_LABELS, POSITION_LABELS } from "~/lib/labels";
 import { getOwnApplication, saveDraft } from "~/modules/applications/service.server";
-import { EDITABLE, STATUS_LABELS, type AppStatus } from "~/modules/applications/workflow";
+import { candidateStatusLabel, EDITABLE, type AppStatus } from "~/modules/applications/workflow";
 import { isDomainError } from "~/modules/core/errors";
 import { runtimeEnvSync } from "~/modules/settings/runtime-config.server";
 import type { DocType } from "~/modules/documents/policy";
@@ -289,7 +289,7 @@ export default function ApplicationEditor({ loaderData }: Route.ComponentProps) 
             {L.vacancy.department} · {L.vacancy.position} · Closes {formatDateTime(L.vacancy.closesAt)}
           </p>
         </div>
-        <Badge tone={statusTone(L.status)}>{STATUS_LABELS[L.status as AppStatus]}</Badge>
+        <Badge tone={statusTone(L.status)}>{candidateStatusLabel(L.status as AppStatus)}</Badge>
       </header>
 
       {L.clarification && (
