@@ -64,6 +64,7 @@ export default [
   route("admin/departments", "routes/admin/departments.tsx"),
   route("admin/notices", "routes/admin/notices.tsx"),
   route("admin/notices/:id/file", "routes/admin/notice-file.ts"),
+  route("admin/interview-kit", "routes/admin/interview-kit.tsx"),
   route("admin/users", "routes/admin/users.tsx"),
   route("admin/viewers", "routes/admin/viewers.tsx"),
   route("admin/advisors", "routes/admin/advisors.tsx"),

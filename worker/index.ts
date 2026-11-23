@@ -17,6 +17,10 @@ import { generateBundle, markBundleFailed, PipelineError } from "~/modules/docum
 import { scanBytes } from "~/modules/documents/scan.server";
 import { getVerifiedFile } from "~/modules/documents/storage.server";
 import { MailBudgetExceededError, sendNotificationEmail } from "~/modules/notifications/mailer.server";
+import { interviewKitAttachments } from "~/modules/settings/interview-kit.server";
+
+/** Notification types that carry the interview kit (PPT + datasheet), common to every candidate. */
+const INTERVIEW_KIT_TYPES = new Set(["application.interview_call", "application.interview_rescheduled"]);
 
 const JOB_VERSION = 1;
 const DOCUMENTS = "documents";
@@ -172,11 +176,15 @@ async function processEmail(job: Job) {
   // Already sent (a retried job), or in-app only: never e-mail twice.
   if (!n || n.status === "SENT" || n.status === "IN_APP") return;
   try {
+    // Resolved fresh at send time (not stored on the notification): always the currently
+    // configured kit, and a missing or unreadable file never blocks the e-mail itself.
+    const attachments = INTERVIEW_KIT_TYPES.has(n.type) ? await interviewKitAttachments() : undefined;
     await sendNotificationEmail(
       n.user.email,
       n.subject,
       n.body,
       n.priority === "critical" ? "critical" : "routine",
+      attachments,
     );
     await prisma.notification.update({
       where: { id: n.id },

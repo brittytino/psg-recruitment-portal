@@ -69,6 +69,7 @@ const LABELS: Record<string, string> = {
   "discipline.created": "Discipline added",
   "research_specialisation.created": "Research specialisation added",
   "research_specialisation.updated": "Research specialisation edited",
+  "settings.interview_kit_updated": "Interview kit updated",
   "notice.uploaded": "Open-positions PDF uploaded",
   "notice.shown": "Open-positions PDF shown on home page",
   "notice.hidden": "Open-positions PDF hidden",

@@ -21,6 +21,7 @@ import {
 import {
   Briefcase,
   Building2,
+  CalendarCheck,
   ClipboardCheck,
   ExternalLink,
   Eye,
@@ -86,6 +87,10 @@ function staffNav(grants: RoleGrant[]): { title: string; items: NavItem[] }[] {
   const setup: NavItem[] = [];
   if (hasPermission(grants, "recruitment:manage"))
     setup.push({ to: "/admin", label: "Job profiles", icon: Briefcase, end: true });
+  // HR – N4 Section's own files: deliberately not bundled with Job profiles, which Dean / Principal
+  // and Admin can also reach — this page is HR's to maintain.
+  if (hasPermission(grants, "interview_kit:manage"))
+    setup.push({ to: "/admin/interview-kit", label: "Interview kit (HR)", icon: CalendarCheck });
   if (hasPermission(grants, "department:manage"))
     setup.push({ to: "/admin/departments", label: "Departments & HODs", icon: Building2 });
   if (hasPermission(grants, "viewer:manage"))

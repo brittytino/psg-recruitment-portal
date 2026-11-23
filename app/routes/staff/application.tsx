@@ -10,6 +10,7 @@ import { getStaffApplication, transition, updateInternalNote } from "~/modules/a
 import { advisoryOpinionsFor } from "~/modules/reviews/advisory.server";
 import { ADVISORY_LABELS } from "~/modules/reviews/advisory-labels";
 import { INTERVIEW_FROM, inviteForInterview } from "~/modules/applications/interview.server";
+import { getInterviewKit } from "~/modules/settings/interview-kit.server";
 import { CalendarCheck, Download, Eye, Gavel } from "lucide-react";
 import { StarRatingInput, StarRatingView } from "~/components/star-rating";
 import {
@@ -155,6 +156,15 @@ export async function loader({ request, params, context }: Route.LoaderArgs) {
       INTERVIEW_FROM.includes(app.status as AppStatus) &&
       (app.status !== "UNDER_HR_REVIEW" || app.recruitmentCategory === "RESEARCH") &&
       !app.positionChanges.some((c) => c.status === "PENDING"),
+    // Default venue / instructions text to start the interview-call form from (editable before sending).
+    interviewKit: isOffice
+      ? await getInterviewKit().then((k) => ({
+          venueTemplate: k.venueTemplate,
+          instructionsTemplate: k.instructionsTemplate,
+          hasPpt: !!k.pptKey,
+          hasDatasheet: !!k.datasheetKey,
+        }))
+      : null,
     hods: isOffice && app.vacancy.departmentId ? await hodsForDepartment(app.vacancy.departmentId) : [],
     // Flow: HOD review, then the external advisor, then Dean / Principal. Read only, for the office.
     advisory: isOffice ? await advisoryOpinionsFor(app.id) : [],
@@ -222,6 +232,7 @@ export default function StaffApplication({ loaderData, actionData }: Route.Compo
     isAssignedHod,
     canDownload,
     canInterview,
+    interviewKit,
     canRegenerate,
     canApprove,
     canAssign,
@@ -928,6 +939,7 @@ export default function StaffApplication({ loaderData, actionData }: Route.Compo
                       id="iv-venue"
                       name="interviewVenue"
                       required
+                      defaultValue={app.interview?.venue ?? interviewKit?.venueTemplate ?? ""}
                       placeholder="Board Room, Admin Block, PSG Tech"
                       className="field-input mt-1"
                     />
@@ -940,10 +952,30 @@ export default function StaffApplication({ loaderData, actionData }: Route.Compo
                       id="iv-notes"
                       name="interviewNotes"
                       rows={3}
+                      defaultValue={app.interview?.notes ?? interviewKit?.instructionsTemplate ?? ""}
                       placeholder="Report 30 minutes early; prepare a 10-minute presentation…"
                       className="field-input mt-1"
                     />
+                    <p className="mt-1 text-xs text-muted">
+                      Pre-filled from the saved default — edit it for this candidate if needed.
+                    </p>
                   </div>
+                  {interviewKit && (interviewKit.hasPpt || interviewKit.hasDatasheet) ? (
+                    <p className="rounded-lg bg-soft px-3 py-2 text-xs text-muted">
+                      Attached automatically, maintained by HR – N4 Section:{" "}
+                      {[
+                        interviewKit.hasPpt && "the PPT template",
+                        interviewKit.hasDatasheet && "the datasheet",
+                      ]
+                        .filter(Boolean)
+                        .join(" and ")}
+                      .
+                    </p>
+                  ) : (
+                    <p className="rounded-lg bg-warning-50 px-3 py-2 text-xs text-muted">
+                      No PPT or datasheet is set up yet — HR – N4 Section can add one under Interview kit.
+                    </p>
+                  )}
                   <ConfirmDialog
                     trigger={app.interview ? "Reschedule and e-mail again" : "Send interview call"}
                     triggerClassName="btn-primary w-full"
@@ -954,8 +986,9 @@ export default function StaffApplication({ loaderData, actionData }: Route.Compo
                     disabled={busy}
                   >
                     <p>
-                      The candidate receives the date, venue and instructions by e-mail and sees them in their
-                      account.
+                      The candidate receives the date, venue and instructions by e-mail
+                      {(interviewKit?.hasPpt || interviewKit?.hasDatasheet) && " with the attached files"},
+                      and sees them in their account.
                     </p>
                   </ConfirmDialog>
                 </Form>

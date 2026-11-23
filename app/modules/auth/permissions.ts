@@ -81,7 +81,9 @@ export type Permission =
   /** External advisor: read applications after the HOD review and record an advisory opinion. */
   | "advisory:review"
   /** Add and remove External Advisor accounts (Super Admin, HR – N4 Section). */
-  | "advisor:manage";
+  | "advisor:manage"
+  /** The interview-call PPT, datasheet and default venue / instructions (Super Admin, HR – N4 Section only). */
+  | "interview_kit:manage";
 
 /** Every permission except the candidate-only one. */
 export const ALL_STAFF_PERMISSIONS: readonly Permission[] = [
@@ -110,6 +112,7 @@ export const ALL_STAFF_PERMISSIONS: readonly Permission[] = [
   "viewer:manage",
   "advisory:review",
   "advisor:manage",
+  "interview_kit:manage",
 ];
 export const ROLE_PERMISSIONS: Record<RoleName, readonly Permission[]> = {
   CANDIDATE: ["application:own"],
@@ -128,6 +131,7 @@ export const ROLE_PERMISSIONS: Record<RoleName, readonly Permission[]> = {
     "helpdesk:handle",
     "viewer:manage",
     "advisor:manage",
+    "interview_kit:manage",
   ],
   HOD: [
     "application:list",

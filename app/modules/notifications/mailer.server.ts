@@ -395,6 +395,26 @@ function parseAddressList(value: SendMailOptions["to"]): { email: string; name?:
   return out;
 }
 
+/**
+ * Nodemailer's `attachments` (Buffer/Uint8Array/string content only — the Brevo HTTP API takes the
+ * bytes inline, not a filesystem path) as Brevo's `attachment` field (base64 content + name).
+ */
+function brevoAttachments(attachments: SendMailOptions["attachments"]): { content: string; name: string }[] {
+  if (!attachments?.length) return [];
+  const out: { content: string; name: string }[] = [];
+  for (const a of attachments) {
+    if (!a.filename || typeof a.filename !== "string") continue;
+    let base64: string | null = null;
+    if (Buffer.isBuffer(a.content)) base64 = a.content.toString("base64");
+    else if (a.content instanceof Uint8Array) base64 = Buffer.from(a.content).toString("base64");
+    else if (typeof a.content === "string") {
+      base64 = a.encoding === "base64" ? a.content : Buffer.from(a.content, "utf8").toString("base64");
+    }
+    if (base64) out.push({ content: base64, name: a.filename });
+  }
+  return out;
+}
+
 async function deliverBrevoApi(ch: MailChannelConfig, mail: SendMailOptions, e: Env): Promise<void> {
   if (!ch.password) {
     const err = new Error("Brevo API key is missing") as Error & { httpStatus?: number };
@@ -417,6 +437,8 @@ async function deliverBrevoApi(ch: MailChannelConfig, mail: SendMailOptions, e: 
     }
   }
 
+  const attachment = brevoAttachments(mail.attachments);
+
   const payload = {
     sender: {
       name: (ch.fromName || e.SMTP_FROM_NAME).trim(),
@@ -428,6 +450,7 @@ async function deliverBrevoApi(ch: MailChannelConfig, mail: SendMailOptions, e: 
     ...(mail.html ? { htmlContent: String(mail.html) } : {}),
     ...(mail.text ? { textContent: String(mail.text) } : {}),
     ...(Object.keys(headers).length > 0 ? { headers } : {}),
+    ...(attachment.length > 0 ? { attachment } : {}),
   };
 
   const res = await fetch("https://api.brevo.com/v3/smtp/email", {
@@ -1117,8 +1140,9 @@ export async function sendNotificationEmail(
   subject: string,
   body: string,
   priority: "critical" | "routine" = "routine",
+  attachments?: { filename: string; content: Buffer }[],
 ): Promise<void> {
   const e = env();
   const { text, html } = renderNotificationEmail(subject, body);
-  await deliver({ from: e.MAIL_FROM, to, subject, text, html }, priority);
+  await deliver({ from: e.MAIL_FROM, to, subject, text, html, attachments }, priority);
 }
