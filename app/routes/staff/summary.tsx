@@ -170,6 +170,29 @@ export default function Summary({ loaderData, actionData }: Route.ComponentProps
         <Alert tone="danger">{actionData.formError}</Alert>
       )}
 
+      {/* Quick jump: this page is long — land on the overview, then go straight to a section
+          instead of scrolling past the rest to reach it. */}
+      {L.office && (
+        <nav aria-label="Jump to section" className="-mx-1 overflow-x-auto px-1 print:hidden">
+          <div className="inline-flex gap-2 whitespace-nowrap">
+            {[
+              ["#overview", "Overview"],
+              ["#dept", "Department report"],
+              ["#all", "Applications"],
+              ["#sheets", "Approved summary sheets"],
+            ].map(([href, label]) => (
+              <a
+                key={href}
+                href={href}
+                className="rounded-full border border-line bg-paper px-3 py-1.5 text-sm font-medium text-ink no-underline hover:border-brand-600 hover:text-brand-700"
+              >
+                {label}
+              </a>
+            ))}
+          </div>
+        </nav>
+      )}
+
       {L.hod.map((h) => (
         <section key={h.dept.id} className="card space-y-4" aria-labelledby={`hod-${h.dept.id}`}>
           <div className="flex flex-wrap items-start justify-between gap-3">
@@ -383,6 +406,11 @@ function OfficeReport({ L, busy }: { L: OfficeData; busy: boolean }) {
   const pct = (n: number) => (s.total ? Math.round((n / s.total) * 100) : 0);
   const listHref = (extra: Record<string, string>) =>
     `/staff?${new URLSearchParams({ ...(L.q.year ? { year: L.q.year } : {}), ...extra })}`;
+  // Jump straight from a department's row to its own current approved sheet (department by
+  // department), instead of scrolling down and searching for it in the list further below.
+  const currentSheetByDept = new Map(
+    L.sheets.filter((sh) => sh.status === "APPROVED").map((sh) => [sh.department.id, sh.id]),
+  );
 
   return (
     <>
@@ -394,7 +422,11 @@ function OfficeReport({ L, busy }: { L: OfficeData; busy: boolean }) {
       )}
 
       {/* Headline numbers */}
-      <section aria-label="Headline numbers" className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+      <section
+        id="overview"
+        aria-label="Headline numbers"
+        className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4"
+      >
         <StatTile label="Applications" value={s.total.toLocaleString("en-IN")} icon={Users} accent="brand" />
         <StatTile
           label="Not yet with a HOD"
@@ -552,6 +584,14 @@ function OfficeReport({ L, busy }: { L: OfficeData; busy: boolean }) {
                         <span className="block text-xs text-muted">
                           {d.hods.length ? `HOD: ${d.hods.join(", ")}` : "No HOD set up"}
                         </span>
+                        {currentSheetByDept.has(d.id) && (
+                          <Link
+                            to={`/staff/summary/${currentSheetByDept.get(d.id)}`}
+                            className="mt-0.5 block text-xs font-semibold text-brand-700 no-underline hover:underline"
+                          >
+                            View summary sheet →
+                          </Link>
+                        )}
                       </td>
                       <td className="text-right tabular-nums">{cell(d.total, {})}</td>
                       <td className="text-right tabular-nums">{cell(d.unassigned, { hod: "unassigned" })}</td>
