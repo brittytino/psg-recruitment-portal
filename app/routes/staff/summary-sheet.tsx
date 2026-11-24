@@ -4,10 +4,7 @@ import { Alert, Badge, ConfirmDialog, CsrfInput, formatDateTime } from "~/compon
 import { PageHeader } from "~/components/staff";
 import { clientIp, handleAction, readForm, requireStaff } from "~/lib/http.server";
 import { hasPermission } from "~/modules/auth/permissions";
-import { auditBestEffort } from "~/modules/audit/audit.server";
 import { prisma } from "~/modules/core/db.server";
-import { ValidationError } from "~/modules/core/errors";
-import { csvCell } from "~/modules/reporting/applications.server";
 import { listSummarySheets, reopenSummarySheet, type SummaryRow } from "~/modules/reviews/service.server";
 import { SummaryTable } from "~/components/summary-table";
 
@@ -16,64 +13,12 @@ export const meta: Route.MetaFunction = () => [
   { name: "robots", content: "noindex, nofollow" },
 ];
 
-async function loadSheet(user: Parameters<typeof listSummarySheets>[0], id: string) {
-  // listSummarySheets applies the role scope (HODs see only their own departments).
-  const sheet = (await listSummarySheets(user)).find((s) => s.id === id);
-  if (!sheet) throw new Response("Not found", { status: 404 });
-  return sheet;
-}
-
 export async function loader({ request, params, context }: Route.LoaderArgs) {
   const user = requireStaff(context, request, "application:list");
-  const sheet = await loadSheet(user, params.id);
+  // listSummarySheets applies the role scope (HODs see only their own departments).
+  const sheet = (await listSummarySheets(user)).find((s) => s.id === params.id);
+  if (!sheet) throw new Response("Not found", { status: 404 });
   const rows = Array.isArray(sheet.rows) ? (sheet.rows as unknown as SummaryRow[]) : [];
-  if (new URL(request.url).searchParams.get("format") === "csv") {
-    if (!rows.length) throw new ValidationError("This summary sheet has no rows to export");
-    const header = [
-      "S. No.",
-      "Reference No.",
-      "Candidate Name",
-      "Department",
-      "Applied For",
-      "Recommended / Approved",
-      "HOD Decision",
-      "Reason / Remarks",
-      "Status",
-    ];
-    const lines = [
-      header.map(csvCell).join(","),
-      ...rows.map((r) =>
-        [
-          r.sNo,
-          r.referenceNo,
-          r.candidateName,
-          r.department,
-          r.appliedFor,
-          r.recommendedFor,
-          r.decision,
-          r.reason,
-          r.status,
-        ]
-          .map(csvCell)
-          .join(","),
-      ),
-    ];
-    await auditBestEffort({
-      actorId: user.id,
-      action: "summary.exported",
-      entityType: "summary_sheet",
-      entityId: sheet.id,
-      ip: clientIp(request),
-      metadata: { rows: rows.length },
-    });
-    return new Response("﻿" + lines.join("\r\n") + "\r\n", {
-      headers: {
-        "Content-Type": "text/csv; charset=utf-8",
-        "Content-Disposition": `attachment; filename="PSGCT_${sheet.academicYear}_${sheet.department.code}_summary_v${sheet.version}.csv"`,
-        "Cache-Control": "private, no-store",
-      },
-    });
-  }
   const approver = await prisma.user.findUnique({
     where: { id: sheet.approvedById },
     select: { email: true, profile: { select: { fullName: true } } },
@@ -96,6 +41,18 @@ export async function action({ request, params, context }: Route.ActionArgs) {
 
 export default function SummarySheetPage({ loaderData, actionData }: Route.ComponentProps) {
   const { sheet, approver, canReopen } = loaderData;
+  // Defensive: loaderData should always carry a sheet on success (the loader never returns
+  // otherwise), but a page that cannot show the right thing should say so plainly, not crash.
+  if (!sheet) {
+    return (
+      <div className="page-stack">
+        <Alert tone="danger">This summary sheet could not be opened. Please go back and try again.</Alert>
+        <p className="text-sm">
+          <Link to="/staff/summary">← Summary sheets</Link>
+        </p>
+      </div>
+    );
+  }
   return (
     <div className="page-stack">
       <p className="text-sm">
@@ -110,7 +67,7 @@ export default function SummarySheetPage({ loaderData, actionData }: Route.Compo
             <Badge tone={sheet.status === "APPROVED" ? "success" : "neutral"}>
               {sheet.status === "APPROVED" ? "Current" : "Superseded"}
             </Badge>
-            <a href="?format=csv" className="btn-primary">
+            <a href={`/staff/summary/${sheet.id}/export.csv`} className="btn-primary">
               Download CSV
             </a>
           </>

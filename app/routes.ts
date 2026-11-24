@@ -52,6 +52,7 @@ export default [
   route("staff/advisory/:id", "routes/staff/advisory-application.tsx"),
   route("staff/summary", "routes/staff/summary.tsx"),
   route("staff/summary/:id", "routes/staff/summary-sheet.tsx"),
+  route("staff/summary/:id/export.csv", "routes/staff/summary-sheet-export.ts"),
   route("staff/audit", "routes/staff/audit.tsx"),
   route("staff/help-desk", "routes/staff/help-desk.tsx"),
   route("staff/help-desk/settings", "routes/staff/help-desk-settings.tsx"),

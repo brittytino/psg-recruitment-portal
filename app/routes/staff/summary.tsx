@@ -210,60 +210,118 @@ export default function Summary({ loaderData, actionData }: Route.ComponentProps
 
       {L.office && <OfficeReport L={L} busy={busy} />}
 
-      <section className="card space-y-3" aria-labelledby="sheets">
+      <ApprovedSheets sheets={L.sheets} />
+    </div>
+  );
+}
+
+/**
+ * Every approved summary sheet, department by department. With many departments and several
+ * approved versions each (every reopen keeps the superseded ones), this was one long unfiltered
+ * table — a long scroll to find one department. Filters instantly in the browser (the whole list
+ * is already loaded, so there is nothing to wait for), and only the current version of each
+ * department shows by default; older, superseded versions are one click away, not scrolled past.
+ */
+function ApprovedSheets({ sheets }: { sheets: Route.ComponentProps["loaderData"]["sheets"] }) {
+  const [q, setQ] = useState("");
+  const [showSuperseded, setShowSuperseded] = useState(false);
+
+  const term = q.trim().toLowerCase();
+  const visible = sheets.filter(
+    (s) =>
+      (showSuperseded || s.status === "APPROVED") &&
+      (!term || s.department.name.toLowerCase().includes(term)),
+  );
+  const supersededCount = sheets.length - sheets.filter((s) => s.status === "APPROVED").length;
+
+  return (
+    <section className="card space-y-3" aria-labelledby="sheets">
+      <div className="flex flex-wrap items-center justify-between gap-3">
         <h2 id="sheets" className="text-xl">
           Approved summary sheets
         </h2>
-        {L.sheets.length === 0 ? (
-          <EmptyState title="No summary sheet has been approved yet">
-            HODs approve a sheet after deciding every application.
-          </EmptyState>
-        ) : (
-          <div className="table-wrap">
-            <table className="table">
-              <thead>
-                <tr>
-                  <th scope="col">Department</th>
-                  <th scope="col">Academic year</th>
-                  <th scope="col" className="text-right">
-                    Version
-                  </th>
-                  <th scope="col" className="text-right">
-                    Candidates
-                  </th>
-                  <th scope="col">Approved</th>
-                  <th scope="col">State</th>
-                  <th scope="col">
-                    <span className="sr-only">Open</span>
-                  </th>
-                </tr>
-              </thead>
-              <tbody>
-                {L.sheets.map((s) => (
-                  <tr key={s.id}>
-                    <td className="font-medium">{s.department.name}</td>
-                    <td>{s.academicYear}</td>
-                    <td className="text-right tabular-nums">{s.version}</td>
-                    <td className="text-right tabular-nums">{(s.rows as unknown[]).length}</td>
-                    <td className="whitespace-nowrap">{formatDateTime(s.approvedAt)}</td>
-                    <td>
-                      <Badge tone={s.status === "APPROVED" ? "success" : "neutral"}>
-                        {s.status === "APPROVED" ? "Current" : "Superseded"}
-                      </Badge>
-                    </td>
-                    <td>
-                      <Link to={`/staff/summary/${s.id}`} className="whitespace-nowrap text-sm font-semibold">
-                        View
-                      </Link>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
+        {sheets.length > 0 && (
+          <div className="flex flex-wrap items-center gap-3">
+            <label htmlFor="sheet-q" className="sr-only">
+              Search department
+            </label>
+            <input
+              id="sheet-q"
+              type="search"
+              value={q}
+              onChange={(e) => setQ(e.target.value)}
+              placeholder="Search department…"
+              className="field-input w-52"
+            />
+            {supersededCount > 0 && (
+              <label className="flex items-center gap-1.5 text-sm text-muted">
+                <input
+                  type="checkbox"
+                  checked={showSuperseded}
+                  onChange={(e) => setShowSuperseded(e.target.checked)}
+                  className="h-4 w-4"
+                />
+                Show {supersededCount} superseded version{supersededCount === 1 ? "" : "s"}
+              </label>
+            )}
           </div>
         )}
-      </section>
-    </div>
+      </div>
+      {sheets.length === 0 ? (
+        <EmptyState title="No summary sheet has been approved yet">
+          HODs approve a sheet after deciding every application.
+        </EmptyState>
+      ) : visible.length === 0 ? (
+        <EmptyState title={`No department matches “${q}”`}>
+          <button type="button" onClick={() => setQ("")} className="font-medium text-brand-700 underline">
+            Clear search
+          </button>
+        </EmptyState>
+      ) : (
+        <div className="table-wrap">
+          <table className="table">
+            <thead>
+              <tr>
+                <th scope="col">Department</th>
+                <th scope="col">Academic year</th>
+                <th scope="col" className="text-right">
+                  Version
+                </th>
+                <th scope="col" className="text-right">
+                  Candidates
+                </th>
+                <th scope="col">Approved</th>
+                <th scope="col">State</th>
+                <th scope="col">
+                  <span className="sr-only">Open</span>
+                </th>
+              </tr>
+            </thead>
+            <tbody>
+              {visible.map((s) => (
+                <tr key={s.id}>
+                  <td className="font-medium">{s.department.name}</td>
+                  <td>{s.academicYear}</td>
+                  <td className="text-right tabular-nums">{s.version}</td>
+                  <td className="text-right tabular-nums">{(s.rows as unknown[]).length}</td>
+                  <td className="whitespace-nowrap">{formatDateTime(s.approvedAt)}</td>
+                  <td>
+                    <Badge tone={s.status === "APPROVED" ? "success" : "neutral"}>
+                      {s.status === "APPROVED" ? "Current" : "Superseded"}
+                    </Badge>
+                  </td>
+                  <td>
+                    <Link to={`/staff/summary/${s.id}`} className="whitespace-nowrap text-sm font-semibold">
+                      View
+                    </Link>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
+    </section>
   );
 }
 
