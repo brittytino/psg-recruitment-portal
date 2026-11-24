@@ -4,7 +4,19 @@ import { clientIp, requireStaff } from "~/lib/http.server";
 import { isDomainError, ValidationError } from "~/modules/core/errors";
 import { logger } from "~/modules/core/logger.server";
 import { csvCell } from "~/modules/reporting/applications.server";
+import {
+  DEFAULT_SUMMARY_SHEET_COLUMNS,
+  SUMMARY_SHEET_COLUMNS,
+  type SummarySheetColumnKey,
+} from "~/modules/reporting/columns";
 import { listSummarySheets, type SummaryRow } from "~/modules/reviews/service.server";
+
+function parseSummaryColumns(raw: string[]): readonly SummarySheetColumnKey[] {
+  const valid = new Set(SUMMARY_SHEET_COLUMNS.map((c) => c.key));
+  const cols = raw.filter((k): k is SummarySheetColumnKey => valid.has(k as SummarySheetColumnKey));
+  // No (valid) selection: keep the whole sheet, exactly as a plain "Download CSV" has always worked.
+  return cols.length ? cols : DEFAULT_SUMMARY_SHEET_COLUMNS;
+}
 
 /**
  * CSV of one approved summary sheet. A dedicated resource route (no component) — kept apart from
@@ -19,36 +31,35 @@ export async function loader({ request, params, context }: Route.LoaderArgs) {
   if (!sheet) throw new Response("Not found", { status: 404 });
   const rows = Array.isArray(sheet.rows) ? (sheet.rows as unknown as SummaryRow[]) : [];
   if (!rows.length) throw new ValidationError("This summary sheet has no rows to export");
+  const cols = parseSummaryColumns(new URL(request.url).searchParams.getAll("cols"));
+  const columns = SUMMARY_SHEET_COLUMNS.filter((c) => cols.includes(c.key));
 
   try {
-    const header = [
-      "S. No.",
-      "Reference No.",
-      "Candidate Name",
-      "Department",
-      "Applied For",
-      "Recommended / Approved",
-      "HOD Decision",
-      "Reason / Remarks",
-      "Status",
-    ];
+    const valueOf = (r: SummaryRow, key: SummarySheetColumnKey) => {
+      switch (key) {
+        case "sNo":
+          return r.sNo;
+        case "referenceNo":
+          return r.referenceNo;
+        case "candidateName":
+          return r.candidateName;
+        case "department":
+          return r.department;
+        case "appliedFor":
+          return r.appliedFor;
+        case "recommendedFor":
+          return r.recommendedFor;
+        case "decision":
+          return r.decision;
+        case "reason":
+          return r.reason;
+        case "status":
+          return r.status;
+      }
+    };
     const lines = [
-      header.map(csvCell).join(","),
-      ...rows.map((r) =>
-        [
-          r.sNo,
-          r.referenceNo,
-          r.candidateName,
-          r.department,
-          r.appliedFor,
-          r.recommendedFor,
-          r.decision,
-          r.reason,
-          r.status,
-        ]
-          .map(csvCell)
-          .join(","),
-      ),
+      columns.map((c) => csvCell(c.label)).join(","),
+      ...rows.map((r) => columns.map((c) => csvCell(valueOf(r, c.key))).join(",")),
     ];
     // A safe filename regardless of what is stored: the academic year and department code are
     // normally short and plain, but a header built from unvalidated text can otherwise throw
@@ -62,7 +73,7 @@ export async function loader({ request, params, context }: Route.LoaderArgs) {
       entityType: "summary_sheet",
       entityId: sheet.id,
       ip: clientIp(request),
-      metadata: { rows: rows.length },
+      metadata: { rows: rows.length, columns: columns.map((c) => c.key) },
     });
     return new Response("﻿" + lines.join("\r\n") + "\r\n", {
       headers: {

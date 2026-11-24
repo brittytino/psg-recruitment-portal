@@ -1,10 +1,14 @@
+import { useState } from "react";
+import { Download } from "lucide-react";
 import { Form, Link } from "react-router";
 import type { Route } from "./+types/summary-sheet";
 import { Alert, Badge, ConfirmDialog, CsrfInput, formatDateTime } from "~/components/forms";
+import { Modal, ModalActions, ModalClose } from "~/components/modal";
 import { PageHeader } from "~/components/staff";
 import { clientIp, handleAction, readForm, requireStaff } from "~/lib/http.server";
 import { hasPermission } from "~/modules/auth/permissions";
 import { prisma } from "~/modules/core/db.server";
+import { SUMMARY_SHEET_COLUMNS, type SummarySheetColumnKey } from "~/modules/reporting/columns";
 import { listSummarySheets, reopenSummarySheet, type SummaryRow } from "~/modules/reviews/service.server";
 import { SummaryTable } from "~/components/summary-table";
 
@@ -67,9 +71,7 @@ export default function SummarySheetPage({ loaderData, actionData }: Route.Compo
             <Badge tone={sheet.status === "APPROVED" ? "success" : "neutral"}>
               {sheet.status === "APPROVED" ? "Current" : "Superseded"}
             </Badge>
-            <a href={`/staff/summary/${sheet.id}/export.csv`} className="btn-primary">
-              Download CSV
-            </a>
+            <ExportSheetDialog sheetId={sheet.id} />
           </>
         }
       />
@@ -113,5 +115,86 @@ export default function SummarySheetPage({ loaderData, actionData }: Route.Compo
         </section>
       )}
     </div>
+  );
+}
+
+const DEFAULT_COLS: readonly SummarySheetColumnKey[] = SUMMARY_SHEET_COLUMNS.map((c) => c.key);
+
+/**
+ * Choose which columns to include before downloading the CSV — the same "pick your fields"
+ * option HR – N4 Section and Dean / Admin already have on the Applications export, here for a
+ * HOD's own department sheet too.
+ */
+function ExportSheetDialog({ sheetId }: { sheetId: string }) {
+  const [cols, setCols] = useState<Set<SummarySheetColumnKey>>(new Set(DEFAULT_COLS));
+  return (
+    <Modal
+      size="sm"
+      trigger={
+        <>
+          <Download className="h-4 w-4" aria-hidden="true" /> Download CSV
+        </>
+      }
+      icon={<Download className="h-5 w-5" aria-hidden="true" />}
+      title="Download CSV"
+      description="Choose which fields to include."
+      closeOnSuccess={false}
+    >
+      {(close) => (
+        <Form
+          method="get"
+          action={`/staff/summary/${sheetId}/export.csv`}
+          reloadDocument
+          className="space-y-4"
+        >
+          <div className="flex flex-wrap items-center gap-2">
+            <button
+              type="button"
+              className="btn-secondary btn-sm"
+              onClick={() => setCols(new Set(DEFAULT_COLS))}
+            >
+              Select all
+            </button>
+            <button type="button" className="btn-ghost btn-sm" onClick={() => setCols(new Set())}>
+              Clear
+            </button>
+          </div>
+          <fieldset className="space-y-1.5">
+            <legend className="sr-only">Fields to include</legend>
+            {SUMMARY_SHEET_COLUMNS.map((c) => (
+              <label key={c.key} className="flex items-center gap-2.5 text-sm">
+                <input
+                  type="checkbox"
+                  name="cols"
+                  value={c.key}
+                  className="h-4 w-4"
+                  checked={cols.has(c.key)}
+                  onChange={(e) =>
+                    setCols((s) => {
+                      const n = new Set(s);
+                      if (e.target.checked) n.add(c.key);
+                      else n.delete(c.key);
+                      return n;
+                    })
+                  }
+                />
+                {c.label}
+              </label>
+            ))}
+          </fieldset>
+          <ModalActions>
+            <ModalClose className="btn-secondary">Close</ModalClose>
+            <button
+              type="submit"
+              className="btn-primary"
+              disabled={cols.size === 0}
+              onClick={() => window.setTimeout(close, 0)}
+            >
+              <Download className="h-4 w-4" aria-hidden="true" /> Download
+            </button>
+          </ModalActions>
+        </Form>
+      )}
+    </Modal>
   );
 }
