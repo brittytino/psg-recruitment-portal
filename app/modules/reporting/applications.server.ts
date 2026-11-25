@@ -52,6 +52,8 @@ export const listQuerySchema = z.object({
   exam: z.string().trim().max(40).optional().catch(undefined),
   minExp: z.coerce.number().int().min(0).max(50).optional().catch(undefined),
   hod: z.enum(["assigned", "unassigned"]).optional().catch(undefined),
+  /** External advisor's opinion: none yet, any opinion recorded, or a specific recommendation. */
+  advisory: z.enum(["none", "any", "SHORTLIST", "HOLD", "REJECT"]).optional().catch(undefined),
   /**
    * Mode of study (summary sheet check boxes), comma separated: "full" = every degree and the
    * Ph.D. full-time; "part" / "distance" = at least one degree or the Ph.D. in that mode.
@@ -157,6 +159,9 @@ function filterWhere(q: ListQuery): Prisma.ApplicationWhereInput {
     });
   if (q.hod === "assigned") and.push({ assignedHodId: { not: null } });
   if (q.hod === "unassigned") and.push({ assignedHodId: null });
+  if (q.advisory === "none") and.push({ reviews: { none: { stage: "ADVISORY" } } });
+  else if (q.advisory === "any") and.push({ reviews: { some: { stage: "ADVISORY" } } });
+  else if (q.advisory) and.push({ reviews: { some: { stage: "ADVISORY", recommendation: q.advisory } } });
   if (q.from) and.push({ submittedAt: { gte: new Date(`${q.from}T00:00:00+05:30`) } });
   if (q.to)
     and.push({ submittedAt: { lt: new Date(new Date(`${q.to}T00:00:00+05:30`).getTime() + 86400_000) } });
@@ -252,6 +257,18 @@ export async function listApplications(user: SessionUser | null, q: ListQuery) {
           select: { id: true, version: true, pageCount: true },
           orderBy: { version: "desc" },
           take: 1,
+        },
+        // External advisor's opinion(s), for HR / Admin / Dean-Principal deciding whom to call
+        // for interview; the opinion itself never changes the application's status.
+        reviews: {
+          where: { stage: "ADVISORY" },
+          orderBy: { createdAt: "desc" },
+          take: 3,
+          select: {
+            recommendation: true,
+            score: true,
+            reviewer: { select: { email: true, profile: { select: { fullName: true } } } },
+          },
         },
       },
     }),

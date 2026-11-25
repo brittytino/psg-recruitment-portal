@@ -28,6 +28,7 @@ import {
 } from "~/modules/reporting/applications.server";
 import { PAGE_SIZES } from "~/modules/reporting/constants";
 import { assignToDepartmentHods, assignToHod } from "~/modules/reviews/service.server";
+import { ADVISORY_LABELS, type AdvisoryRecommendation } from "~/modules/reviews/advisory-labels";
 import { hodsForDepartment } from "~/modules/users/service.server";
 
 export const meta: Route.MetaFunction = () => [
@@ -456,6 +457,19 @@ export default function StaffIndex({ loaderData, actionData }: Route.ComponentPr
               ["assigned", "With a HOD"],
             ]}
           />
+          <FilterSelect
+            name="advisory"
+            label="Advisor opinion"
+            value={q.advisory}
+            allLabel="Any"
+            options={[
+              ["none", "Not yet reviewed by advisor"],
+              ["any", "Reviewed by advisor (any)"],
+              ["SHORTLIST", ADVISORY_LABELS.SHORTLIST],
+              ["HOLD", ADVISORY_LABELS.HOLD],
+              ["REJECT", ADVISORY_LABELS.REJECT],
+            ]}
+          />
           <div>
             <label htmlFor="f-from" className="block text-sm font-semibold">
               Submitted from
@@ -663,6 +677,7 @@ export default function StaffIndex({ loaderData, actionData }: Route.ComponentPr
                     </Link>
                   </th>
                   <th scope="col">HOD</th>
+                  <th scope="col">Advisor</th>
                 </tr>
               </thead>
               <tbody>
@@ -746,6 +761,32 @@ export default function StaffIndex({ loaderData, actionData }: Route.ComponentPr
                       </td>
                       <td className="text-sm">
                         {r.assignedHod ? (r.assignedHod.profile?.fullName ?? r.assignedHod.email) : "—"}
+                      </td>
+                      <td className="text-sm whitespace-nowrap">
+                        {r.reviews.length === 0 ? (
+                          <span className="text-muted">Not yet</span>
+                        ) : (
+                          r.reviews.map((rv, i) => (
+                            <span key={i} className="mb-1 block last:mb-0">
+                              <Badge
+                                tone={
+                                  rv.recommendation === "SHORTLIST"
+                                    ? "success"
+                                    : rv.recommendation === "REJECT"
+                                      ? "danger"
+                                      : "warning"
+                                }
+                              >
+                                {ADVISORY_LABELS[rv.recommendation as AdvisoryRecommendation] ??
+                                  rv.recommendation}
+                                {rv.score != null && ` · ${rv.score}/5`}
+                              </Badge>
+                              <span className="block text-xs text-muted">
+                                {rv.reviewer.profile?.fullName ?? rv.reviewer.email}
+                              </span>
+                            </span>
+                          ))
+                        )}
                       </td>
                     </tr>
                   );
