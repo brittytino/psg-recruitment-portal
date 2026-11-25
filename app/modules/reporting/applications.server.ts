@@ -311,6 +311,11 @@ export async function dashboardCounts(
   const failed = await prisma.application.count({
     where: { AND: [where, { processingStatus: "FAILED" }] },
   });
+  // External advisor's opinion: visible to every office role (HR, Admin, Dean / Principal), same
+  // as the applications list itself — one click takes them straight to the reviewed ones.
+  const advisoryReviewed = await prisma.application.count({
+    where: { AND: [where, { reviews: { some: { stage: "ADVISORY" } } }] },
+  });
   const count = (...s: string[]) =>
     byStatus.filter((b) => s.includes(b.status)).reduce((n, b) => n + b._count._all, 0);
   let drafts: number | null = null;
@@ -330,6 +335,7 @@ export async function dashboardCounts(
     approved: count("APPROVED"),
     withdrawn: count("WITHDRAWN"),
     processingFailures: failed,
+    advisoryReviewed,
   };
 }
 

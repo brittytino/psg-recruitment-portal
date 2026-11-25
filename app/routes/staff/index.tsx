@@ -1,5 +1,15 @@
 import { useState } from "react";
-import { ArrowLeftRight, CheckCircle2, Clock, Download, FileText, Plus, Users, XCircle } from "lucide-react";
+import {
+  ArrowLeftRight,
+  CheckCircle2,
+  Clock,
+  Download,
+  FileText,
+  Plus,
+  Scale,
+  Users,
+  XCircle,
+} from "lucide-react";
 import { recruitmentName } from "~/modules/reporting/years";
 import { StarRatingView } from "~/components/star-rating";
 import { Form, Link, redirect, useLocation, useNavigation, useSearchParams } from "react-router";
@@ -259,6 +269,13 @@ export default function StaffIndex({ loaderData, actionData }: Route.ComponentPr
               withParams({ status: "HOD_REJECTED", page: 1 }),
               XCircle,
               "red",
+            ],
+            [
+              "Reviewed by advisor",
+              counts.advisoryReviewed,
+              withParams({ advisory: "any", status: null, hod: null, page: 1 }),
+              Scale,
+              "purple",
             ],
           ] as const
         ).map(([label, value, to, icon, accent], i) => (
