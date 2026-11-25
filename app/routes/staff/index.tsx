@@ -1,15 +1,5 @@
 import { useState } from "react";
-import {
-  ArrowLeftRight,
-  CheckCircle2,
-  Clock,
-  Download,
-  FileText,
-  Plus,
-  Scale,
-  Users,
-  XCircle,
-} from "lucide-react";
+import { CheckCircle2, Clock, Download, FileText, Plus, Scale, Users, XCircle } from "lucide-react";
 import { recruitmentName } from "~/modules/reporting/years";
 import { StarRatingView } from "~/components/star-rating";
 import { Form, Link, redirect, useLocation, useNavigation, useSearchParams } from "react-router";
@@ -255,13 +245,6 @@ export default function StaffIndex({ loaderData, actionData }: Route.ComponentPr
               withParams({ status: "HOD_ACCEPTED", page: 1 }),
               CheckCircle2,
               "green",
-            ],
-            [
-              "Position change",
-              counts.hodChanged,
-              withParams({ status: "HOD_RECOMMENDED_CHANGE", page: 1 }),
-              ArrowLeftRight,
-              "purple",
             ],
             [
               "Rejected by HOD",

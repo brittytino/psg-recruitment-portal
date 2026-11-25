@@ -1,6 +1,7 @@
 import type { Route } from "./+types/summary-sheet-export";
 import { auditBestEffort } from "~/modules/audit/audit.server";
 import { clientIp, requireStaff } from "~/lib/http.server";
+import { prisma } from "~/modules/core/db.server";
 import { isDomainError, ValidationError } from "~/modules/core/errors";
 import { logger } from "~/modules/core/logger.server";
 import { csvCell } from "~/modules/reporting/applications.server";
@@ -9,6 +10,7 @@ import {
   SUMMARY_SHEET_COLUMNS,
   type SummarySheetColumnKey,
 } from "~/modules/reporting/columns";
+import { ADVISORY_LABELS, type AdvisoryRecommendation } from "~/modules/reviews/advisory-labels";
 import { listSummarySheets, type SummaryRow } from "~/modules/reviews/service.server";
 
 function parseSummaryColumns(raw: string[]): readonly SummarySheetColumnKey[] {
@@ -35,6 +37,32 @@ export async function loader({ request, params, context }: Route.LoaderArgs) {
   const columns = SUMMARY_SHEET_COLUMNS.filter((c) => cols.includes(c.key));
 
   try {
+    // Neither the HOD's star rating nor the advisor's opinion is part of the sheet's own frozen
+    // snapshot — the advisor reviews only after the HOD's decision is already locked in, so both
+    // are fetched fresh here, by application id, rather than ever being baked into the snapshot.
+    const applicationIds = rows.map((r) => r.applicationId);
+    const [hodRatings, advisoryReviews] = await Promise.all([
+      prisma.application.findMany({
+        where: { id: { in: applicationIds } },
+        select: { id: true, hodRating: true },
+      }),
+      prisma.review.findMany({
+        where: { applicationId: { in: applicationIds }, stage: "ADVISORY" },
+        orderBy: { createdAt: "desc" },
+        select: {
+          applicationId: true,
+          recommendation: true,
+          score: true,
+          reviewer: { select: { email: true, profile: { select: { fullName: true } } } },
+        },
+      }),
+    ]);
+    const hodRatingById = new Map(hodRatings.map((a) => [a.id, a.hodRating]));
+    // Most recent opinion per application; several advisors could in principle each leave one.
+    const advisoryById = new Map<string, (typeof advisoryReviews)[number]>();
+    for (const r of advisoryReviews)
+      if (!advisoryById.has(r.applicationId)) advisoryById.set(r.applicationId, r);
+
     const valueOf = (r: SummaryRow, key: SummarySheetColumnKey) => {
       switch (key) {
         case "sNo":
@@ -51,10 +79,22 @@ export async function loader({ request, params, context }: Route.LoaderArgs) {
           return r.recommendedFor;
         case "decision":
           return r.decision;
+        case "hodRating":
+          return hodRatingById.get(r.applicationId) ?? "";
         case "reason":
           return r.reason;
         case "status":
           return r.status;
+        case "advisorRecommendation": {
+          const rec = advisoryById.get(r.applicationId)?.recommendation;
+          return rec ? (ADVISORY_LABELS[rec as AdvisoryRecommendation] ?? rec) : "Not yet reviewed";
+        }
+        case "advisorRating":
+          return advisoryById.get(r.applicationId)?.score ?? "";
+        case "advisorName": {
+          const reviewer = advisoryById.get(r.applicationId)?.reviewer;
+          return reviewer ? (reviewer.profile?.fullName ?? reviewer.email) : "";
+        }
       }
     };
     const lines = [

@@ -127,9 +127,10 @@ const DEFAULT_COLS: readonly SummarySheetColumnKey[] = SUMMARY_SHEET_COLUMNS.map
  */
 function ExportSheetDialog({ sheetId }: { sheetId: string }) {
   const [cols, setCols] = useState<Set<SummarySheetColumnKey>>(new Set(DEFAULT_COLS));
+  const groups = [...new Set(SUMMARY_SHEET_COLUMNS.map((c) => c.group))];
   return (
     <Modal
-      size="sm"
+      size="md"
       trigger={
         <>
           <Download className="h-4 w-4" aria-hidden="true" /> Download CSV
@@ -137,7 +138,7 @@ function ExportSheetDialog({ sheetId }: { sheetId: string }) {
       }
       icon={<Download className="h-5 w-5" aria-hidden="true" />}
       title="Download CSV"
-      description="Choose which fields to include."
+      description={`Choose which fields to include — ${cols.size} of ${SUMMARY_SHEET_COLUMNS.length} selected. The advisor's opinion and rating are her latest, read fresh (they are never frozen into the sheet, since she reviews after the HOD's decision is already locked in).`}
       closeOnSuccess={false}
     >
       {(close) => (
@@ -159,29 +160,35 @@ function ExportSheetDialog({ sheetId }: { sheetId: string }) {
               Clear
             </button>
           </div>
-          <fieldset className="space-y-1.5">
-            <legend className="sr-only">Fields to include</legend>
-            {SUMMARY_SHEET_COLUMNS.map((c) => (
-              <label key={c.key} className="flex items-center gap-2.5 text-sm">
-                <input
-                  type="checkbox"
-                  name="cols"
-                  value={c.key}
-                  className="h-4 w-4"
-                  checked={cols.has(c.key)}
-                  onChange={(e) =>
-                    setCols((s) => {
-                      const n = new Set(s);
-                      if (e.target.checked) n.add(c.key);
-                      else n.delete(c.key);
-                      return n;
-                    })
-                  }
-                />
-                {c.label}
-              </label>
+          <div className="grid gap-4 sm:grid-cols-3">
+            {groups.map((g) => (
+              <fieldset key={g} className="rounded-xl border border-line p-3">
+                <legend className="px-1 text-sm font-semibold">{g}</legend>
+                <div className="mt-1 space-y-1.5">
+                  {SUMMARY_SHEET_COLUMNS.filter((c) => c.group === g).map((c) => (
+                    <label key={c.key} className="flex items-center gap-2.5 text-sm">
+                      <input
+                        type="checkbox"
+                        name="cols"
+                        value={c.key}
+                        className="h-4 w-4"
+                        checked={cols.has(c.key)}
+                        onChange={(e) =>
+                          setCols((s) => {
+                            const n = new Set(s);
+                            if (e.target.checked) n.add(c.key);
+                            else n.delete(c.key);
+                            return n;
+                          })
+                        }
+                      />
+                      {c.label}
+                    </label>
+                  ))}
+                </div>
+              </fieldset>
             ))}
-          </fieldset>
+          </div>
           <ModalActions>
             <ModalClose className="btn-secondary">Close</ModalClose>
             <button

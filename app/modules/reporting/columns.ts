@@ -66,20 +66,25 @@ export const DEFAULT_EXPORT_COLUMNS: readonly ExportColumnKey[] = [
 
 /**
  * Columns for one department's approved summary sheet CSV (HOD's own download, and the same
- * sheet opened by HR / Admin / Dean-Principal). A summary sheet only ever stores these nine
- * fields per candidate (see SummaryRow) — this list is exactly that, not the larger set above,
- * which reads from the full application record and does not apply to an already-approved sheet.
+ * sheet opened by HR / Admin / Dean-Principal). The first group is exactly what the sheet itself
+ * stores (see SummaryRow), frozen at HOD approval. The advisor reviews afterwards, so her opinion
+ * is never part of that frozen snapshot — the export route fetches it live, by application id, at
+ * download time, same as the HOD's own star rating (also not stored in the frozen snapshot).
  */
 export const SUMMARY_SHEET_COLUMNS = [
-  { key: "sNo", label: "S. No." },
-  { key: "referenceNo", label: "Reference No." },
-  { key: "candidateName", label: "Candidate Name" },
-  { key: "department", label: "Department" },
-  { key: "appliedFor", label: "Applied For" },
-  { key: "recommendedFor", label: "Recommended / Approved" },
-  { key: "decision", label: "HOD Decision" },
-  { key: "reason", label: "Reason / Remarks" },
-  { key: "status", label: "Status" },
+  { key: "sNo", label: "S. No.", group: "Summary" },
+  { key: "referenceNo", label: "Reference No.", group: "Summary" },
+  { key: "candidateName", label: "Candidate Name", group: "Summary" },
+  { key: "department", label: "Department", group: "Summary" },
+  { key: "appliedFor", label: "Applied For", group: "Summary" },
+  { key: "status", label: "Status", group: "Summary" },
+  { key: "recommendedFor", label: "Recommended / Approved", group: "HOD review" },
+  { key: "decision", label: "HOD Decision", group: "HOD review" },
+  { key: "hodRating", label: "HOD Rating", group: "HOD review" },
+  { key: "reason", label: "HOD Reason / Remarks", group: "HOD review" },
+  { key: "advisorRecommendation", label: "Advisor Opinion", group: "Advisor review" },
+  { key: "advisorRating", label: "Advisor Rating", group: "Advisor review" },
+  { key: "advisorName", label: "Reviewed By (Advisor)", group: "Advisor review" },
 ] as const;
 export type SummarySheetColumnKey = (typeof SUMMARY_SHEET_COLUMNS)[number]["key"];
 export const DEFAULT_SUMMARY_SHEET_COLUMNS: readonly SummarySheetColumnKey[] = SUMMARY_SHEET_COLUMNS.map(
