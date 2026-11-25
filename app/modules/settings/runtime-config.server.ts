@@ -119,10 +119,10 @@ export const RUNTIME_ENV_FIELDS = [
   },
   {
     key: "SESSION_TTL_HOURS",
-    label: "Session duration (hours)",
-    help: "Default session lifetime (non-remembered logins).",
+    label: "Staff session duration (hours)",
+    help: "How long staff (HR, HOD, Admin, Dean / Principal, Advisor, Viewer, Super Admin) stay signed in before a fresh one-time code is needed. 168 = one week. Candidates have their own separate, longer 'keep me signed in'.",
     min: 1,
-    max: 72,
+    max: 336,
     unit: "hours",
   },
   {
@@ -268,7 +268,7 @@ export const runtimeEnvInputSchema = z.object({
   OTP_MAX_ATTEMPTS: z.coerce.number().int().min(1).max(20).optional(),
   OTP_MAX_SENDS_PER_HOUR: z.coerce.number().int().min(1).max(50).optional(),
   IP_RATE_LIMIT_MULTIPLIER: z.coerce.number().int().min(1).max(1000).optional(),
-  SESSION_TTL_HOURS: z.coerce.number().int().min(1).max(72).optional(),
+  SESSION_TTL_HOURS: z.coerce.number().int().min(1).max(336).optional(),
   MAX_UPLOAD_MB: z.coerce.number().int().min(1).max(50).optional(),
   MAIL_DAILY_BUDGET: z.coerce.number().int().min(10).max(100000).optional(),
   SMTP_CONNECTION_TIMEOUT_MS: z.coerce.number().int().min(1000).max(60000).optional(),

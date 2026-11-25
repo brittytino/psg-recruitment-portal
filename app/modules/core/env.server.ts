@@ -10,7 +10,10 @@ const schema = z.object({
   REDIS_URL: z.string().min(1),
   SESSION_SECRET: z.string().min(32, "SESSION_SECRET must be at least 32 characters"),
   COOKIE_SECURE: bool.default(false),
-  SESSION_TTL_HOURS: z.coerce.number().int().min(1).max(72).default(12),
+  // Staff session lifetime (candidates have their own separate, longer "keep me signed in").
+  // Up to 336h (14 days), so day-to-day staff accounts can go at least a week without a fresh
+  // sign-in code, without matching the much longer candidate "remember me" window.
+  SESSION_TTL_HOURS: z.coerce.number().int().min(1).max(336).default(168),
   STORAGE_DIR: z.string().min(1),
   MAX_UPLOAD_MB: z.coerce.number().int().min(1).max(50).default(10),
   /**
