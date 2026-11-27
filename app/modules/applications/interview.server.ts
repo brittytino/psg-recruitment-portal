@@ -19,6 +19,7 @@ import type { AppStatus } from "./workflow";
 export const INTERVIEW_FROM: readonly AppStatus[] = [
   "HOD_ACCEPTED",
   "HOD_RECOMMENDED_CHANGE",
+  "HOD_REJECTED",
   "UNDER_HR_REVIEW",
   "SHORTLISTED",
 ];
@@ -28,24 +29,20 @@ export const INTERVIEW_FROM: readonly AppStatus[] = [
  * Shared by the server action and the "Call for interview" button's visibility, so both always
  * agree.
  *
- *  - The HOD's decision is not the only one that can clear a candidate for interview: if the
- *    HOD rejected but the Dean / Principal / Admin accepted on final review, or the external
- *    advisor recommended shortlisting, the call can still go out.
+ *  - The HOD's decision never blocks the call on its own, including a rejection: the Dean /
+ *    Principal, the external advisor and HR – N4 Section itself may or may not review every
+ *    candidate in a given recruitment cycle, so the call must not depend on any of them having
+ *    done so. HR – N4 Section makes the final call on whom to invite.
  *  - Once a call has been sent at least once, sending it again is always allowed — e.g. to
  *    correct wrong venue or instructions text — even if the application has since moved on to
  *    a status this would not otherwise cover.
  */
-export function interviewEligible(
-  app: {
-    status: AppStatus;
-    recruitmentCategory: string;
-    finalDecision: string | null;
-    interviewInvitedAt: Date | string | null;
-  },
-  advisorRecommendedShortlist: boolean,
-): boolean {
+export function interviewEligible(app: {
+  status: AppStatus;
+  recruitmentCategory: string;
+  interviewInvitedAt: Date | string | null;
+}): boolean {
   if (app.interviewInvitedAt) return true;
-  if (app.status === "HOD_REJECTED") return app.finalDecision === "ACCEPT" || advisorRecommendedShortlist;
   if (!INTERVIEW_FROM.includes(app.status)) return false;
   if (app.status === "UNDER_HR_REVIEW" && app.recruitmentCategory !== "RESEARCH") return false;
   return true;
@@ -100,16 +97,10 @@ export async function inviteForInterview(user: SessionUser, id: string, input: u
   });
   if (!app) throw new NotFoundError("Application");
   const status = app.status as AppStatus;
-  const advisorRecommendedShortlist =
-    status === "HOD_REJECTED" && !app.interviewInvitedAt && app.finalDecision !== "ACCEPT"
-      ? (await prisma.review.count({
-          where: { applicationId: id, stage: "ADVISORY", recommendation: "SHORTLIST" },
-        })) > 0
-      : false;
-  if (!interviewEligible(app, advisorRecommendedShortlist))
+  if (!interviewEligible(app))
     throw new ConflictError(
       app.recruitmentCategory === "FACULTY"
-        ? "The interview call is sent after the HOD, the Dean / Principal or the external advisor has accepted the application"
+        ? "The interview call is sent after the HOD has recorded a decision"
         : "Start HR screening before calling the candidate for interview",
     );
   if (app.positionChanges.some((c) => c.status === "PENDING"))

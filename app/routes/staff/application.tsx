@@ -156,10 +156,7 @@ export async function loader({ request, params, context }: Route.LoaderArgs) {
     canInterview:
       isOffice &&
       hasPermission(user.grants, "application:transition") &&
-      interviewEligible(
-        app,
-        advisory.some((a) => a.recommendation === "SHORTLIST"),
-      ) &&
+      interviewEligible(app) &&
       !app.positionChanges.some((c) => c.status === "PENDING"),
     // Default venue / instructions text to start the interview-call form from (editable before sending).
     interviewKit: isOffice
