@@ -9,7 +9,7 @@ import { FORM_LABELS, POSITION_LABELS } from "~/lib/labels";
 import { getStaffApplication, transition, updateInternalNote } from "~/modules/applications/service.server";
 import { advisoryOpinionsFor } from "~/modules/reviews/advisory.server";
 import { ADVISORY_LABELS } from "~/modules/reviews/advisory-labels";
-import { INTERVIEW_FROM, inviteForInterview } from "~/modules/applications/interview.server";
+import { interviewEligible, inviteForInterview } from "~/modules/applications/interview.server";
 import { getInterviewKit } from "~/modules/settings/interview-kit.server";
 import { CalendarCheck, Download, Eye, Gavel } from "lucide-react";
 import { StarRatingInput, StarRatingView } from "~/components/star-rating";
@@ -73,6 +73,9 @@ export async function loader({ request, params, context }: Route.LoaderArgs) {
         ? (POSITION_LABELS[app.vacancy.position] ?? app.vacancy.position)
         : "Research Assistant"));
   const current = app.generated.filter((g) => g.revisionId === app.currentRevisionId && g.status === "READY");
+  // Flow: HOD review, then the external advisor, then Dean / Principal. Read only, for the office;
+  // also used below to decide whether the interview call can be sent despite a HOD rejection.
+  const advisory = isOffice ? await advisoryOpinionsFor(app.id) : [];
   return {
     app: {
       id: app.id,
@@ -153,8 +156,10 @@ export async function loader({ request, params, context }: Route.LoaderArgs) {
     canInterview:
       isOffice &&
       hasPermission(user.grants, "application:transition") &&
-      INTERVIEW_FROM.includes(app.status as AppStatus) &&
-      (app.status !== "UNDER_HR_REVIEW" || app.recruitmentCategory === "RESEARCH") &&
+      interviewEligible(
+        app,
+        advisory.some((a) => a.recommendation === "SHORTLIST"),
+      ) &&
       !app.positionChanges.some((c) => c.status === "PENDING"),
     // Default venue / instructions text to start the interview-call form from (editable before sending).
     interviewKit: isOffice
@@ -166,8 +171,7 @@ export async function loader({ request, params, context }: Route.LoaderArgs) {
         }))
       : null,
     hods: isOffice && app.vacancy.departmentId ? await hodsForDepartment(app.vacancy.departmentId) : [],
-    // Flow: HOD review, then the external advisor, then Dean / Principal. Read only, for the office.
-    advisory: isOffice ? await advisoryOpinionsFor(app.id) : [],
+    advisory,
     changeOptions: allowedChanges(applied),
   };
 }

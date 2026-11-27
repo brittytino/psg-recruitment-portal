@@ -23,6 +23,34 @@ export const INTERVIEW_FROM: readonly AppStatus[] = [
   "SHORTLISTED",
 ];
 
+/**
+ * Whether the interview call can be sent (or re-sent to correct a mistake), for one application.
+ * Shared by the server action and the "Call for interview" button's visibility, so both always
+ * agree.
+ *
+ *  - The HOD's decision is not the only one that can clear a candidate for interview: if the
+ *    HOD rejected but the Dean / Principal / Admin accepted on final review, or the external
+ *    advisor recommended shortlisting, the call can still go out.
+ *  - Once a call has been sent at least once, sending it again is always allowed — e.g. to
+ *    correct wrong venue or instructions text — even if the application has since moved on to
+ *    a status this would not otherwise cover.
+ */
+export function interviewEligible(
+  app: {
+    status: AppStatus;
+    recruitmentCategory: string;
+    finalDecision: string | null;
+    interviewInvitedAt: Date | string | null;
+  },
+  advisorRecommendedShortlist: boolean,
+): boolean {
+  if (app.interviewInvitedAt) return true;
+  if (app.status === "HOD_REJECTED") return app.finalDecision === "ACCEPT" || advisorRecommendedShortlist;
+  if (!INTERVIEW_FROM.includes(app.status)) return false;
+  if (app.status === "UNDER_HR_REVIEW" && app.recruitmentCategory !== "RESEARCH") return false;
+  return true;
+}
+
 const schema = z.object({
   interviewAt: z
     .string()
@@ -72,14 +100,18 @@ export async function inviteForInterview(user: SessionUser, id: string, input: u
   });
   if (!app) throw new NotFoundError("Application");
   const status = app.status as AppStatus;
-  if (!INTERVIEW_FROM.includes(status))
+  const advisorRecommendedShortlist =
+    status === "HOD_REJECTED" && !app.interviewInvitedAt && app.finalDecision !== "ACCEPT"
+      ? (await prisma.review.count({
+          where: { applicationId: id, stage: "ADVISORY", recommendation: "SHORTLIST" },
+        })) > 0
+      : false;
+  if (!interviewEligible(app, advisorRecommendedShortlist))
     throw new ConflictError(
       app.recruitmentCategory === "FACULTY"
-        ? "The interview call is sent after the HOD has accepted the application"
+        ? "The interview call is sent after the HOD, the Dean / Principal or the external advisor has accepted the application"
         : "Start HR screening before calling the candidate for interview",
     );
-  if (status === "UNDER_HR_REVIEW" && app.recruitmentCategory !== "RESEARCH")
-    throw new ConflictError("Faculty applications need the HOD's decision before the interview call");
   if (app.positionChanges.some((c) => c.status === "PENDING"))
     throw new ConflictError("Approve or reject the HOD's position-change recommendation first");
 
