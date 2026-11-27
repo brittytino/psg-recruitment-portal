@@ -13,6 +13,7 @@ import { experiencePeriods } from "~/modules/forms/validation";
 import { totalDuration } from "~/modules/forms/experience";
 import type { Answers, TableRow } from "~/modules/forms/types";
 import { DEFAULT_EXPORT_COLUMNS, EXPORT_COLUMNS, type ExportColumnKey } from "./columns";
+import { ADVISORY_LABELS, type AdvisoryRecommendation } from "~/modules/reviews/advisory-labels";
 
 import { DEFAULT_PAGE_SIZE, PAGE_SIZES } from "./constants";
 import { YEAR_PATTERN, yearOfVacancy, yearRange } from "./years";
@@ -439,6 +440,18 @@ const exportInclude = {
   assignedHod: { select: { email: true, profile: { select: { fullName: true } } } },
   currentRevision: true,
   positionChanges: { orderBy: { createdAt: "desc" as const }, take: 1 },
+  // The external advisor's opinion, read live: she reviews after a department summary sheet may
+  // already be approved, so this must never come from a frozen snapshot of any kind.
+  reviews: {
+    where: { stage: "ADVISORY" as const },
+    orderBy: { createdAt: "desc" as const },
+    take: 1,
+    select: {
+      recommendation: true,
+      score: true,
+      reviewer: { select: { email: true, profile: { select: { fullName: true } } } },
+    },
+  },
 } satisfies Prisma.ApplicationInclude;
 
 export type ExportRecord = Prisma.ApplicationGetPayload<{ include: typeof exportInclude }>;
@@ -462,6 +475,11 @@ export function exportValue(key: ExportColumnKey, r: ExportRecord, sNo: number):
     const q = rows("collegeQualifications").find((x) => x.level === lvl);
     return q ? `${s(q.score)}${String(q.scoreType ?? "").startsWith("CGPA") ? " CGPA" : "%"}` : "";
   };
+  const collegeOf = (lvl: string) => {
+    const q = rows("collegeQualifications").find((x) => x.level === lvl);
+    return q ? s(q.college) : "";
+  };
+  const advisory = r.reviews[0];
   const pc = r.positionChanges[0];
   const months = r.currentRevision?.totalExperienceMonths;
   const nature = (n: string) =>
@@ -482,6 +500,8 @@ export function exportValue(key: ExportColumnKey, r: ExportRecord, sNo: number):
       return s(a.age);
     case "community":
       return s(a.community ?? a.communityCategory);
+    case "caste":
+      return s(a.caste);
     case "email":
       return s(a.email ?? r.candidate.email);
     case "mobile":
@@ -519,6 +539,21 @@ export function exportValue(key: ExportColumnKey, r: ExportRecord, sNo: number):
       return degree("PG");
     case "pgScore":
       return score("PG");
+    case "qualificationsSummary": {
+      const parts = [
+        degree("UG") && `UG: ${degree("UG")}${score("UG") ? ` (${score("UG")})` : ""}`,
+        degree("PG") && `PG: ${degree("PG")}${score("PG") ? ` (${score("PG")})` : ""}`,
+        r.currentRevision?.phdStatus && `Ph.D.: ${s(r.currentRevision.phdStatus)}`,
+      ].filter(Boolean);
+      return parts.join(" | ");
+    }
+    case "collegeStudied": {
+      const parts = [
+        collegeOf("UG") && `UG: ${collegeOf("UG")}`,
+        collegeOf("PG") && `PG: ${collegeOf("PG")}`,
+      ].filter(Boolean);
+      return parts.join(" | ");
+    }
     case "phdStatus":
       return s(r.currentRevision?.phdStatus);
     case "phdUniversity":
@@ -533,6 +568,8 @@ export function exportValue(key: ExportColumnKey, r: ExportRecord, sNo: number):
       return nature("Industry");
     case "currentEmployer":
       return current ? `${s(current.designation)}, ${s(current.institution)}` : "";
+    case "currentlyEmployed":
+      return current ? "Yes" : "No";
     case "lastDrawnPay":
       return s(a.lastDrawnPay);
     case "expectedPay":
@@ -547,6 +584,13 @@ export function exportValue(key: ExportColumnKey, r: ExportRecord, sNo: number):
       return rows("booksPublished").length || "";
     case "bookChapters":
       return rows("bookChapters").length || "";
+    case "totalPublications":
+      return (
+        (r.currentRevision?.journalCount ?? 0) +
+        (r.currentRevision?.conferenceCount ?? 0) +
+        rows("booksPublished").length +
+        rows("bookChapters").length
+      );
     case "hIndex":
       return s(a.hIndex);
     case "i10Index":
@@ -579,6 +623,21 @@ export function exportValue(key: ExportColumnKey, r: ExportRecord, sNo: number):
       return pc ? `${POSITION_LABELS[pc.toPosition]} (${pc.status.toLowerCase()})` : "";
     case "hodReason":
       return [r.hodDecisionReason, r.hodRemarks].filter(Boolean).join(" — ");
+    case "hodRating":
+      return r.hodRating ?? "";
+    case "advisorRecommendation":
+      return advisory
+        ? (ADVISORY_LABELS[advisory.recommendation as AdvisoryRecommendation] ?? advisory.recommendation)
+        : "Not yet reviewed";
+    case "advisorRating":
+      return advisory?.score ?? "";
+    case "advisorName":
+      return advisory ? (advisory.reviewer.profile?.fullName ?? advisory.reviewer.email) : "";
+    // Whether an interview call has actually been sent — not simply "status is Shortlisted", since
+    // the HOD's decision alone never decides this: the Dean / Principal or the advisor may have
+    // cleared a HOD-rejected candidate, and HR - N4 Section makes the final call either way.
+    case "shortlistedForInterview":
+      return r.interviewInvitedAt ? "Yes" : "No";
     case "status":
       return STATUS_LABELS[r.status as AppStatus];
     case "submittedAt":

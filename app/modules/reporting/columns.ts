@@ -1,4 +1,10 @@
-/** Exportable summary columns (shared by the export page checkboxes and the CSV builder). */
+/**
+ * Exportable columns — shared by the office "Applications" export and the department summary
+ * sheet download (HOD's own, and the same one HR / Admin / Dean-Principal open). One catalogue
+ * for both, computed from the live application record every time: a candidate's status, the
+ * HOD's rating and the external advisor's opinion can all change after a summary sheet was
+ * approved, so the export always reflects the latest decision, never a frozen value.
+ */
 export const EXPORT_COLUMNS = [
   { key: "sNo", label: "S. No.", group: "Summary" },
   { key: "referenceNo", label: "Reference No.", group: "Summary" },
@@ -14,6 +20,7 @@ export const EXPORT_COLUMNS = [
   { key: "dateOfBirth", label: "Date of Birth", group: "Personal" },
   { key: "age", label: "Age", group: "Personal" },
   { key: "community", label: "Community", group: "Personal" },
+  { key: "caste", label: "Caste", group: "Personal" },
   { key: "email", label: "E-mail", group: "Contact" },
   { key: "mobile", label: "Mobile", group: "Contact" },
   { key: "city", label: "Present Address (City, District, State)", group: "Contact" },
@@ -26,6 +33,8 @@ export const EXPORT_COLUMNS = [
   { key: "ugScore", label: "UG CGPA / %", group: "Qualifications" },
   { key: "pgDegree", label: "PG Degree", group: "Qualifications" },
   { key: "pgScore", label: "PG CGPA / %", group: "Qualifications" },
+  { key: "qualificationsSummary", label: "Qualifications (UG/PG/Ph.D.)", group: "Qualifications" },
+  { key: "collegeStudied", label: "College Studied (UG/PG)", group: "Qualifications" },
   { key: "phdStatus", label: "Ph.D. Status", group: "Qualifications" },
   { key: "phdUniversity", label: "Ph.D. University", group: "Qualifications" },
   { key: "arrears", label: "Arrear Papers", group: "Qualifications" },
@@ -33,6 +42,7 @@ export const EXPORT_COLUMNS = [
   { key: "teachingExperience", label: "Teaching Experience", group: "Experience" },
   { key: "industryExperience", label: "Industry Experience", group: "Experience" },
   { key: "currentEmployer", label: "Present Post", group: "Experience" },
+  { key: "currentlyEmployed", label: "Currently Employed (Y/N)", group: "Experience" },
   { key: "lastDrawnPay", label: "Last Drawn Pay (Rs.)", group: "Experience" },
   { key: "expectedPay", label: "Expected Pay (Rs.)", group: "Experience" },
   { key: "joiningTime", label: "Joining Time", group: "Experience" },
@@ -40,6 +50,7 @@ export const EXPORT_COLUMNS = [
   { key: "conferences", label: "Conference Papers", group: "Research" },
   { key: "books", label: "Books", group: "Research" },
   { key: "bookChapters", label: "Book Chapters", group: "Research" },
+  { key: "totalPublications", label: "Total No. of Publications", group: "Research" },
   { key: "hIndex", label: "h-index", group: "Research" },
   { key: "i10Index", label: "i10-index", group: "Research" },
   { key: "citations", label: "Citations", group: "Research" },
@@ -50,8 +61,17 @@ export const EXPORT_COLUMNS = [
   { key: "examDetails", label: "Exam Details (year, score)", group: "Competitive exams" },
   { key: "hod", label: "Reviewing HOD", group: "HOD review" },
   { key: "hodDecision", label: "HOD Decision", group: "HOD review" },
+  { key: "hodRating", label: "HOD Rating", group: "HOD review" },
   { key: "recommendedFor", label: "Recommended Position", group: "HOD review" },
   { key: "hodReason", label: "HOD Reason / Remarks", group: "HOD review" },
+  { key: "advisorRecommendation", label: "Advisor Opinion", group: "Advisor review" },
+  { key: "advisorRating", label: "Advisor Rating", group: "Advisor review" },
+  { key: "advisorName", label: "Reviewed By (Advisor)", group: "Advisor review" },
+  {
+    key: "shortlistedForInterview",
+    label: "Shortlisted for Interview (Y/N)",
+    group: "Interview",
+  },
 ] as const;
 
 export type ExportColumnKey = (typeof EXPORT_COLUMNS)[number]["key"];
@@ -65,28 +85,8 @@ export const DEFAULT_EXPORT_COLUMNS: readonly ExportColumnKey[] = [
 ];
 
 /**
- * Columns for one department's approved summary sheet CSV (HOD's own download, and the same
- * sheet opened by HR / Admin / Dean-Principal). The first group is exactly what the sheet itself
- * stores (see SummaryRow), frozen at HOD approval. The advisor reviews afterwards, so her opinion
- * is never part of that frozen snapshot — the export route fetches it live, by application id, at
- * download time, same as the HOD's own star rating (also not stored in the frozen snapshot).
+ * Every column, for the department summary sheet download (HOD's own, HR's, Admin's and Dean /
+ * Principal's) — the same catalogue as the office export above, so nothing is unavailable there
+ * that is available here. Everything is selected by default; unchecking narrows it.
  */
-export const SUMMARY_SHEET_COLUMNS = [
-  { key: "sNo", label: "S. No.", group: "Summary" },
-  { key: "referenceNo", label: "Reference No.", group: "Summary" },
-  { key: "candidateName", label: "Candidate Name", group: "Summary" },
-  { key: "department", label: "Department", group: "Summary" },
-  { key: "appliedFor", label: "Applied For", group: "Summary" },
-  { key: "status", label: "Status", group: "Summary" },
-  { key: "recommendedFor", label: "Recommended / Approved", group: "HOD review" },
-  { key: "decision", label: "HOD Decision", group: "HOD review" },
-  { key: "hodRating", label: "HOD Rating", group: "HOD review" },
-  { key: "reason", label: "HOD Reason / Remarks", group: "HOD review" },
-  { key: "advisorRecommendation", label: "Advisor Opinion", group: "Advisor review" },
-  { key: "advisorRating", label: "Advisor Rating", group: "Advisor review" },
-  { key: "advisorName", label: "Reviewed By (Advisor)", group: "Advisor review" },
-] as const;
-export type SummarySheetColumnKey = (typeof SUMMARY_SHEET_COLUMNS)[number]["key"];
-export const DEFAULT_SUMMARY_SHEET_COLUMNS: readonly SummarySheetColumnKey[] = SUMMARY_SHEET_COLUMNS.map(
-  (c) => c.key,
-);
+export const DEFAULT_SUMMARY_SHEET_COLUMNS: readonly ExportColumnKey[] = EXPORT_COLUMNS.map((c) => c.key);

@@ -8,7 +8,11 @@ import { PageHeader } from "~/components/staff";
 import { clientIp, handleAction, readForm, requireStaff } from "~/lib/http.server";
 import { hasPermission } from "~/modules/auth/permissions";
 import { prisma } from "~/modules/core/db.server";
-import { SUMMARY_SHEET_COLUMNS, type SummarySheetColumnKey } from "~/modules/reporting/columns";
+import {
+  DEFAULT_SUMMARY_SHEET_COLUMNS,
+  EXPORT_COLUMNS,
+  type ExportColumnKey,
+} from "~/modules/reporting/columns";
 import { listSummarySheets, reopenSummarySheet, type SummaryRow } from "~/modules/reviews/service.server";
 import { SummaryTable } from "~/components/summary-table";
 
@@ -118,19 +122,35 @@ export default function SummarySheetPage({ loaderData, actionData }: Route.Compo
   );
 }
 
-const DEFAULT_COLS: readonly SummarySheetColumnKey[] = SUMMARY_SHEET_COLUMNS.map((c) => c.key);
+const DEFAULT_COLS: readonly ExportColumnKey[] = DEFAULT_SUMMARY_SHEET_COLUMNS;
+const DECISION_COLS: readonly ExportColumnKey[] = [
+  "sNo",
+  "candidateName",
+  "department",
+  "appliedFor",
+  "status",
+  "hodDecision",
+  "hodRating",
+  "recommendedFor",
+  "advisorRecommendation",
+  "advisorRating",
+  "advisorName",
+  "shortlistedForInterview",
+];
 
 /**
  * Choose which columns to include before downloading the CSV — the same "pick your fields"
  * option HR – N4 Section and Dean / Admin already have on the Applications export, here for a
- * HOD's own department sheet too.
+ * HOD's own department sheet too. Every field is read live (see summary-sheet-export.ts), so a
+ * HOD rejection overruled later, or an advisor opinion recorded after the sheet was approved,
+ * always shows its current state here, never what was true at the moment of approval.
  */
 function ExportSheetDialog({ sheetId }: { sheetId: string }) {
-  const [cols, setCols] = useState<Set<SummarySheetColumnKey>>(new Set(DEFAULT_COLS));
-  const groups = [...new Set(SUMMARY_SHEET_COLUMNS.map((c) => c.group))];
+  const [cols, setCols] = useState<Set<ExportColumnKey>>(new Set(DEFAULT_COLS));
+  const groups = [...new Set(EXPORT_COLUMNS.map((c) => c.group))];
   return (
     <Modal
-      size="md"
+      size="xl"
       trigger={
         <>
           <Download className="h-4 w-4" aria-hidden="true" /> Download CSV
@@ -138,7 +158,7 @@ function ExportSheetDialog({ sheetId }: { sheetId: string }) {
       }
       icon={<Download className="h-5 w-5" aria-hidden="true" />}
       title="Download CSV"
-      description={`Choose which fields to include — ${cols.size} of ${SUMMARY_SHEET_COLUMNS.length} selected. The advisor's opinion and rating are her latest, read fresh (they are never frozen into the sheet, since she reviews after the HOD's decision is already locked in).`}
+      description={`Choose which fields to include — ${cols.size} of ${EXPORT_COLUMNS.length} selected. Every field reflects the current, live record: the HOD's decision, the external advisor's opinion and rating, and whether an interview call has actually been sent — not what was true when this sheet was approved.`}
       closeOnSuccess={false}
     >
       {(close) => (
@@ -156,16 +176,23 @@ function ExportSheetDialog({ sheetId }: { sheetId: string }) {
             >
               Select all
             </button>
+            <button
+              type="button"
+              className="btn-secondary btn-sm"
+              onClick={() => setCols(new Set(DECISION_COLS))}
+            >
+              Decisions only
+            </button>
             <button type="button" className="btn-ghost btn-sm" onClick={() => setCols(new Set())}>
               Clear
             </button>
           </div>
-          <div className="grid gap-4 sm:grid-cols-3">
+          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
             {groups.map((g) => (
               <fieldset key={g} className="rounded-xl border border-line p-3">
                 <legend className="px-1 text-sm font-semibold">{g}</legend>
                 <div className="mt-1 space-y-1.5">
-                  {SUMMARY_SHEET_COLUMNS.filter((c) => c.group === g).map((c) => (
+                  {EXPORT_COLUMNS.filter((c) => c.group === g).map((c) => (
                     <label key={c.key} className="flex items-center gap-2.5 text-sm">
                       <input
                         type="checkbox"
